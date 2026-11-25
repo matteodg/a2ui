@@ -141,7 +141,12 @@ final class SuiteRegistry {
             Map.of("data_model", new DataModelHandler()), Map.of(), Set.of("data_model")));
     suites.put("core/data_model_pointers.yaml", new Unsupported(NOT_YET));
     suites.put("core/error_responses.yaml", new Unsupported(NOT_YET));
-    suites.put("core/expressions.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/expressions.yaml",
+        new Supported(
+            Map.of("parse_expression_template", new ParseExpressionTemplateHandler()),
+            Map.of("validate", NOT_YET),
+            Set.of("parse_expression_template")));
     suites.put("core/functions.yaml", new Unsupported(NOT_YET));
     suites.put("core/index_function.yaml", new Unsupported(NOT_YET));
     suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
