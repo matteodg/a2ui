@@ -87,7 +87,8 @@ class SuiteRegistryTest {
 
   @Test
   void anUnsupportedActionSkipsItsCasesWithItsReason() {
-    Supported supported = new Supported(Map.of(), Map.of("validate", "later"), Set.of());
+    Supported supported =
+        new Supported(Map.of(), SuiteRegistry.reasons("validate", "later"), Set.of());
     ConformanceCase testCase =
         caseOf(Map.of("name", "a", "action", "validate", "protocolVersion", "1.0"));
 
@@ -96,7 +97,8 @@ class SuiteRegistryTest {
 
   @Test
   void anUnsupportedKeyPathSkipsOnlyTheCasesThatSetTheKey() {
-    Supported supported = new Supported(Map.of(), Map.of("load.expect.deep", "later"), Set.of());
+    Supported supported =
+        new Supported(Map.of(), SuiteRegistry.reasons("load.expect.deep", "later"), Set.of());
     Map<String, Object> deep = new LinkedHashMap<>();
     deep.put("deep", null);
     ConformanceCase setsKey = caseOf(Map.of("name", "a", "action", "load", "expect", deep));
@@ -108,6 +110,32 @@ class SuiteRegistryTest {
     assertEquals("later", SuiteRegistry.skipReason(setsKey, supported));
     assertNull(SuiteRegistry.skipReason(otherKey, supported));
     assertNull(SuiteRegistry.skipReason(otherAction, supported));
+  }
+
+  @Test
+  void theFirstUnsupportedKeyThatAppliesGivesTheReason() {
+    ConformanceCase testCase =
+        caseOf(Map.of("name", "a", "action", "load", "expect", Map.of("first", 1, "second", 2)));
+    Supported firstThenSecond =
+        new Supported(
+            Map.of(),
+            SuiteRegistry.reasons("load.expect.first", "one", "load.expect.second", "two"),
+            Set.of());
+    Supported secondThenFirst =
+        new Supported(
+            Map.of(),
+            SuiteRegistry.reasons("load.expect.second", "two", "load.expect.first", "one"),
+            Set.of());
+
+    assertEquals("one", SuiteRegistry.skipReason(testCase, firstThenSecond));
+    assertEquals("two", SuiteRegistry.skipReason(testCase, secondThenFirst));
+  }
+
+  @Test
+  void reasonsFailsForAKeyWithNoReasonAndForAKeyThatIsThereTwice() {
+    assertThrows(IllegalArgumentException.class, () -> SuiteRegistry.reasons("load"));
+    assertThrows(
+        IllegalArgumentException.class, () -> SuiteRegistry.reasons("load", "one", "load", "two"));
   }
 
   @Test
@@ -133,7 +161,7 @@ class SuiteRegistryTest {
 
   @Test
   void anActionForEachVersionRunsACaseOfADifferentProtocolVersion() {
-    Supported supported = new Supported(Map.of(), Map.of(), Set.of("data_model"));
+    Supported supported = new Supported(Map.of(), SuiteRegistry.reasons(), Set.of("data_model"));
     ConformanceCase testCase =
         caseOf(Map.of("name", "a", "action", "data_model", "protocolVersion", "v0.9"));
 

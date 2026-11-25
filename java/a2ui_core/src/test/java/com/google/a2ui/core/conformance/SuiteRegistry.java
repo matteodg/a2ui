@@ -20,6 +20,7 @@ import com.google.a2ui.core.schema.v1_0.SchemaDocuments;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /** The list of the core suites and the support that this harness gives to each suite. */
@@ -42,16 +43,20 @@ final class SuiteRegistry {
    * @param unsupported the cases that this harness does not run, each with its reason. A key is an
    *     action ({@code validate}), or an action and the path of a key ({@code
    *     from_json.expect.selfContained}). The second form applies only to the cases of the action
-   *     that set that key. The harness records the cases as skipped.
+   *     that set that key. The harness records the cases as skipped. If two keys apply to one case,
+   *     the first key in the sequence of the map gives the reason. Thus the reason is the same in
+   *     each run. {@link SuiteRegistry#reasons(String...)} makes such a map.
    * @param anyVersion the actions that run for each protocol version label. The behavior that they
    *     examine is the same in each version, and the SDK has one implementation.
    */
   record Supported(
-      Map<String, CaseHandler> actions, Map<String, String> unsupported, Set<String> anyVersion)
+      Map<String, CaseHandler> actions,
+      SequencedMap<String, String> unsupported,
+      Set<String> anyVersion)
       implements SuiteSupport {
     /** Makes the support for a suite where each action runs and the version label is important. */
     Supported(Map<String, CaseHandler> actions) {
-      this(actions, Map.of(), Set.of());
+      this(actions, reasons(), Set.of());
     }
   }
 
@@ -87,6 +92,26 @@ final class SuiteRegistry {
   static final Map<String, SuiteSupport> CORE_SUITES = coreSuites();
 
   private SuiteRegistry() {}
+
+  /**
+   * Makes a map for {@link Supported#unsupported()} that keeps the sequence of its entries.
+   *
+   * @param keysAndReasons each key, and after it the reason to skip the cases that the key applies
+   *     to
+   * @return the map. It is read-only.
+   */
+  static SequencedMap<String, String> reasons(String... keysAndReasons) {
+    if (keysAndReasons.length % 2 != 0) {
+      throw new IllegalArgumentException("Each key must have a reason.");
+    }
+    SequencedMap<String, String> reasons = new LinkedHashMap<>();
+    for (int i = 0; i < keysAndReasons.length; i += 2) {
+      if (reasons.put(keysAndReasons[i], keysAndReasons[i + 1]) != null) {
+        throw new IllegalArgumentException("The key " + keysAndReasons[i] + " is there twice.");
+      }
+    }
+    return Collections.unmodifiableSequencedMap(reasons);
+  }
 
   /**
    * Gets the reason to skip a case.
@@ -174,7 +199,7 @@ final class SuiteRegistry {
                 "to_json", new ToJsonHandler(),
                 "round_trip", new RoundTripHandler(),
                 "derive", new DeriveHandler()),
-            Map.of(
+            reasons(
                 "validation_schema", NEEDS_VALIDATION_SCHEMA,
                 "from_json.expect.selfContained", NEEDS_VALIDATION_SCHEMA,
                 "from_json.expect.validComponents", NEEDS_COMPONENT_VALIDATION,
@@ -184,25 +209,25 @@ final class SuiteRegistry {
         "core/common_types.yaml",
         new Supported(
             Map.of("common_types_schema", new SchemaDocumentHandler(SchemaDocuments::commonTypes)),
-            Map.of("validate_common_type", NEEDS_VALIDATOR),
+            reasons("validate_common_type", NEEDS_VALIDATOR),
             Set.of()));
     suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/data_context.yaml",
         new Supported(
-            Map.of("resolve_path", new ResolvePathHandler()), Map.of(), Set.of("resolve_path")));
+            Map.of("resolve_path", new ResolvePathHandler()), reasons(), Set.of("resolve_path")));
     suites.put("core/data_deletion.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/data_model.yaml",
         new Supported(
-            Map.of("data_model", new DataModelHandler()), Map.of(), Set.of("data_model")));
+            Map.of("data_model", new DataModelHandler()), reasons(), Set.of("data_model")));
     suites.put("core/data_model_pointers.yaml", new Unsupported(NOT_YET));
     suites.put("core/error_responses.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/expressions.yaml",
         new Supported(
             Map.of("parse_expression_template", new ParseExpressionTemplateHandler()),
-            Map.of("validate", NOT_YET),
+            reasons("validate", NOT_YET),
             Set.of("parse_expression_template")));
     suites.put("core/functions.yaml", new Unsupported(NOT_YET));
     suites.put("core/index_function.yaml", new Unsupported(NOT_YET));
