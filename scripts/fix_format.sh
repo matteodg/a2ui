@@ -31,6 +31,7 @@ SKIP_PYTHON=false
 SKIP_DART=false
 SKIP_SWIFT=false
 SKIP_KOTLIN=false
+SKIP_JAVA=false
 for arg in "$@"; do
   case "$arg" in
     --check)
@@ -42,6 +43,7 @@ for arg in "$@"; do
       SKIP_DART=true
       SKIP_SWIFT=false
       SKIP_KOTLIN=true
+      SKIP_JAVA=true
       ;;
     --skip-prettier)
       SKIP_PRETTIER=true
@@ -58,9 +60,12 @@ for arg in "$@"; do
     --skip-kotlin)
       SKIP_KOTLIN=true
       ;;
+    --skip-java)
+      SKIP_JAVA=true
+      ;;
     *)
       echo "Unknown option: $arg" >&2
-      echo "Usage: $0 [--check] [--only-swift] [--skip-prettier] [--skip-python] [--skip-dart] [--skip-swift] [--skip-kotlin]" >&2
+      echo "Usage: $0 [--check] [--only-swift] [--skip-prettier] [--skip-python] [--skip-dart] [--skip-swift] [--skip-kotlin] [--skip-java]" >&2
       exit 2
       ;;
   esac
@@ -204,6 +209,21 @@ if [ "$SKIP_KOTLIN" = false ]; then
     done < <(find "$REPO_ROOT" \( -name build -o -name .gradle -o -name node_modules -o -name .git -o -name .yarn -o -name .dart_tool \) -prune -o -name "build.gradle.kts" -print0)
   else
     echo "Warning: no Java runtime found. Skipping Kotlin formatting."
+  fi
+fi
+
+if [ "$SKIP_JAVA" = false ]; then
+  echo "Running google-java-format for Java files..."
+  cd "$REPO_ROOT/java"
+  # Do a test of the runtime. On macOS, /usr/bin/java is on PATH when no JDK is installed.
+  if java -version >/dev/null 2>&1; then
+    if [ "$CHECK_ONLY" = true ]; then
+      ./mvnw -q -B spotless:check
+    else
+      ./mvnw -q -B spotless:apply
+    fi
+  else
+    echo "Warning: no Java runtime found. Skipping Java formatting."
   fi
 fi
 

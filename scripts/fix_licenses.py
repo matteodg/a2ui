@@ -44,6 +44,7 @@ IGNORE_PATTERNS = [
     "**/.venv/**",
     "**/node_modules/**",
     "**/build/**",
+    "**/target/**",
     "**/dist/**",
     "**/.wireit/**",
     "**/.next/**",
