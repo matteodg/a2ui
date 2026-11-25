@@ -64,7 +64,7 @@
         <directory>src/main/resources</directory>
       </resource>
       <!--
-        The build copies the v1.0 schemas from the repository. Thus the SDK
+        The build copies the v1.0 schemas and the basic catalog from the repository. Thus the SDK
         does not contain a copy that a person can edit.
       -->
       <resource>
@@ -76,6 +76,13 @@
         <excludes>
           <exclude>sample.json</exclude>
         </excludes>
+      </resource>
+      <resource>
+        <directory>${a2ui.repoRoot}/catalogs/basic/v1</directory>
+        <targetPath>com/google/a2ui/core/basic_catalog/v1_0</targetPath>
+        <includes>
+          <include>catalog.json</include>
+        </includes>
       </resource>
     </resources>
   </build>

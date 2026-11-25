@@ -21,6 +21,7 @@
  * UI code.
  */
 module com.google.a2ui.core {
+  exports com.google.a2ui.core.basic_catalog.v1_0;
   exports com.google.a2ui.core.catalog;
   exports com.google.a2ui.core.common;
   exports com.google.a2ui.core.exceptions;
