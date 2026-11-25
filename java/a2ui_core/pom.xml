@@ -35,6 +35,11 @@
   </properties>
 
   <dependencies>
+    <!-- Unicode properties for the UAX #31 identifiers. -->
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
