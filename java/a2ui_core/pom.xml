@@ -57,4 +57,26 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!--
+        The build copies the v1.0 schemas from the repository. Thus the SDK
+        does not contain a copy that a person can edit.
+      -->
+      <resource>
+        <directory>${a2ui.repoRoot}/specification/v1_0/json</directory>
+        <targetPath>com/google/a2ui/core/schema/v1_0</targetPath>
+        <includes>
+          <include>*.json</include>
+        </includes>
+        <excludes>
+          <exclude>sample.json</exclude>
+        </excludes>
+      </resource>
+    </resources>
+  </build>
 </project>
