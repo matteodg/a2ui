@@ -38,8 +38,10 @@ final class SuiteRegistry {
    * <p>An action that is in no map fails its case.
    *
    * @param actions the handler for each action that this harness runs
-   * @param unsupported the actions that this harness does not run, each with its reason. The
-   *     harness records their cases as skipped.
+   * @param unsupported the cases that this harness does not run, each with its reason. A key is an
+   *     action ({@code validate}), or an action and the path of a key ({@code
+   *     from_json.expect.selfContained}). The second form applies only to the cases of the action
+   *     that set that key. The harness records the cases as skipped.
    * @param anyVersion the actions that run for each protocol version label. The behavior that they
    *     examine is the same in each version, and the SDK has one implementation.
    */
@@ -94,8 +96,10 @@ final class SuiteRegistry {
     }
     Supported supported = (Supported) support;
     String action = testCase.action();
-    if (action != null && supported.unsupported().containsKey(action)) {
-      return supported.unsupported().get(action);
+    for (Map.Entry<String, String> entry : supported.unsupported().entrySet()) {
+      if (matchesUnsupported(testCase, entry.getKey())) {
+        return entry.getValue();
+      }
     }
     String version = testCase.protocolVersion();
     boolean versionMatters = action == null || !supported.anyVersion().contains(action);
@@ -117,6 +121,29 @@ final class SuiteRegistry {
           "Unknown action '" + testCase.action() + "' in " + testCase.location());
     }
     return handler;
+  }
+
+  /**
+   * Tells if a key of {@code unsupported} applies to a case.
+   *
+   * <p>The key applies if its action is the action of the case and the case sets the key path that
+   * follows the action. A key with no path applies to each case of the action.
+   *
+   * @param target the key, for example {@code from_json.expect.selfContained}
+   */
+  static boolean matchesUnsupported(ConformanceCase testCase, String target) {
+    String[] parts = target.split("[.]");
+    if (!parts[0].equals(testCase.action())) {
+      return false;
+    }
+    Object current = testCase.fields();
+    for (int i = 1; i < parts.length; i++) {
+      if (!(current instanceof Map<?, ?> map) || !map.containsKey(parts[i])) {
+        return false;
+      }
+      current = map.get(parts[i]);
+    }
+    return true;
   }
 
   private static Map<String, SuiteSupport> coreSuites() {

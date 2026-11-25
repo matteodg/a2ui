@@ -95,6 +95,43 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void anUnsupportedKeyPathSkipsOnlyTheCasesThatSetTheKey() {
+    Supported supported = new Supported(Map.of(), Map.of("load.expect.deep", "later"), Set.of());
+    Map<String, Object> deep = new LinkedHashMap<>();
+    deep.put("deep", null);
+    ConformanceCase setsKey = caseOf(Map.of("name", "a", "action", "load", "expect", deep));
+    ConformanceCase otherKey =
+        caseOf(Map.of("name", "b", "action", "load", "expect", Map.of("shallow", 1)));
+    ConformanceCase otherAction =
+        caseOf(Map.of("name", "c", "action", "save", "expect", Map.of("deep", 1)));
+
+    assertEquals("later", SuiteRegistry.skipReason(setsKey, supported));
+    assertNull(SuiteRegistry.skipReason(otherKey, supported));
+    assertNull(SuiteRegistry.skipReason(otherAction, supported));
+  }
+
+  @Test
+  void eachRegisteredHandlerAndEachUnsupportedEntryMatchesACase() {
+    SuiteRegistry.CORE_SUITES.forEach((suite, support) -> {
+      if (!(support instanceof Supported supported)) {
+        return;
+      }
+      List<ConformanceCase> cases = ConformanceLoader.loadSuite(suite);
+      Set<String> withNoCase = new TreeSet<>(supported.actions().keySet());
+      cases.forEach(testCase -> withNoCase.remove(testCase.action()));
+      Set<String> unmatched = new TreeSet<>(supported.unsupported().keySet());
+      unmatched.removeIf(target ->
+          cases.stream().anyMatch(testCase -> SuiteRegistry.matchesUnsupported(testCase, target)));
+      Set<String> anyVersionWithNoHandler = new TreeSet<>(supported.anyVersion());
+      anyVersionWithNoHandler.removeAll(supported.actions().keySet());
+
+      assertEquals(Set.of(), withNoCase, "Handlers for " + suite + " with no case");
+      assertEquals(Set.of(), unmatched, "Unsupported entries for " + suite + " with no case");
+      assertEquals(Set.of(), anyVersionWithNoHandler, "anyVersion in " + suite);
+    });
+  }
+
+  @Test
   void anActionForEachVersionRunsACaseOfADifferentProtocolVersion() {
     Supported supported = new Supported(Map.of(), Map.of(), Set.of("data_model"));
     ConformanceCase testCase =
