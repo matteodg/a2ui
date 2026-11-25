@@ -21,6 +21,8 @@
  * UI code.
  */
 module com.google.a2ui.core {
+  exports com.google.a2ui.core.state;
+
   requires com.ibm.icu;
 
   exports com.google.a2ui.core.common;
