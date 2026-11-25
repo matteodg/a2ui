@@ -20,4 +20,6 @@
  * <p>This module contains the state model and the protocol logic of the A2UI client SDK. It has no
  * UI code.
  */
-module com.google.a2ui.core {}
+module com.google.a2ui.core {
+  exports com.google.a2ui.core.exceptions;
+}
