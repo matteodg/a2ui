@@ -16,6 +16,7 @@
 
 package com.google.a2ui.core.conformance;
 
+import com.google.a2ui.core.schema.v1_0.SchemaDocuments;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -68,6 +69,8 @@ final class SuiteRegistry {
   static final Map<String, String> SKIP_TEST_NAMES = Map.of();
 
   private static final String NOT_YET = "Not implemented in java-core yet";
+  private static final String NEEDS_VALIDATOR =
+      "Needs the JSON Schema validator, which java-core does not have yet";
   private static final String NEEDS_VALIDATION_SCHEMA =
       "Needs the flattened validation schema of a catalog, which java-core does not have yet";
   private static final String NEEDS_COMPONENT_VALIDATION =
@@ -157,7 +160,12 @@ final class SuiteRegistry {
     suites.put("core/adapter_conformance.yaml", new Unsupported(ADAPTER));
     suites.put("core/add_catalog.yaml", new Unsupported(NOT_YET));
     suites.put("core/agent_function_routing.yaml", new Unsupported(NOT_YET));
-    suites.put("core/agent_to_renderer.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/agent_to_renderer.yaml",
+        new Supported(
+            Map.of(
+                "agent_to_renderer_schema",
+                new SchemaDocumentHandler(SchemaDocuments::agentToRenderer))));
     suites.put(
         "core/catalog.yaml",
         new Supported(
@@ -172,7 +180,12 @@ final class SuiteRegistry {
                 "from_json.expect.validComponents", NEEDS_COMPONENT_VALIDATION,
                 "from_json.expect.invalidComponents", NEEDS_COMPONENT_VALIDATION),
             Set.of()));
-    suites.put("core/common_types.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/common_types.yaml",
+        new Supported(
+            Map.of("common_types_schema", new SchemaDocumentHandler(SchemaDocuments::commonTypes)),
+            Map.of("validate_common_type", NEEDS_VALIDATOR),
+            Set.of()));
     suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/data_context.yaml",
