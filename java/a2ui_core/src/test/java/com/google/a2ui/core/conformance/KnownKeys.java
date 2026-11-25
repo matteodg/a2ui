@@ -16,6 +16,8 @@
 
 package com.google.a2ui.core.conformance;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +27,18 @@ final class KnownKeys {
   static final Set<String> CASE_METADATA_KEYS = Set.of("name", "description", "features");
 
   private KnownKeys() {}
+
+  /**
+   * Makes the set of the keys that a handler accepts in a case.
+   *
+   * @param keys the keys that the handler reads
+   * @return the given keys and {@link #CASE_METADATA_KEYS}
+   */
+  static Set<String> caseKeys(String... keys) {
+    Set<String> all = new HashSet<>(CASE_METADATA_KEYS);
+    all.addAll(List.of(keys));
+    return Set.copyOf(all);
+  }
 
   /**
    * Fails if a map has a key that is not permitted.

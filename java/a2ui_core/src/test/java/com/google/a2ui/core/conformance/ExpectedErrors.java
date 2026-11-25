@@ -65,7 +65,7 @@ final class ExpectedErrors {
    * Runs a block and fails if it does not throw the expected error.
    *
    * <p>The error must be an instance of the class for the {@code category}. Its message must
-   * contain a match for the regular expression {@code message}.
+   * contain the text {@code message}, or a match for {@code message} as a regular expression.
    *
    * @param expectError the expectation of the case
    * @param where the location for failure messages
@@ -111,7 +111,10 @@ final class ExpectedErrors {
     if (pattern != null) {
       String regex = asString(pattern, "expectError.message in " + where);
       String message = thrown.getMessage() == null ? "" : thrown.getMessage();
-      if (!Pattern.compile(regex).matcher(message).find()) {
+      // Some suites write a message as plain text that is not a correct pattern, for example
+      // "external $ref". Thus a message that contains the text as the suite writes it is also a
+      // match.
+      if (!message.contains(regex) && !Pattern.compile(regex).matcher(message).find()) {
         throw new AssertionError(
             where + ": expected a message matching /" + regex + "/ but got '" + message + "'",
             thrown);

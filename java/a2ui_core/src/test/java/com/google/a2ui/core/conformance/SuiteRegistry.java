@@ -68,6 +68,10 @@ final class SuiteRegistry {
   static final Map<String, String> SKIP_TEST_NAMES = Map.of();
 
   private static final String NOT_YET = "Not implemented in java-core yet";
+  private static final String NEEDS_VALIDATION_SCHEMA =
+      "Needs the flattened validation schema of a catalog, which java-core does not have yet";
+  private static final String NEEDS_COMPONENT_VALIDATION =
+      "Needs the validation of component instances, which java-core does not have yet";
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
@@ -154,7 +158,20 @@ final class SuiteRegistry {
     suites.put("core/add_catalog.yaml", new Unsupported(NOT_YET));
     suites.put("core/agent_function_routing.yaml", new Unsupported(NOT_YET));
     suites.put("core/agent_to_renderer.yaml", new Unsupported(NOT_YET));
-    suites.put("core/catalog.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/catalog.yaml",
+        new Supported(
+            Map.of(
+                "from_json", new FromJsonHandler(),
+                "to_json", new ToJsonHandler(),
+                "round_trip", new RoundTripHandler(),
+                "derive", new DeriveHandler()),
+            Map.of(
+                "validation_schema", NEEDS_VALIDATION_SCHEMA,
+                "from_json.expect.selfContained", NEEDS_VALIDATION_SCHEMA,
+                "from_json.expect.validComponents", NEEDS_COMPONENT_VALIDATION,
+                "from_json.expect.invalidComponents", NEEDS_COMPONENT_VALIDATION),
+            Set.of()));
     suites.put("core/common_types.yaml", new Unsupported(NOT_YET));
     suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
     suites.put(
