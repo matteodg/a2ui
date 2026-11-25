@@ -10,10 +10,12 @@ The module implements the A2UI protocol v1.0. The design obeys
 
 The Java module name is `com.google.a2ui.core`. It exports these packages:
 
-| Package                           | Contents                                                                  |
-| :-------------------------------- | :------------------------------------------------------------------------ |
-| `com.google.a2ui.core.exceptions` | `A2uiError` and its subclasses. Each failure of the core is one of these. |
-| `com.google.a2ui.core.common`     | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`.             |
+| Package                            | Contents                                                                  |
+| :--------------------------------- | :------------------------------------------------------------------------ |
+| `com.google.a2ui.core.exceptions`  | `A2uiError` and its subclasses. Each failure of the core is one of these. |
+| `com.google.a2ui.core.common`      | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`.             |
+| `com.google.a2ui.core.state`       | `DataModel`, the observable store of the data of one surface.             |
+| `com.google.a2ui.core.expressions` | `ExpressionParser`, the parser for `${...}` templates.                    |
 
 ## Threads
 
@@ -39,6 +41,33 @@ Reactive.batch(() -> {
   first.set(1);
   second.set(2);
 });
+```
+
+## Data model
+
+A `DataModel` holds JSON values in plain JVM types: `Map<String, Object>`, `List<Object>`, `String`,
+`Long`, `Double`, `Boolean` and `null`. The paths are JSON Pointers (RFC 6901).
+
+```java
+DataModel model = new DataModel(Map.of("user", Map.of("name", "Ada")));
+DataSubscription subscription = model.subscribe("/user/name", value -> System.out.println(value));
+
+model.set("/user/name", "Grace"); // Prints "Grace".
+Object user = model.get("/user"); // A read-only copy: {name=Grace}
+model.delete("/user/name");
+```
+
+The model makes a copy of each value that goes in or out. A write that fails does not change the
+model.
+
+## Expression templates
+
+`ExpressionParser.parseTemplate` divides a `formatString` template into literals, data paths and
+function calls.
+
+```java
+List<Expression> parts = ExpressionParser.parseTemplate("Hello, ${/user/name}!");
+// [Literal[value=Hello, ], Path[path=/user/name], Literal[value=!]]
 ```
 
 ## Tests
