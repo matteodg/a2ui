@@ -45,5 +45,11 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- The conformance suites need a YAML 1.2 parser. -->
+    <dependency>
+      <groupId>org.snakeyaml</groupId>
+      <artifactId>snakeyaml-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
