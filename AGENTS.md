@@ -86,6 +86,7 @@ For a detailed explanation of the methodology, lifecycle, and workflows, read th
 - **`python/`**: Core state SDK (`a2ui_core/`), framework-agnostic agent SDK (`a2ui_agent/`), agent framework integrations for A2A (`a2ui_a2a/`) and ADK (`a2ui_adk/`), and catalog packages (`catalogs/`) for Python.
 - **`conformance/`**: Language-agnostic test suites (`core/`, `agent/`, `extensions/`) and test data (`test_data/`) for verifying behavioral parity across all SDK implementations.
 - **`dart/`**: Dart implementations including core state model (`a2ui_core/`), agent SDK (`a2ui_agent/`), and Flutter framework adapter (`a2ui_flutter/`).
+- **`java/`**: Java client SDK built with Maven, including the core state model (`a2ui_core/`).
 - **`kotlin/`**: Legacy Kotlin agent SDK (`agent_sdk_legacy/`).
 - **`typescript/`**: Framework-agnostic Web Core state and protocol logic (`core/web_core/`), web framework renderers (`renderers/lit/`, `renderers/angular/`, `renderers/react/`), Markdown renderer (`renderers/markdown-it/`), TypeScript agent SDK (`agents/a2ui_agent/`), TypeScript catalog packages (`catalogs/`), and release scripts (`scripts/`).
 - **`samples/`**: Ready-to-run demo agents utilizing Python ADK (`agent/adk/`), MCP server (`agent/mcp/`), and sample clients (`client/lit/`, `client/angular/`, `client/react/`, `client/flutter/`).
