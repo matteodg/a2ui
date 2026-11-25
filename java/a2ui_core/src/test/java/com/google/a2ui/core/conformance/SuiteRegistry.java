@@ -35,9 +35,22 @@ final class SuiteRegistry {
   /**
    * The harness runs the suite. It selects the handler from the {@code action} of each case.
    *
-   * @param actions the handler for each action
+   * <p>An action that is in no map fails its case.
+   *
+   * @param actions the handler for each action that this harness runs
+   * @param unsupported the actions that this harness does not run, each with its reason. The
+   *     harness records their cases as skipped.
+   * @param anyVersion the actions that run for each protocol version label. The behavior that they
+   *     examine is the same in each version, and the SDK has one implementation.
    */
-  record Supported(Map<String, CaseHandler> actions) implements SuiteSupport {}
+  record Supported(
+      Map<String, CaseHandler> actions, Map<String, String> unsupported, Set<String> anyVersion)
+      implements SuiteSupport {
+    /** Makes the support for a suite where each action runs and the version label is important. */
+    Supported(Map<String, CaseHandler> actions) {
+      this(actions, Map.of(), Set.of());
+    }
+  }
 
   /**
    * The harness records each case of the suite as skipped.
@@ -79,8 +92,14 @@ final class SuiteRegistry {
     if (support instanceof Unsupported unsupported) {
       return unsupported.reason();
     }
+    Supported supported = (Supported) support;
+    String action = testCase.action();
+    if (action != null && supported.unsupported().containsKey(action)) {
+      return supported.unsupported().get(action);
+    }
     String version = testCase.protocolVersion();
-    if (version != null && !SUPPORTED_PROTOCOL_VERSIONS.contains(version)) {
+    boolean versionMatters = action == null || !supported.anyVersion().contains(action);
+    if (versionMatters && version != null && !SUPPORTED_PROTOCOL_VERSIONS.contains(version)) {
       return "Protocol version " + version + " is not supported; " + V1_ONLY;
     }
     return null;
@@ -111,9 +130,15 @@ final class SuiteRegistry {
     suites.put("core/catalog.yaml", new Unsupported(NOT_YET));
     suites.put("core/common_types.yaml", new Unsupported(NOT_YET));
     suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
-    suites.put("core/data_context.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/data_context.yaml",
+        new Supported(
+            Map.of("resolve_path", new ResolvePathHandler()), Map.of(), Set.of("resolve_path")));
     suites.put("core/data_deletion.yaml", new Unsupported(NOT_YET));
-    suites.put("core/data_model.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/data_model.yaml",
+        new Supported(
+            Map.of("data_model", new DataModelHandler()), Map.of(), Set.of("data_model")));
     suites.put("core/data_model_pointers.yaml", new Unsupported(NOT_YET));
     suites.put("core/error_responses.yaml", new Unsupported(NOT_YET));
     suites.put("core/expressions.yaml", new Unsupported(NOT_YET));

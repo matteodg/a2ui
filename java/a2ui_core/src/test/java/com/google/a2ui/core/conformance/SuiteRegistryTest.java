@@ -86,6 +86,24 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void anUnsupportedActionSkipsItsCasesWithItsReason() {
+    Supported supported = new Supported(Map.of(), Map.of("validate", "later"), Set.of());
+    ConformanceCase testCase =
+        caseOf(Map.of("name", "a", "action", "validate", "protocolVersion", "1.0"));
+
+    assertEquals("later", SuiteRegistry.skipReason(testCase, supported));
+  }
+
+  @Test
+  void anActionForEachVersionRunsACaseOfADifferentProtocolVersion() {
+    Supported supported = new Supported(Map.of(), Map.of(), Set.of("data_model"));
+    ConformanceCase testCase =
+        caseOf(Map.of("name", "a", "action", "data_model", "protocolVersion", "v0.9"));
+
+    assertNull(SuiteRegistry.skipReason(testCase, supported));
+  }
+
+  @Test
   void handlerForSelectsTheHandlerOfTheAction() {
     CaseHandler handler = testCase -> {};
     Supported supported = new Supported(Map.of("get", handler));
