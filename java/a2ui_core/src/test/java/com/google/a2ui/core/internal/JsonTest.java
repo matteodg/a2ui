@@ -130,4 +130,30 @@ class JsonTest {
     assertEquals("a/b~c", Json.unescapePointer("a~1b~0c"));
     assertEquals("~1", Json.unescapePointer(Json.escapePointer("~1")));
   }
+
+  @Test
+  void writeMakesTextThatParseReadsBackToTheSameValue() {
+    Map<String, Object> value = new LinkedHashMap<>();
+    value.put("s", "a \"b\" \n \\ ü");
+    value.put("i", 7L);
+    value.put("d", 1.5);
+    value.put("t", true);
+    value.put("n", null);
+    value.put("l", List.of(1L, Map.of()));
+
+    String text = Json.write(value);
+
+    assertEquals(value, Json.parse(text));
+    assertEquals(
+        "{\"z\":1,\"a\":[true,null,\"x\"]}",
+        Json.write(Json.parse("{\"z\": 1, \"a\": [true, null, \"x\"]}")));
+  }
+
+  @Test
+  void writeFailsForAValueThatIsNotPlainJson() {
+    assertThrows(IllegalArgumentException.class, () -> Json.write(Map.of("a", new Object())));
+    assertThrows(IllegalArgumentException.class, () -> Json.write(List.of(1)));
+    assertThrows(IllegalArgumentException.class, () -> Json.write(Double.NaN));
+    assertThrows(IllegalArgumentException.class, () -> Json.write(Map.of(1, "a")));
+  }
 }

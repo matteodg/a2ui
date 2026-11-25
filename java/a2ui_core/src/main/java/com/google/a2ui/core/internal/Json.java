@@ -19,6 +19,7 @@ package com.google.a2ui.core.internal;
 import com.google.a2ui.core.exceptions.A2uiParseError;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -30,9 +31,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
 import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.json.JsonFactory;
 
 /**
@@ -68,6 +71,22 @@ public final class Json {
     } catch (JacksonException e) {
       throw new A2uiParseError("Invalid JSON: " + e.getOriginalMessage(), e);
     }
+  }
+
+  /**
+   * Writes a JSON value as JSON text. The text has no spaces and no line breaks.
+   *
+   * @param value the value to write. It is a plain value, as {@link #parse(String)} and {@link
+   *     #freeze(Object)} make them.
+   * @return the text
+   * @throws IllegalArgumentException if the value contains an object that is not a plain JSON value
+   */
+  public static String write(Object value) {
+    StringWriter text = new StringWriter();
+    try (JsonGenerator generator = FACTORY.createGenerator(ObjectWriteContext.empty(), text)) {
+      write(generator, value);
+    }
+    return text.toString();
   }
 
   /**
@@ -184,6 +203,38 @@ public final class Json {
    */
   public static String unescapePointer(String segment) {
     return segment.replace("~1", "/").replace("~0", "~");
+  }
+
+  private static void write(JsonGenerator generator, Object value) {
+    switch (value) {
+      case null -> generator.writeNull();
+      case String s -> generator.writeString(s);
+      case Boolean b -> generator.writeBoolean(b);
+      case Long l -> generator.writeNumber(l);
+      case Double d -> generator.writeNumber(finite(d));
+      case Map<?, ?> map -> {
+        generator.writeStartObject();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+          if (!(entry.getKey() instanceof String key)) {
+            throw new IllegalArgumentException(
+                "A JSON object key must be a string, but got: " + entry.getKey());
+          }
+          generator.writeName(key);
+          write(generator, entry.getValue());
+        }
+        generator.writeEndObject();
+      }
+      case List<?> list -> {
+        generator.writeStartArray();
+        for (Object item : list) {
+          write(generator, item);
+        }
+        generator.writeEndArray();
+      }
+      default ->
+          throw new IllegalArgumentException(
+              "Not a plain JSON value: " + value.getClass().getName());
+    }
   }
 
   private static Object read(JsonParser parser, JsonToken token) {
