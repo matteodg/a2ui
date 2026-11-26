@@ -19,8 +19,16 @@ package com.google.a2ui.core.state;
 import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.common.Coercion;
+import com.google.a2ui.core.common.EventNotifier;
+import com.google.a2ui.core.common.EventSource;
 import com.google.a2ui.core.common.ProtocolVersion;
+import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.ErrorFields;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,6 +57,9 @@ public final class SurfaceModel<C extends ComponentApi> {
   private final A2uiMetadata metadata;
   private final DataModel dataModel = new DataModel();
   private final SurfaceComponentsModel componentsModel = new SurfaceComponentsModel();
+  private final EventNotifier<RendererAction> actions = new EventNotifier<>();
+  private final EventNotifier<A2uiError> errors = new EventNotifier<>();
+  private final EventNotifier<SurfaceModel<C>> disposing = new EventNotifier<>();
 
   /**
    * Makes a surface that has no data and no components.
@@ -199,10 +210,135 @@ public final class SurfaceModel<C extends ComponentApi> {
     return defaultCatalog;
   }
 
-  /** Removes each component and each listener of the components and of the data. */
+  /**
+   * Gets the source of the action events. An event occurs when a component of this surface reports
+   * an action for the agent.
+   *
+   * @return the event source
+   */
+  public EventSource<RendererAction> onAction() {
+    return actions;
+  }
+
+  /**
+   * Gets the source of the error events. An event occurs when a problem occurs on this surface
+   * after the processor accepted its messages. Examples are a binding that the core cannot
+   * evaluate, a component of an unknown type and a cycle of references.
+   *
+   * <p>The agent must know about each such problem. The other parts of the surface continue to
+   * operate.
+   *
+   * @return the event source
+   */
+  public EventSource<A2uiError> onError() {
+    return errors;
+  }
+
+  /**
+   * Gets the source of the event that occurs one time, when {@link #dispose()} starts. At that time
+   * the surface has its components and its data.
+   *
+   * @return the event source. The event is this surface.
+   */
+  public EventSource<SurfaceModel<C>> onDisposing() {
+    return disposing;
+  }
+
+  /**
+   * Reports an event action to the listeners of {@link #onAction()}, with no {@code
+   * action.metadata}. See {@link #dispatchAction(Map, String, A2uiMetadata)}.
+   *
+   * @param payload the action as a component declares it, with resolved bindings
+   * @param sourceComponentId the ID of the component that the user operated
+   * @throws A2uiValidationError if the event has no name
+   * @throws IllegalArgumentException if the context is not JSON
+   */
+  public void dispatchAction(Map<String, ?> payload, String sourceComponentId) {
+    dispatchAction(payload, sourceComponentId, null);
+  }
+
+  /**
+   * Reports an event action to the listeners of {@link #onAction()}.
+   *
+   * <p>The payload is an action as a component declares it: <code>
+   * {"event": {"name": ..., "context": ..., "userMessage": ...}}</code>. The caller resolves its
+   * bindings before the call. A {@code functionCall} action is work of the renderer. Thus the
+   * surface reports nothing for a payload that has no {@code event}.
+   *
+   * @param payload the action as a component declares it, with resolved bindings
+   * @param sourceComponentId the ID of the component that the user operated
+   * @param metadata the {@code action.metadata} to send with the action, or null
+   * @throws A2uiValidationError if the event has no name, or if a key of the extensions of the
+   *     metadata is not a UAX #31 identifier
+   * @throws IllegalArgumentException if the context is not JSON
+   */
+  public void dispatchAction(
+      Map<String, ?> payload, String sourceComponentId, A2uiMetadata metadata) {
+    Objects.requireNonNull(payload, "payload");
+    Objects.requireNonNull(sourceComponentId, "sourceComponentId");
+    if (!(payload.get("event") instanceof Map<?, ?> event)) {
+      return;
+    }
+    if (!(event.get("name") instanceof String name)) {
+      throw new A2uiValidationError("An event action needs a name.");
+    }
+    Optional<Map<String, Object>> extensions =
+        metadata == null ? Optional.empty() : metadata.extensions();
+    for (String key : extensions.orElse(Map.of()).keySet()) {
+      if (!Uax31.isIdentifier(key)) {
+        throw new A2uiValidationError("Extension key '" + key + "' is not a UAX #31 identifier.");
+      }
+    }
+    Map<String, Object> context = new LinkedHashMap<>();
+    if (event.get("context") instanceof Map<?, ?> written) {
+      written.forEach((key, value) -> context.put(String.valueOf(key), value));
+    }
+    String defaultId = defaultCatalog == null ? null : defaultCatalog.id();
+    Optional<String> sourceCatalog =
+        componentsModel
+            .get(sourceComponentId)
+            .map(component -> component.catalog().id())
+            .filter(catalogId -> !catalogId.equals(defaultId));
+    actions.emit(
+        new RendererAction(
+            name,
+            id,
+            sourceComponentId,
+            Instant.now(),
+            context,
+            Optional.ofNullable(event.get("userMessage")).map(Coercion::toText),
+            sourceCatalog,
+            extensions.map(map -> metadata)));
+  }
+
+  /**
+   * Reports an error to the listeners of {@link #onError()}. If the error names no surface, this
+   * method writes the ID of this surface on it.
+   *
+   * <p>The view of a component uses this method for a failure of its own that the agent must know
+   * about.
+   *
+   * @param error the error to report
+   */
+  public void dispatchError(A2uiError error) {
+    Objects.requireNonNull(error, "error");
+    if (error.surfaceId().isEmpty()) {
+      ErrorFields.surfaceId(error, id);
+    }
+    errors.emit(error);
+  }
+
+  /**
+   * Notifies the listeners of {@link #onDisposing()}. Then removes each component and each listener
+   * of the surface.
+   */
   public void dispose() {
+    disposing.emit(this);
+    disposing.dispose();
     componentsModel.dispose();
     dataModel.dispose();
+    actions.dispose();
+    errors.dispose();
   }
 
   @Override

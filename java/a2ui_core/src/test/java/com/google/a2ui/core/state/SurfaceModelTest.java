@@ -29,8 +29,14 @@ import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionApi;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.ErrorFields;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -118,6 +124,125 @@ class SurfaceModelTest {
 
     assertTrue(surface.componentsModel().all().isEmpty());
     assertEquals(List.of(), values);
+  }
+
+  @Test
+  void disposeNotifiesTheListenersBeforeItRemovesTheComponents() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    surface
+        .componentsModel()
+        .addComponent(new ComponentModel("root", "Text", BASIC, Map.of(), null, null, null));
+    List<Integer> counts = new ArrayList<>();
+    surface.onDisposing().subscribe(model -> counts.add(model.componentsModel().all().size()));
+
+    surface.dispose();
+    surface.dispose();
+
+    assertEquals(List.of(1), counts);
+  }
+
+  @Test
+  void dispatchActionReportsAnEventWithItsContext() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    surface
+        .componentsModel()
+        .addComponent(new ComponentModel("save", "Button", BASIC, Map.of(), null, null, null));
+    List<RendererAction> actions = new ArrayList<>();
+    surface.onAction().subscribe(actions::add);
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("who", "Ada");
+    context.put("count", 2L);
+    Instant before = Instant.now();
+
+    surface.dispatchAction(
+        Map.of("event", Map.of("name", "submit", "context", context, "userMessage", 7L)), "save");
+
+    assertEquals(1, actions.size());
+    RendererAction action = actions.getFirst();
+    assertEquals("submit", action.name());
+    assertEquals("s", action.surfaceId());
+    assertEquals("save", action.sourceComponentId());
+    assertFalse(action.timestamp().isBefore(before));
+    assertEquals(context, action.context());
+    assertThrows(UnsupportedOperationException.class, () -> action.context().put("x", 1L));
+    assertEquals(Optional.of("7"), action.userMessage());
+    assertEquals(Optional.empty(), action.catalogId());
+    assertEquals(Optional.empty(), action.metadata());
+    assertEquals(
+        List.of("name", "userMessage", "surfaceId", "sourceComponentId", "timestamp", "context"),
+        List.copyOf(action.toJson().keySet()));
+    assertEquals(action.timestamp().toString(), action.toJson().get("timestamp"));
+  }
+
+  @Test
+  void dispatchActionNamesTheCatalogOfTheSourceIfItIsNotTheDefaultCatalog() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    surface
+        .componentsModel()
+        .addComponent(new ComponentModel("gauge", "Gauge", OTHER, Map.of(), null, null, null));
+    List<RendererAction> actions = new ArrayList<>();
+    surface.onAction().subscribe(actions::add);
+    A2uiMetadata metadata = new A2uiMetadata(Optional.of(Map.of("com_example_trace", "t1")));
+
+    surface.dispatchAction(Map.of("event", Map.of("name", "read")), "gauge", metadata);
+
+    RendererAction action = actions.getFirst();
+    assertEquals(Map.of(), action.context());
+    assertEquals(Optional.empty(), action.userMessage());
+    assertEquals(Optional.of("urn:other"), action.catalogId());
+    assertEquals(Optional.of(metadata), action.metadata());
+    assertEquals("urn:other", action.toJson().get("catalogId"));
+    assertEquals(
+        Map.of("extensions", Map.of("com_example_trace", "t1")), action.toJson().get("metadata"));
+  }
+
+  @Test
+  void dispatchActionReportsNothingForAFunctionCall() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    List<RendererAction> actions = new ArrayList<>();
+    surface.onAction().subscribe(actions::add);
+
+    surface.dispatchAction(Map.of("functionCall", Map.of("@call", "openUrl")), "root");
+
+    assertEquals(List.of(), actions);
+  }
+
+  @Test
+  void dispatchActionRejectsAnEventWithNoNameAndAnExtensionKeyThatIsNoIdentifier() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    List<RendererAction> actions = new ArrayList<>();
+    surface.onAction().subscribe(actions::add);
+    A2uiMetadata metadata = new A2uiMetadata(Optional.of(Map.of("not an identifier", 1L)));
+
+    A2uiValidationError noName =
+        assertThrows(
+            A2uiValidationError.class,
+            () -> surface.dispatchAction(Map.of("event", Map.of()), "root"));
+    A2uiValidationError badKey =
+        assertThrows(
+            A2uiValidationError.class,
+            () -> surface.dispatchAction(Map.of("event", Map.of("name", "a")), "root", metadata));
+
+    assertEquals("An event action needs a name.", noName.getMessage());
+    assertEquals(
+        "Extension key 'not an identifier' is not a UAX #31 identifier.", badKey.getMessage());
+    assertEquals(List.of(), actions);
+  }
+
+  @Test
+  void dispatchErrorWritesTheSurfaceOfAnErrorThatNamesNone() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    List<A2uiError> errors = new ArrayList<>();
+    surface.onError().subscribe(errors::add);
+    A2uiError plain = new A2uiExpressionError("The binding failed.");
+    A2uiError named = ErrorFields.surfaceId(new A2uiExpressionError("Other."), "other");
+
+    surface.dispatchError(plain);
+    surface.dispatchError(named);
+
+    assertEquals(List.of(plain, named), errors);
+    assertEquals(Optional.of("s"), plain.surfaceId());
+    assertEquals(Optional.of("other"), named.surfaceId());
   }
 
   private static SurfaceModel<ComponentApi> surface(Catalog<ComponentApi, FunctionApi> defaults) {
