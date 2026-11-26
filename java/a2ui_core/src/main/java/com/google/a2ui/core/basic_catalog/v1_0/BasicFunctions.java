@@ -34,6 +34,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -241,8 +242,9 @@ final class BasicFunctions {
    */
   private static String formatString(Object template, DataContext context) {
     StringBuilder text = new StringBuilder();
-    for (Expression part : ExpressionParser.parseTemplate(Coercion.toText(template))) {
-      text.append(Coercion.toText(context.evaluate(part)));
+    List<Expression> parts = ExpressionParser.parseTemplate(Coercion.toText(template));
+    for (Object value : context.evaluateTemplate(parts)) {
+      text.append(Coercion.toText(value));
     }
     return text.toString();
   }

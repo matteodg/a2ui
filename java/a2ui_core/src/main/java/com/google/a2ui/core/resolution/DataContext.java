@@ -25,7 +25,10 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
+import com.google.a2ui.core.exceptions.A2uiRpcError;
+import com.google.a2ui.core.exceptions.RpcErrorCode;
 import com.google.a2ui.core.expressions.Expression;
+import com.google.a2ui.core.internal.AgentCalls;
 import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.state.DataModel;
@@ -45,8 +48,15 @@ import java.util.function.Supplier;
  * The scope in which the core evaluates a data binding or a function call: a surface, a position in
  * the data of the surface, and the permissions of the caller.
  *
- * <p>Each call that a context evaluates is a call of the renderer: a property binding, a check or
- * an action. Thus a context refuses a function that only the agent can call.
+ * <p>Each call that such a context evaluates is a call of the renderer: a property binding, a check
+ * or an action. Thus the context refuses a function that only the agent can call.
+ *
+ * <p>The core also makes a context for a {@code callRendererFunction} message. Each call that this
+ * context evaluates is a call of the agent. This is also the rule for a call in an argument and for
+ * a call in a template. This context permits a function that only the agent can call. It refuses a
+ * function that only the renderer can call, and a function that requires a user gesture when there
+ * is none. Such a refusal is an {@link A2uiRpcError} with the code {@link
+ * RpcErrorCode#INVALID_FUNCTION_CALL}. An application cannot make this context.
  *
  * <p>A context cannot change. {@link #nested(String)} and {@link #withUserActivation()} make a new
  * context.
@@ -65,6 +75,9 @@ public final class DataContext {
   private final String path;
   private final int index;
   private final boolean userActivated;
+
+  /** True if each call that this context evaluates is a call of the agent. */
+  private final boolean agentCaller;
 
   /**
    * The catalog of the function that runs in this context, or null if no function runs in it. A
@@ -101,7 +114,8 @@ public final class DataContext {
         NO_INDEX,
         false,
         null,
-        null);
+        null,
+        false);
   }
 
   private DataContext(
@@ -110,13 +124,29 @@ public final class DataContext {
       int index,
       boolean userActivated,
       Catalog<?, ?> callCatalog,
-      Set<String> reads) {
+      Set<String> reads,
+      boolean agentCaller) {
     this.surface = surface;
     this.path = path;
     this.index = index;
     this.userActivated = userActivated;
     this.callCatalog = callCatalog;
     this.reads = reads;
+    this.agentCaller = agentCaller;
+  }
+
+  static {
+    // The RPC layer is in a different package. It makes the context of an agent call through
+    // this function, which is not part of the API.
+    AgentCalls.register((context, catalog, userActivated) ->
+        new DataContext(
+            context.surface,
+            context.path,
+            context.index,
+            userActivated,
+            catalog,
+            context.reads,
+            true));
   }
 
   /**
@@ -132,7 +162,7 @@ public final class DataContext {
    */
   static DataContext tracking(
       SurfaceModel<?> surface, String path, OptionalInt index, Set<String> reads) {
-    return new DataContext(surface, path, index.orElse(NO_INDEX), false, null, reads);
+    return new DataContext(surface, path, index.orElse(NO_INDEX), false, null, reads, false);
   }
 
   /**
@@ -206,7 +236,7 @@ public final class DataContext {
    */
   public DataContext nested(String relativePath) {
     return new DataContext(
-        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads);
+        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads, agentCaller);
   }
 
   /**
@@ -223,7 +253,7 @@ public final class DataContext {
       throw new IllegalArgumentException("The position of a list item must not be negative.");
     }
     return new DataContext(
-        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads);
+        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads, agentCaller);
   }
 
   /**
@@ -234,7 +264,7 @@ public final class DataContext {
    * @return the new context
    */
   public DataContext withUserActivation() {
-    return new DataContext(surface, path, index, true, callCatalog, reads);
+    return new DataContext(surface, path, index, true, callCatalog, reads, agentCaller);
   }
 
   /**
@@ -270,6 +300,9 @@ public final class DataContext {
    * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
    *     no code, that only the agent can call, or that requires a user gesture when there is none,
    *     or if the code of a function throws an exception that is not an {@code A2uiError}
+   * @throws A2uiRpcError if this context evaluates the calls of the agent, and a call names a
+   *     function that only the renderer can call, or that requires a user gesture when there is
+   *     none
    * @throws A2uiCatalogError if the surface cannot use the catalog that a call names, or if a call
    *     names no catalog and the surface has no default catalog
    * @throws A2uiDataError if the path of a binding is not correct
@@ -313,6 +346,9 @@ public final class DataContext {
    * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
    *     no code, that only the agent can call, or that requires a user gesture when there is none,
    *     or if the code of a function throws an exception that is not an {@code A2uiError}
+   * @throws A2uiRpcError if this context evaluates the calls of the agent, and a call names a
+   *     function that only the renderer can call, or that requires a user gesture when there is
+   *     none
    * @throws A2uiCatalogError if no function runs in this context and the surface has no default
    *     catalog
    * @throws A2uiDataError if a data path is not correct
@@ -332,6 +368,59 @@ public final class DataContext {
                 return arguments;
               });
     };
+  }
+
+  /**
+   * Evaluates the parts of a parsed <code>${...}</code> template, in their sequence. See {@link
+   * #evaluate(Expression)}.
+   *
+   * <p>A function that evaluates a template uses this method. If this context evaluates the calls
+   * of the agent, the method first examines each function call of each part. If the agent cannot
+   * call one of these functions, the method throws the error before a part runs. Thus a part that
+   * fails for a different cause cannot hide a call that the agent must not make.
+   *
+   * @param parts the parts to evaluate, as {@code ExpressionParser.parseTemplate} gives them
+   * @return the value of each part, in the sequence of the parts. The list is read-only.
+   * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
+   *     no code, that only the agent can call, or that requires a user gesture when there is none,
+   *     or if the code of a function throws an exception that is not an {@code A2uiError}
+   * @throws A2uiRpcError if this context evaluates the calls of the agent, and a call names a
+   *     function that only the renderer can call, or that requires a user gesture when there is
+   *     none
+   * @throws A2uiCatalogError if no function runs in this context and the surface has no default
+   *     catalog
+   * @throws A2uiDataError if a data path is not correct
+   */
+  public List<Object> evaluateTemplate(List<? extends Expression> parts) {
+    Objects.requireNonNull(parts, "parts");
+    if (agentCaller) {
+      parts.forEach(this::examineForAgent);
+    }
+    List<Object> values = new ArrayList<>(parts.size());
+    for (Expression part : parts) {
+      values.add(evaluate(part));
+    }
+    return Collections.unmodifiableList(values);
+  }
+
+  /**
+   * Examines each function call of a template part against the caller boundary of the agent. The
+   * method runs no function. It does not examine a call whose function it cannot find, because the
+   * evaluation reports that problem.
+   */
+  private void examineForAgent(Expression expression) {
+    if (!(expression instanceof Expression.Call call)) {
+      return;
+    }
+    if (!call.name().startsWith("@")) {
+      Catalog<?, ?> catalog =
+          callCatalog != null ? callCatalog : surface.defaultCatalog().orElse(null);
+      FunctionApi function = catalog == null ? null : catalog.functions().get(call.name());
+      if (function != null) {
+        AgentCalls.examine(function, userActivated);
+      }
+    }
+    call.args().values().forEach(this::examineForAgent);
   }
 
   private Map<String, Object> resolveArguments(Map<?, ?> call) {
@@ -377,7 +466,10 @@ public final class DataContext {
       throw new A2uiExpressionError(
           "Unknown function '" + name + "' in catalog '" + catalog.id() + "'.");
     }
-    if (function.allowedCallers() == AllowedCallers.AGENT_ONLY) {
+    if (agentCaller) {
+      // The caller boundary of the agent. It also examines the user gesture.
+      AgentCalls.examine(function, userActivated);
+    } else if (function.allowedCallers() == AllowedCallers.AGENT_ONLY) {
       throw new A2uiExpressionError(
           "Function '" + name + "' is agentOnly and cannot be called by renderer code.");
     }
@@ -396,7 +488,8 @@ public final class DataContext {
               + "' has no implementation in this renderer.");
     }
     Map<String, Object> resolved = coerceArguments(function, arguments.get());
-    DataContext scope = new DataContext(surface, path, index, userActivated, catalog, reads);
+    DataContext scope =
+        new DataContext(surface, path, index, userActivated, catalog, reads, agentCaller);
     try {
       return implementation.execute(resolved, scope);
     } catch (A2uiError error) {
