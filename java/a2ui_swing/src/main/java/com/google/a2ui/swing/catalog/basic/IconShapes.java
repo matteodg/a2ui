@@ -35,8 +35,9 @@ import java.util.TreeMap;
  *
  * <p>The shapes are in the resource {@code icons.properties} of this package: one line for each
  * name of the {@code Icon} component, with SVG path data for a view box of {@value #VIEW_BOX} by
- * {@value #VIEW_BOX} units. The shapes are original drawings for this module. The module reads the
- * resource one time, when a surface shows the first named icon.
+ * {@value #VIEW_BOX} units. The path data is from the Material Icons of Google, which have the
+ * Apache License 2.0. The header of the resource gives the source. The module reads the resource
+ * one time, when a surface shows the first named icon.
  */
 final class IconShapes {
   /** The width and the height of the view box of each shape. */
