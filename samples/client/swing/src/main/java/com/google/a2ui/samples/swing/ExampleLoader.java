@@ -46,6 +46,9 @@ final class ExampleLoader {
   /** The directory of the examples of the basic catalog, relative to the root of the repository. */
   static final Path REPOSITORY_DIRECTORY = Path.of("catalogs", "basic", "v1", "examples");
 
+  /** The system property that gives the directory of the examples. */
+  static final String DIRECTORY_PROPERTY = "gallery.examples";
+
   private ExampleLoader() {}
 
   /**
