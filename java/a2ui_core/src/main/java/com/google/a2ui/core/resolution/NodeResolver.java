@@ -398,7 +398,8 @@ public final class NodeResolver<C extends ComponentApi> {
     return switch (behavior) {
       case PropertyBehavior.Static _ -> raw;
       case PropertyBehavior.Dynamic dynamic -> binding(pass, raw, dynamic.bool(), where);
-      case PropertyBehavior.Action _ -> raw;
+      case PropertyBehavior.Action _ ->
+          raw instanceof Map<?, ?> payload ? action(pass, payload) : raw;
       case PropertyBehavior.Child _ ->
           raw instanceof String id ? child(pass, id, pass.node.dataPath(), pass.node.index) : raw;
       case PropertyBehavior.ChildList _ -> childList(pass, raw, where);
@@ -503,6 +504,77 @@ public final class NodeResolver<C extends ComponentApi> {
       children.add(child(pass, componentId, prefix + position, position));
     }
     return Collections.unmodifiableList(children);
+  }
+
+  // Actions.
+
+  @SuppressWarnings("unchecked")
+  private NodeAction action(Pass pass, Map<?, ?> payload) {
+    // A component model keeps each object as a map with string keys.
+    return new BoundAction(pass.node, (Map<String, Object>) payload);
+  }
+
+  /** An action of a node, as its payload writes it. Two are equal if the two parts are the same. */
+  private final class BoundAction implements NodeAction {
+    private final ComponentNode<C> node;
+    private final Map<String, Object> payload;
+
+    private BoundAction(ComponentNode<C> node, Map<String, Object> payload) {
+      this.node = node;
+      this.payload = payload;
+    }
+
+    @Override
+    public void invoke(ActionDispatchOptions options) {
+      Objects.requireNonNull(options, "options");
+      if (disposed || node.isDisposed()) {
+        return;
+      }
+      // The action resolves its values at this time, not at the time of the node. Thus it reports
+      // the data as it is now.
+      DataContext context = DataContext.tracking(surface, node.dataPath(), node.index(), null);
+      try {
+        if (payload.get("event") instanceof Map<?, ?> event) {
+          Map<String, Object> resolved = new LinkedHashMap<>();
+          resolved.put("name", event.get("name"));
+          Object written = event.get("context");
+          resolved.put(
+              "context", context.resolveDynamicValue(written == null ? Map.of() : written));
+          if (event.get("userMessage") != null) {
+            resolved.put("userMessage", context.resolveDynamicValue(event.get("userMessage")));
+          }
+          surface.dispatchAction(
+              Map.of("event", resolved), node.componentId(), options.metadata().orElse(null));
+        } else if (payload.get("functionCall") != null) {
+          // The user operated the component. Thus the call can require a user gesture.
+          context.withUserActivation().resolveDynamicValue(payload.get("functionCall"));
+        }
+      } catch (A2uiError error) {
+        surface.dispatchError(error);
+      }
+    }
+
+    private NodeResolver<C> owner() {
+      return NodeResolver.this;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof NodeResolver<?>.BoundAction action
+          && action.owner() == owner()
+          && action.node == node
+          && action.payload.equals(payload);
+    }
+
+    @Override
+    public int hashCode() {
+      return payload.hashCode();
+    }
+
+    @Override
+    public String toString() {
+      return "NodeAction(" + node.instanceId() + ")";
+    }
   }
 
   // Instance IDs.
