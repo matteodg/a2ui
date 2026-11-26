@@ -45,10 +45,10 @@ import java.util.function.Function;
  * }</pre>
  *
  * <p>The catalog has the ID and the document of {@code BasicCatalog}. It declares each component of
- * the catalog document. This version has a view for these components:
+ * the catalog document, and it has a view for each of them:
  *
  * <table>
- *   <caption>Components that have a view</caption>
+ *   <caption>The views of the components</caption>
  *   <tr><th>Component</th><th>Swing component</th></tr>
  *   <tr><td>{@code Text}</td><td>The view of the {@code markdown} service. The default is a {@code
  *       JEditorPane} that shows the Markdown subset.</td></tr>
@@ -58,6 +58,8 @@ import java.util.function.Function;
  *       data of the agent</td></tr>
  *   <tr><td>{@code Video}</td><td>The view of the {@code mediaPlayer} service. The default is a
  *       button with the poster image that opens the URL in an external application.</td></tr>
+ *   <tr><td>{@code AudioPlayer}</td><td>The view of the {@code mediaPlayer} service. The default is
+ *       a button and the description. The button opens the URL in an external application.</td></tr>
  *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
  *   <tr><td>{@code List}</td><td>{@link FlexPanel} in a {@code JScrollPane}</td></tr>
  *   <tr><td>{@code Card}</td><td>A panel that paints a rounded outline</td></tr>
@@ -76,12 +78,11 @@ import java.util.function.Function;
  *       text</td></tr>
  * </table>
  *
- * <p>Each other component of the catalog document has an implementation with no view. See {@link
+ * <p>An application can replace an implementation with one that has no view. See {@link
  * SwingComponentImplementation#withoutView(ComponentApi)}. A message that uses such a component is
  * correct. The surface shows its {@code error} fallback with the error type {@code no-view} for the
  * component, or nothing, and the component uses no layout space. This is what the adapter does for
- * each node that cannot show. A later version adds the views. {@link #viewNames()} gives the
- * components that have a view.
+ * each node that cannot show. {@link #viewNames()} gives the components that have a view.
  *
  * <p>To replace the view of one component, make a catalog with a different list:
  *
@@ -121,6 +122,7 @@ public final class SwingBasicCatalog {
     views.put("Image", ImageView::new);
     views.put("Icon", IconView::new);
     views.put("Video", VideoView::new);
+    views.put("AudioPlayer", AudioPlayerView::new);
     views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
     views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
     views.put("List", ListView::new);
@@ -198,7 +200,7 @@ public final class SwingBasicCatalog {
   }
 
   /**
-   * Gets the names of the components that have a view in this version.
+   * Gets the names of the components that have a view: each component of the catalog document.
    *
    * @return the names. The set is read-only.
    */

@@ -76,7 +76,8 @@ class GalleryExamplesTest {
 
   /**
    * The README of the sample tells how many components have a view and how many examples show
-   * completely. This test fails when a new view makes these numbers different.
+   * completely. This test fails when a change of the views or of the examples makes these numbers
+   * different.
    */
   @Test
   void theReadmeHasTheNumberOfTheViewsAndOfTheCompleteExamples() throws IOException {
@@ -96,11 +97,16 @@ class GalleryExamplesTest {
         readme.contains(
             "Thus " + complete + " of the " + examples.size() + " examples show completely"),
         "the number of the complete examples");
-    assertTrue(
-        readme.contains("The other " + (examples.size() - complete) + " examples show a"),
-        "the number of the other examples");
-    for (String view : SwingBasicCatalog.viewNames()) {
-      assertTrue(readme.contains("`" + view + "`"), view);
+    if (complete < examples.size()) {
+      assertTrue(
+          readme.contains("The other " + (examples.size() - complete) + " examples show a"),
+          "the number of the other examples");
+    }
+    // The README has the names of the views only while some components have none.
+    if (SwingBasicCatalog.viewNames().size() < SwingBasicCatalog.components().size()) {
+      for (String view : SwingBasicCatalog.viewNames()) {
+        assertTrue(readme.contains("`" + view + "`"), view);
+      }
     }
   }
 

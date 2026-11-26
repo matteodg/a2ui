@@ -56,6 +56,7 @@ class SwingBasicCatalogTest {
           "Image",
           "Icon",
           "Video",
+          "AudioPlayer",
           "Row",
           "Column",
           "List",

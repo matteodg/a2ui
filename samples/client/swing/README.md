@@ -70,7 +70,8 @@ The menu **View** changes the look and feel while the application runs.
 
 A component that the surface cannot show is visible as a label with a dashed border:
 
-- `No Swing view: Icon 'star_icon'` is a component of the catalog that has no Swing view.
+- `No Swing view: Gauge 'speed'` is a component whose type has no Swing view. Each component of
+  the basic catalog has a view. Thus this label shows only for other component types.
 - `Waiting for the component 'title'` is a component that did not arrive.
 
 The `Modal` component shows its content in a dialog above the window. Select the example `modal`
@@ -78,14 +79,16 @@ and operate its button. Close the dialog with its close control or with the Esca
 
 ## Limits
 
-- The Swing adapter has views for 17 of the 18 components of the basic catalog at this time: `Text`,
-  `Icon`, `Image`, `Video`, `Row`, `Column`, `List`, `Card`, `Tabs`, `Modal`, `Divider`, `Button`,
-  `TextField`, `CheckBox`, `ChoicePicker`, `Slider` and `DateTimeInput`. Thus 42 of the 43 examples
-  show completely.
-- The other 1 examples show a placeholder for each component with no view. The component with no
-  view is `AudioPlayer` (in 1 example).
-- A placeholder is wider than an icon. Thus a row with placeholders can have less space for its
-  text than the same row with icons, and a long word in such a row can lose its end.
+- The Swing adapter has views for 18 of the 18 components of the basic catalog. Thus 43 of the 43
+  examples show completely. The mark for a component with no view stays in the gallery, for a
+  directory with examples that use other component types.
+- Swing cannot play media. The `Video` component shows its poster image as a button, and the
+  `AudioPlayer` component shows a button and its description. The button opens the URL in the
+  browser of the system. See the section about the services in the
+  [README of the adapter](../../../java/a2ui_swing/README.md).
+- The gallery loads the images from the network with the default image loader of the adapter. An
+  example with an image shows a neutral area while the image loads, and an area with a mark if the
+  computer has no network. The tests do not use the network.
 - The gallery shows the first surface of an example.
 - The gallery has the examples of protocol v1.0 only, and it has no example with a custom catalog.
 - The function `openUrl` opens the browser of the system. The tests use a different URL opener.

@@ -79,15 +79,13 @@ from the services. Give the same services to the `A2uiSurface`.
 | `Image`         | A component that paints the image of the `imageLoader` service      | Available |
 | `Icon`          | A component that paints a shape of the module or SVG path data      | Available |
 | `Video`         | The view of the `mediaPlayer` service, or a button with the poster  | Available |
-| `AudioPlayer`   | The view of the `mediaPlayer` service                               | Later     |
+| `AudioPlayer`   | The view of the `mediaPlayer` service, or a button and the text     | Available |
 
-The Swing class of a component with the state "Later" is the plan, and it can change.
-
-A component with the state "Later" is in the catalog, and it has no view
-(`SwingComponentImplementation.withoutView`). Thus a message that uses it is correct. The surface
-shows its `error` fallback for it, with the error type `no-view`, or nothing. Then the component
-uses no layout space. The adapter reports nothing to the agent. `SwingBasicCatalog.viewNames()`
-gives the components that have a view.
+Each component of the catalog has a view. An application can declare a component that has no view
+(`SwingComponentImplementation.withoutView`). A message that uses such a component is correct. The
+surface shows its `error` fallback for it, with the error type `no-view`, or nothing. Then the
+component uses no layout space. The adapter reports nothing to the agent.
+`SwingBasicCatalog.viewNames()` gives the components that have a view.
 
 These rules apply to the views:
 
@@ -479,9 +477,10 @@ second file, with `-modal-content` in its name.
 The conformance harness of this module has the name `swing`. It registers each suite of the
 `adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
 only if the adapter has a view for each basic catalog component that the case uses. The harness
-records each other case as skipped, with the names of the absent views. In this version, 35 cases
-run: the 7 cases of the Markdown subset, 21 cases of the surface suite and the 7 cases of the
-accessibility suite. The harness does not run the `axeCore` rules, which need a DOM. See
+records each other case as skipped, with the names of the absent views. The adapter has each view
+of the basic catalog. Thus 36 cases run: the 7 cases of the Markdown subset, the 22 cases of the
+surface suite and the 7 cases of the accessibility suite. The harness skips only the 16 cases of
+the suite for protocol v0.9. The harness does not run the `axeCore` rules, which need a DOM. See
 [the conformance section](../README.md#conformance) for the commands.
 
 ## References

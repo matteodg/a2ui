@@ -31,7 +31,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.swing.JButton;
 import javax.swing.JTextField;
 import org.junit.jupiter.api.Test;
@@ -225,11 +227,16 @@ class GalleryPanelTest {
   @Test
   void theListMarksAnExampleThatCannotShowCompletely() {
     Example complete = Headless.examples().get(0);
+    // Each example of the repository is complete. Thus the test makes an example that is not.
     Example incomplete =
-        Headless.examples().stream()
-            .filter(example -> !example.complete())
-            .findFirst()
-            .orElseThrow();
+        new Example(
+            "gauge-card",
+            "Gauge card",
+            "",
+            List.of(),
+            new TreeSet<>(Set.of("Card", "Gauge", "Text")),
+            new TreeSet<>(Set.of("Gauge")),
+            Optional.empty());
 
     assertEquals(complete.id(), ExampleListPanel.entryText(complete));
     assertEquals(

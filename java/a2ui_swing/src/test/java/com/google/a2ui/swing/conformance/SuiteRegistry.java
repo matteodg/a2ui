@@ -64,10 +64,7 @@ final class SuiteRegistry {
   /** The protocol versions that the adapter shows. */
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
-  /**
-   * The components of the basic catalog that have a Swing view: 17 of the 18 components in this
-   * version. The commit that adds the view of a component adds its name to the catalog.
-   */
+  /** The components of the basic catalog that have a Swing view: each of the 18 components. */
   static final Set<String> BASIC_VIEWS = SwingBasicCatalog.viewNames();
 
   /** The start of the reason to skip a case that uses a basic component that has no view. */

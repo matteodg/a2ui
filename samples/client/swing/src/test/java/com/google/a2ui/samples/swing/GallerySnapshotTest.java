@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test;
  */
 class GallerySnapshotTest {
   /**
-   * Complete examples, and then examples that have components with no Swing view. The placeholders
-   * of these components are in a layout: in a card, in the tabs of {@code recipe-card} and in the
-   * list of {@code financial-data-grid}.
+   * Examples of each type of component: layouts, inputs, a modal, icons, images, and the
+   * substitutes of the video and of the audio player. The image loader of the tests gives a
+   * generated image for each URL.
    */
   private static final List<String> EXAMPLES =
       List.of(
@@ -48,7 +48,13 @@ class GallerySnapshotTest {
           "flight-status",
           "recipe-card",
           "financial-data-grid",
-          "live-invitation-builder");
+          "live-invitation-builder",
+          "movie-card",
+          "music-player",
+          "podcast-episode",
+          "product-card",
+          "user-profile",
+          "stats-card");
 
   private GalleryPanel gallery;
 
