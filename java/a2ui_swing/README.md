@@ -417,8 +417,11 @@ A component that has one child, for example a button, calls `children.sync(props
 | weight    | The layout constraint of a component: `panel.add(component, 2.0)`. The default is 0. |
 
 The components that have a weight share the space that the other components do not use, in
-proportion to their weights. `Justify.STRETCH` gives the free space to all the components in equal
-parts. Each enum reads the text of the basic catalog: `Justify.fromWire("spaceBetween")`.
+proportion to their weights. A component that has a weight is not smaller than its minimum size, as
+a flex item with `min-width: auto` in CSS: text that wraps keeps the width of its longest word. The
+other components that have a weight share the space that stays. If the container is too small for
+the minimum sizes, the weights alone give the sizes. `Justify.STRETCH` gives the free space to all
+the components in equal parts. Each enum reads the text of the basic catalog: `Justify.fromWire("spaceBetween")`.
 
 A component with the client property `FlexLayout.STRETCH_PROPERTY` set to `Boolean.TRUE` fills the
 cross axis with each value of `align`, as an element with `align-self: stretch` does in CSS.
@@ -512,9 +515,13 @@ view, after each update. A view does not do this work.
   component from the accessible tree. Thus the adapter gives an empty accessible name and an empty
   accessible description to the component of each view in the hidden part, sends no change event
   for a live component there, and marks each of these components.
-  `A2uiAccessibility.isHidden(component)` reads the mark. The user can still give the focus to a
-  control in a hidden part. A Swing component that a view makes for its own use, for example the
-  label of a field, keeps its name.
+  `A2uiAccessibility.isHidden(component)` reads the mark. A Swing component that a view makes for
+  its own use, for example the label of a field, keeps its name.
+- The keyboard focus does not go into a hidden part, as the rule `aria-hidden-focus` of the
+  accessibility suite requires. The root component of each view there gives a focus traversal
+  policy that has no components, thus the Tab key goes past the view. The control of the view is
+  not focusable. If a component of the view has the focus when the view becomes hidden, the focus
+  goes to the subsequent component. A click on a hidden button still does its action.
 - A view whose control is in a panel overrides `accessibleComponent()` and returns the control.
 
 ## The shapes of the icons
@@ -549,14 +556,48 @@ of the test JVM, Nimbus and the look and feel of the system. Look at the images 
 view or of a layout. The build does not compare them. The image of the content of a modal is a
 second file, with `-modal-content` in its name.
 
-The conformance harness of this module has the name `swing`. It registers each suite of the
-`adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
-only if the adapter has a view for each basic catalog component that the case uses. The harness
-records each other case as skipped, with the names of the absent views. The adapter has each view
-of the basic catalog. Thus 36 cases run: the 7 cases of the Markdown subset, the 22 cases of the
-surface suite and the 7 cases of the accessibility suite. The harness skips only the 16 cases of
-the suite for protocol v0.9. The harness does not run the `axeCore` rules, which need a DOM. See
-[the conformance section](../README.md#conformance) for the commands.
+### Conformance
+
+The conformance harness of this module has the name `swing`. It is in the test package
+`com.google.a2ui.swing.conformance`. The shared suites of [`conformance/`](../../conformance) are in
+corpora, which `conformance/manifest_corpora.json` lists. The harness has a part in two of them:
+
+| Corpus    | Suites                                                           | The harness `swing`                                                     |
+| :-------- | :--------------------------------------------------------------- | :---------------------------------------------------------------------- |
+| `core`    | The suites of the core SDK.                                      | It does not run them. The harness `java-core` of `a2ui_core` runs them. |
+| `adapter` | The surface suite, the accessibility suite, the Markdown subset. | 36 cases run. The 16 cases of the suite for protocol v0.9 are skipped.  |
+| `e2e`     | The scenarios in `e2e/` and in `e2e/v0_9_1/`.                    | 4 scenarios run. The 4 scenarios of protocol v0.9.1 are skipped.        |
+
+`AdapterConformanceTest` runs the `adapter` corpus. A case of the two rendering suites runs only if
+the adapter has a view for each basic catalog component that the case uses. The harness records
+each other case as skipped, with the names of the absent views. The adapter has each view of the
+basic catalog. Thus 36 cases run: the 7 cases of the Markdown subset, the 22 cases of the surface
+suite and the 7 cases of the accessibility suite. The harness does not run the `axeCore` rules,
+which need a DOM. It makes sure of the rule `aria-hidden-focus` with the Swing focus values of each
+hidden component.
+
+`E2eConformanceTest` runs the `e2e` corpus. A scenario is a conversation between an agent and a
+renderer, in turns. The harness does the renderer part: for each turn, it gives the A2UI messages
+of `expectWire` to a `MessageProcessor`, compares the mounted `A2uiSurface` with `expectViewTree`,
+does each operation of `uiOps` through the Swing controls, and compares the data model, the errors
+and the messages for the agent. The text of the model and the list `formats` belong to the harness
+of an agent SDK.
+
+Each case runs on the event dispatch thread, against a surface with no window. A case uses no
+network.
+
+To write the manifest of the executed cases and to compare it with the two corpora, run these
+commands from the `java/` directory:
+
+```sh
+A2UI_CONFORMANCE_MANIFEST_DIR=/tmp/a2ui-manifest ./mvnw verify
+uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
+  --manifest-dir /tmp/a2ui-manifest --harness swing --corpus adapter
+uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
+  --manifest-dir /tmp/a2ui-manifest --harness swing --corpus e2e
+```
+
+See [the conformance section](../README.md#conformance) for the command of the `core` corpus.
 
 ## References
 

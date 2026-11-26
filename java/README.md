@@ -57,6 +57,8 @@ uv run --project ../conformance python ../conformance/scripts/check_executed_cas
   --manifest-dir /tmp/a2ui-manifest --harness java-core --corpus core
 uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
   --manifest-dir /tmp/a2ui-manifest --harness swing --corpus adapter
+uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
+  --manifest-dir /tmp/a2ui-manifest --harness swing --corpus e2e
 ```
 
 The harness `java-core` records the cases of protocol versions before 1.0 and the cases of the two
@@ -65,6 +67,9 @@ framework adapter suites as skipped, each with its reason.
 The harness `swing` runs the four suites of the `adapter` corpus. It runs a case only if the adapter
 has a view for each basic catalog component that the case uses. The adapter has each view, thus the
 harness runs each case of protocol v1.0. It records the cases of protocol v0.9 as skipped.
+
+The harness `swing` also runs the renderer part of the scenarios of the `e2e` corpus. It records the
+scenarios of protocol v0.9.1 as skipped. The `core` corpus belongs to the harness `java-core`.
 
 The timing cases of `core/message_processor_scaling.yaml` run only in the `performance` profile. The
 usual build records them as skipped. Give the two builds different manifest directories:
