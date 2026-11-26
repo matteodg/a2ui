@@ -14,5 +14,8 @@
  * limitations under the License.
  */
 
-/** The state of the surfaces: the data model and, in subsequent changes, the component models. */
+/**
+ * The state of the surfaces: the group of the surfaces, each surface, its data model and its
+ * components.
+ */
 package com.google.a2ui.core.state;
