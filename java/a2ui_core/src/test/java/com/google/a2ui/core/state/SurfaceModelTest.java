@@ -45,7 +45,12 @@ import org.junit.jupiter.api.Test;
 class SurfaceModelTest {
   private static final Catalog<ComponentApi, FunctionApi> BASIC = BasicCatalog.api();
   private static final Catalog<ComponentApi, FunctionApi> OTHER =
-      new Catalog<>("urn:other", List.of(new ComponentApi("Gauge", Map.of("type", "object"))));
+      new Catalog<>(
+          "urn:other",
+          List.of(new ComponentApi("Gauge", Map.of("type", "object"))),
+          List.of(),
+          null,
+          ProtocolVersion.V1_0);
 
   @Test
   void aSurfaceKeepsItsValues() {
@@ -243,6 +248,43 @@ class SurfaceModelTest {
     assertEquals(List.of(plain, named), errors);
     assertEquals(Optional.of("s"), plain.surfaceId());
     assertEquals(Optional.of("other"), named.surfaceId());
+  }
+
+  @Test
+  void allTheCatalogsOfASurfaceAreForItsProtocolVersion() {
+    Catalog<ComponentApi, FunctionApi> old =
+        new Catalog<>("urn:old", List.of(), List.of(), null, ProtocolVersion.V0_9);
+    Catalog<ComponentApi, FunctionApi> unversioned = new Catalog<>("urn:plain", List.of());
+
+    A2uiCatalogError available =
+        assertThrows(
+            A2uiCatalogError.class,
+            () ->
+                new SurfaceModel<>(
+                    "s",
+                    ProtocolVersion.V1_0,
+                    BASIC,
+                    Map.of(BASIC.id(), BASIC, old.id(), old),
+                    false,
+                    null));
+    A2uiCatalogError defaults =
+        assertThrows(
+            A2uiCatalogError.class,
+            () ->
+                new SurfaceModel<>("s", ProtocolVersion.V1_0, unversioned, Map.of(), false, null));
+
+    assertEquals(
+        "Protocol version mismatch: cannot mix catalog 'urn:old' (v0.9) with surface version 1.0.",
+        available.getMessage());
+    assertEquals(
+        "Protocol version mismatch: cannot mix unversioned catalog 'urn:plain' with surface"
+            + " version 1.0.",
+        defaults.getMessage());
+    // A surface of a different version accepts the catalogs of that version.
+    assertEquals(
+        Optional.of(old),
+        new SurfaceModel<>("s", ProtocolVersion.V0_9, old, Map.of(old.id(), old), false, null)
+            .defaultCatalog());
   }
 
   private static SurfaceModel<ComponentApi> surface(Catalog<ComponentApi, FunctionApi> defaults) {

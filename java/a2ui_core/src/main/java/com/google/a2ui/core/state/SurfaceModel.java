@@ -72,6 +72,8 @@ public final class SurfaceModel<C extends ComponentApi> {
    *     of the map.
    * @param sendDataModel true if the renderer sends the data model of this surface to the agent
    * @param metadata the {@code createSurface.metadata}, or null if the message had none
+   * @throws A2uiCatalogError if a catalog is not for the protocol version of the surface. All the
+   *     catalogs of one surface are for one protocol version.
    */
   public SurfaceModel(
       String id,
@@ -88,6 +90,25 @@ public final class SurfaceModel<C extends ComponentApi> {
             new LinkedHashMap<>(Objects.requireNonNull(availableCatalogs, "availableCatalogs")));
     this.sendDataModel = sendDataModel;
     this.metadata = metadata;
+    if (defaultCatalog != null) {
+      requireSurfaceVersion(defaultCatalog);
+    }
+    this.availableCatalogs.values().forEach(this::requireSurfaceVersion);
+  }
+
+  /** Makes sure that a catalog is for the protocol version of this surface. */
+  private void requireSurfaceVersion(Catalog<C, ?> catalog) {
+    ProtocolVersion version = catalog.protocolVersion().orElse(null);
+    if (version != protocolVersion) {
+      throw new A2uiCatalogError(
+          "Protocol version mismatch: cannot mix "
+              + (version == null
+                  ? "unversioned catalog '" + catalog.id() + "'"
+                  : "catalog '" + catalog.id() + "' (" + version.wireValue() + ")")
+              + " with surface version "
+              + protocolVersion.wireValue()
+              + ".");
+    }
   }
 
   /**

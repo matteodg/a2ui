@@ -64,7 +64,9 @@ class FunctionFailureTest {
                   }),
               // Evaluates its argument only. Thus it shows the failure of a nested call.
               new FunctionImplementation(
-                  "echo", Map.of("returnType", "any"), (args, context) -> args.get("value"))));
+                  "echo", Map.of("returnType", "any"), (args, context) -> args.get("value"))),
+          null,
+          ProtocolVersion.V1_0);
 
   private final DataContext context =
       new DataContext(
