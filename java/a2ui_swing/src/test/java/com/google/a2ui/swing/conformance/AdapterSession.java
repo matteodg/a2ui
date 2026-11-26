@@ -496,7 +496,7 @@ final class AdapterSession {
 
   /**
    * Makes sure that the adapter hides, or does not hide, a position and each position below it from
-   * assistive tools: the mark of the adapter, and an empty accessible name.
+   * assistive tools: the mark of the adapter, an empty accessible name, and no keyboard focus.
    */
   private void assertHiddenBelow(MountedNode node, boolean hidden, String at) {
     if (node.view().isPresent()) {
@@ -508,6 +508,18 @@ final class AdapterSession {
       if (hidden) {
         JsonValues.assertJsonEquals(
             "", control.getAccessibleContext().getAccessibleName(), "accessible name of " + id);
+      }
+      // The rule aria-hidden-focus of the suite: the keyboard focus does not go into a hidden
+      // part. The Tab key goes past the root component of a hidden view, and the control of the
+      // view is not focusable.
+      JComponent root = node.view().orElseThrow().component();
+      if (root.isFocusTraversalPolicyProvider() != hidden) {
+        throw new AssertionError(id + ": expected the Tab key to go past the view: " + hidden);
+      }
+      if (hidden
+          && (control.isFocusable()
+              || root.getFocusTraversalPolicy().getFirstComponent(root) != null)) {
+        throw new AssertionError(id + ": the keyboard focus can go into the hidden view.");
       }
     }
     if (hidden) {

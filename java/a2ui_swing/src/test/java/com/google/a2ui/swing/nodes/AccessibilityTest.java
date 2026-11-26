@@ -22,6 +22,7 @@ import static com.google.a2ui.swing.testing.TestSurface.path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.core.resolution.ComponentNode;
@@ -34,6 +35,7 @@ import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.TestSurface;
+import java.awt.FocusTraversalPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,7 @@ import javax.accessibility.AccessibleRole;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.LayoutFocusTraversalPolicy;
 import org.junit.jupiter.api.Test;
 
 class AccessibilityTest {
@@ -263,6 +266,100 @@ class AccessibilityTest {
       assertTrue(A2uiAccessibility.isHidden(componentOf("status")));
       assertEquals("", contextOf("save").getAccessibleName());
       assertEquals("", contextOf("status").getAccessibleName());
+    });
+  }
+
+  private JComponent rootOf(String componentId) {
+    MountedNode node = view.viewTree().orElseThrow().find(componentId).orElseThrow();
+    return node.view().orElseThrow().component();
+  }
+
+  /** Makes sure that the Tab key goes past, or goes into, the root component of a view. */
+  private void assertTabGoesPast(String componentId, boolean past) {
+    JComponent root = rootOf(componentId);
+    assertEquals(past, root.isFocusTraversalPolicyProvider(), componentId);
+    if (past) {
+      FocusTraversalPolicy policy = root.getFocusTraversalPolicy();
+      JComponent control = componentOf(componentId);
+      assertNull(policy.getFirstComponent(root), componentId);
+      assertNull(policy.getLastComponent(root), componentId);
+      assertNull(policy.getDefaultComponent(root), componentId);
+      assertNull(policy.getComponentAfter(root, control), componentId);
+      assertNull(policy.getComponentBefore(root, control), componentId);
+    } else {
+      assertFalse(root.isFocusTraversalPolicySet(), componentId);
+    }
+  }
+
+  @Test
+  void theKeyboardFocusDoesNotGoIntoAHiddenComponentOrBelowIt() {
+    Edt.run(() -> {
+      mountNested(true);
+
+      assertFalse(componentOf("save").isFocusable());
+      for (String id : List.of("root", "inner", "save", "save_text", "status")) {
+        assertTabGoesPast(id, true);
+        assertFalse(rootOf(id).isFocusable(), id);
+      }
+    });
+  }
+
+  @Test
+  void theKeyboardFocusGoesIntoAComponentThatIsNotHiddenAgain() {
+    Edt.run(() -> {
+      mountNested(true);
+
+      surface.setData("/secret", false);
+
+      assertTrue(componentOf("save").isFocusable());
+      for (String id : List.of("root", "inner", "save", "save_text", "status")) {
+        assertTabGoesPast(id, false);
+      }
+
+      surface.setData("/secret", true);
+
+      assertFalse(componentOf("save").isFocusable());
+      assertTabGoesPast("inner", true);
+    });
+  }
+
+  @Test
+  void aComponentThatIsNotHiddenKeepsItsFocusValues() {
+    Edt.run(() -> {
+      mountNested(false);
+
+      assertTrue(componentOf("save").isFocusable());
+      for (String id : List.of("root", "inner", "save", "save_text", "status")) {
+        assertTabGoesPast(id, false);
+      }
+    });
+  }
+
+  @Test
+  void aHiddenViewGetsItsOwnFocusPolicyBack() {
+    Edt.run(() -> {
+      JPanel panel = new JPanel();
+      JTextField field = new JTextField();
+      panel.add(field);
+      FocusTraversalPolicy own = new LayoutFocusTraversalPolicy();
+      panel.setFocusTraversalPolicy(own);
+      panel.setFocusTraversalPolicyProvider(true);
+      field.setFocusable(false);
+      HiddenFocus focus = new HiddenFocus();
+
+      focus.apply(panel, field, true);
+
+      assertTrue(focus.active());
+      assertTrue(panel.isFocusTraversalPolicyProvider());
+      assertNull(panel.getFocusTraversalPolicy().getFirstComponent(panel));
+
+      focus.apply(panel, field, false);
+
+      assertFalse(focus.active());
+      assertTrue(panel.isFocusTraversalPolicyProvider());
+      assertSame(own, panel.getFocusTraversalPolicy());
+      // The field was not focusable before. Thus it is not focusable after.
+      assertFalse(field.isFocusable());
     });
   }
 

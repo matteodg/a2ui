@@ -45,6 +45,9 @@ final class Accessibility {
   /** True if the node, or a node above it, has the attribute {@code hidden}. */
   private boolean hidden;
 
+  /** Keeps the keyboard focus out of the view while the view is hidden. */
+  private final HiddenFocus hiddenFocus = new HiddenFocus();
+
   /**
    * Tells if assistive tools must ignore the component of the node and the components below it.
    *
@@ -81,6 +84,7 @@ final class Accessibility {
     // component has an empty name, because Swing cannot remove it from the accessible tree.
     hidden = attributes.hidden() || hiddenAbove;
     component.putClientProperty(A2uiAccessibility.HIDDEN_PROPERTY, hidden ? Boolean.TRUE : null);
+    hiddenFocus.apply(view.component(), component, hidden);
     String name = hidden ? "" : attributes.label().or(view::inferredAccessibleName).orElse(null);
     String description = hidden ? "" : attributes.description().orElse(null);
     boolean live = attributes.live().filter(value -> !value.equals(OFF)).isPresent();
