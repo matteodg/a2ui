@@ -19,6 +19,7 @@ package com.google.a2ui.core.conformance;
 import com.google.a2ui.core.schema.v1_0.SchemaDocuments;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.Set;
@@ -153,23 +154,29 @@ final class SuiteRegistry {
    * Tells if a key of {@code unsupported} applies to a case.
    *
    * <p>The key applies if its action is the action of the case and the case sets the key path that
-   * follows the action. A key with no path applies to each case of the action.
+   * follows the action. A key with no path applies to each case of the action. If the path goes
+   * through a list, for example {@code steps}, the key applies if one item of the list sets the
+   * remaining path.
    *
    * @param target the key, for example {@code from_json.expect.selfContained}
    */
   static boolean matchesUnsupported(ConformanceCase testCase, String target) {
-    String[] parts = target.split("[.]");
-    if (!parts[0].equals(testCase.action())) {
-      return false;
+    List<String> parts = List.of(target.split("[.]"));
+    return parts.getFirst().equals(testCase.action())
+        && hasPath(testCase.fields(), parts.subList(1, parts.size()));
+  }
+
+  private static boolean hasPath(Object node, List<String> keys) {
+    if (keys.isEmpty()) {
+      return true;
     }
-    Object current = testCase.fields();
-    for (int i = 1; i < parts.length; i++) {
-      if (!(current instanceof Map<?, ?> map) || !map.containsKey(parts[i])) {
-        return false;
-      }
-      current = map.get(parts[i]);
-    }
-    return true;
+    return switch (node) {
+      case List<?> list -> list.stream().anyMatch(item -> hasPath(item, keys));
+      case Map<?, ?> map ->
+          map.containsKey(keys.getFirst())
+              && hasPath(map.get(keys.getFirst()), keys.subList(1, keys.size()));
+      case null, default -> false;
+    };
   }
 
   private static Map<String, SuiteSupport> coreSuites() {

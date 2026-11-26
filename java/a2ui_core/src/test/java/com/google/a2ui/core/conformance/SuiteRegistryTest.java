@@ -113,6 +113,28 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void anUnsupportedKeyPathGoesThroughTheItemsOfAList() {
+    Supported supported =
+        new Supported(Map.of(), SuiteRegistry.reasons("load.steps.expect.deep", "later"), Set.of());
+    ConformanceCase oneStepSetsKey =
+        caseOf(
+            Map.of(
+                "name",
+                "a",
+                "action",
+                "load",
+                "steps",
+                List.of(Map.of("input", 1), Map.of("expect", Map.of("deep", 1)))));
+    ConformanceCase noStepSetsKey =
+        caseOf(
+            Map.of(
+                "name", "b", "action", "load", "steps", List.of(Map.of("expect", Map.of("x", 1)))));
+
+    assertEquals("later", SuiteRegistry.skipReason(oneStepSetsKey, supported));
+    assertNull(SuiteRegistry.skipReason(noStepSetsKey, supported));
+  }
+
+  @Test
   void theFirstUnsupportedKeyThatAppliesGivesTheReason() {
     ConformanceCase testCase =
         caseOf(Map.of("name", "a", "action", "load", "expect", Map.of("first", 1, "second", 2)));
