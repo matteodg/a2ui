@@ -65,9 +65,17 @@ jobs:
       - name: Set up Python
         uses: ./.github/actions/setup-python
 
-      - name: Check executed conformance cases
+      # Each module writes the manifest of its harness to the same directory.
+      - name: Check executed conformance cases of the core
         run: |
           uv run --project conformance python conformance/scripts/check_executed_cases.py \
             --manifest-dir "${{ runner.temp }}/a2ui-manifest" \
             --harness java-core \
             --corpus core
+
+      - name: Check executed conformance cases of the Swing adapter
+        run: |
+          uv run --project conformance python conformance/scripts/check_executed_cases.py \
+            --manifest-dir "${{ runner.temp }}/a2ui-manifest" \
+            --harness swing \
+            --corpus adapter
