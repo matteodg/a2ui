@@ -376,6 +376,8 @@ public final class NodeHost {
     }
     SwingComponentView disposedView = view;
     HostViewContext disposedContext = context;
+    // A hidden view gets its focus values back, and the shield over it goes away.
+    accessibility.dispose();
     view = null;
     accessibility = null;
     context = null;

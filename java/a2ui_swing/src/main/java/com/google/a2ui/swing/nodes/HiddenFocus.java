@@ -24,27 +24,33 @@ import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
 /**
- * Keeps the keyboard focus out of the view of a node that the attribute {@code hidden} hides from
- * assistive tools. Each node host has one instance.
+ * Keeps the keyboard focus and the mouse out of the view of a node that the attribute {@code
+ * hidden} hides from assistive tools. Each node host has one instance.
  *
  * <p>A control that assistive tools ignore must not get the keyboard focus. If it did, a user of a
  * screen reader would be on a control that has no name. The accessibility suite has the rule {@code
- * aria-hidden-focus} for this, and the web renderers make a hidden part {@code inert}.
+ * aria-hidden-focus} for this, and the web renderers make a hidden part {@code inert}: the user
+ * cannot operate it.
  *
- * <p>While the view is hidden, this object does three things:
+ * <p>While the view is hidden, this object does four things:
  *
  * <ul>
+ *   <li>An {@link InputShield} takes the mouse events of the root component of the view. Thus a
+ *       press, a click or a turn of the wheel reaches no component of the view and no component
+ *       below it: no action runs and no control takes the focus.
  *   <li>The root component of the view gives a focus traversal policy that has no components. Thus
  *       the Tab key goes past the view and past all the components below it, also the views of the
  *       nodes below. This is correct in each window: the surface, and the dialog of a modal.
- *   <li>The root component and the control of the view are not focusable. Thus a click on the
- *       control does not give it the focus.
+ *   <li>The root component and the control of the view are not focusable.
  *   <li>If a component of the view has the focus when the view becomes hidden, the focus goes to
  *       the subsequent component.
  * </ul>
  *
- * <p>The object puts each value back when the view is not hidden. A click on a hidden button still
- * does the action of the button.
+ * <p>A key event goes to the component that has the focus. No component of the hidden view can get
+ * the focus from the user, thus no key event reaches the view.
+ *
+ * <p>The object puts each value back when the view is not hidden, and when the host disposes the
+ * view.
  */
 final class HiddenFocus {
   /** A policy that gives no component. The policy of the window then continues after the view. */
@@ -80,6 +86,9 @@ final class HiddenFocus {
   private JComponent root;
 
   private JComponent control;
+
+  /** Takes the mouse events of the root component while the view is hidden, or null. */
+  private InputShield shield;
 
   /** The values of the components before this object changed them. */
   private boolean rootWasProvider;
@@ -124,6 +133,8 @@ final class HiddenFocus {
     root.setFocusTraversalPolicyProvider(true);
     root.setFocusable(false);
     control.setFocusable(false);
+    shield = new InputShield(root);
+    shield.install();
     if (hadFocus) {
       // A component that is not focusable does not keep the focus in each case. This call makes
       // sure that the focus goes to the component after the view.
@@ -131,7 +142,16 @@ final class HiddenFocus {
     }
   }
 
+  /** Puts each value back, as for a view that is not hidden. A second call has no effect. */
+  void dispose() {
+    if (root != null) {
+      restore();
+    }
+  }
+
   private void restore() {
+    shield.uninstall();
+    shield = null;
     root.setFocusTraversalPolicy(rootPolicy);
     root.setFocusTraversalPolicyProvider(rootWasProvider);
     control.setFocusable(controlWasFocusable);

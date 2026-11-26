@@ -46,8 +46,16 @@ final class Accessibility {
   /** True if the node, or a node above it, has the attribute {@code hidden}. */
   private boolean hidden;
 
-  /** Keeps the keyboard focus out of the view while the view is hidden. */
+  /** Keeps the keyboard focus and the mouse out of the view while the view is hidden. */
   private final HiddenFocus hiddenFocus = new HiddenFocus();
+
+  /**
+   * Gives the keyboard focus and the mouse back to the view, for a view that the host disposes. A
+   * second call has no effect.
+   */
+  void dispose() {
+    hiddenFocus.dispose();
+  }
 
   /**
    * Tells if assistive tools must ignore the component of the node and the components below it.

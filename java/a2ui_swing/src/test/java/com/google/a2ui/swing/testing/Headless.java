@@ -18,6 +18,7 @@ package com.google.a2ui.swing.testing;
 
 import com.google.a2ui.swing.surface.A2uiSurface;
 import javax.swing.JPanel;
+import javax.swing.JRootPane;
 
 /**
  * Shows a surface component with no window, for tests that run with no display. Use it on the event
@@ -55,5 +56,26 @@ public final class Headless {
     surface.setSize(width, height);
     surface.validate();
     return surface;
+  }
+
+  /**
+   * Connects a surface component as the content of a root pane, as a window has one, and does the
+   * layout at a size. The root pane is in no window. Use {@link Pointer} to send the mouse events
+   * of a user to the components of the root pane.
+   *
+   * @param surface the surface component
+   * @param width the width in pixels
+   * @param height the height in pixels
+   * @return the root pane. The surface fills its content pane.
+   */
+  public static JRootPane mountInRootPane(A2uiSurface surface, int width, int height) {
+    JPanel holder = new JPanel(null);
+    JRootPane rootPane = new JRootPane();
+    holder.add(rootPane);
+    rootPane.getContentPane().add(surface);
+    rootPane.addNotify();
+    rootPane.setSize(width, height);
+    rootPane.validate();
+    return rootPane;
   }
 }

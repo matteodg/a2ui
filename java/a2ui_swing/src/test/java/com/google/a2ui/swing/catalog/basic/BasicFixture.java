@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.swing.JComponent;
+import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
@@ -75,6 +76,11 @@ final class BasicFixture {
   /** The mounted surface component. */
   A2uiSurface view;
 
+  /** The root pane that has the surface component, or null if the fixture uses none. */
+  JRootPane rootPane;
+
+  private boolean inRootPane;
+
   /** Makes a fixture with the default services. */
   BasicFixture() {
     this(A2uiServices.DEFAULT);
@@ -83,6 +89,15 @@ final class BasicFixture {
   /** Makes a fixture with services. */
   BasicFixture(A2uiServices services) {
     this.services = services;
+  }
+
+  /**
+   * Makes the fixture mount its surface as the content of a root pane, as a window has one. Use
+   * {@code Pointer} to send the mouse events of a user. Call this method before {@code create}.
+   */
+  BasicFixture inRootPane() {
+    inRootPane = true;
+    return this;
   }
 
   private Catalog<SwingComponentImplementation, FunctionImplementation> catalog() {
@@ -104,7 +119,13 @@ final class BasicFixture {
     processor.processMessages(Map.of("version", "1.0", "createSurface", createSurface));
     model().onError().subscribe(errors::add);
     model().onAction().subscribe(actions::add);
-    view = Headless.mount(new A2uiSurface(model(), A2uiFallbacks.NONE, services), WIDTH, HEIGHT);
+    A2uiSurface surface = new A2uiSurface(model(), A2uiFallbacks.NONE, services);
+    if (inRootPane) {
+      rootPane = Headless.mountInRootPane(surface, WIDTH, HEIGHT);
+      view = surface;
+    } else {
+      view = Headless.mount(surface, WIDTH, HEIGHT);
+    }
     return this;
   }
 

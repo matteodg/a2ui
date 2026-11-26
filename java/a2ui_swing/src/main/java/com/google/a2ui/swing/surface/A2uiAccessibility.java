@@ -34,10 +34,11 @@ import javax.swing.JComponent;
  * surface. Swing cannot remove a component from the accessible tree. Thus the adapter gives an
  * empty accessible name and an empty accessible description to the component of each view in the
  * hidden part, and it sends no change event for a live component there. It also marks each of these
- * components. Read the mark with {@link #isHidden(JComponent)}. The keyboard focus does not go into
- * a hidden part: the Tab key goes past it, and the component of each view there is not focusable.
- * The record of a component below a hidden component has only the attributes of that component
- * itself.
+ * components. Read the mark with {@link #isHidden(JComponent)}. The user cannot operate a hidden
+ * part. The keyboard focus does not go into it: the Tab key goes past it, and the component of each
+ * view there is not focusable. In a window, the mouse events at a point of a hidden view go to a
+ * component of the adapter that does nothing, and not to the view. The record of a component below
+ * a hidden component has only the attributes of that component itself.
  *
  * @param label the name of the component for assistive tools, if the agent gave one
  * @param description the description of the component for assistive tools, if the agent gave one
