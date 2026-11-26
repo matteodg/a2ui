@@ -65,9 +65,8 @@ final class SuiteRegistry {
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
   /**
-   * The components of the basic catalog that have a Swing view: Text, Row, Column, Button and
-   * TextField in this version. The commit that adds the view of a component adds its name to the
-   * catalog.
+   * The components of the basic catalog that have a Swing view: 10 of the 18 components in this
+   * version. The commit that adds the view of a component adds its name to the catalog.
    */
   static final Set<String> BASIC_VIEWS = SwingBasicCatalog.viewNames();
 

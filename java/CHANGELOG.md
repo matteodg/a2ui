@@ -90,3 +90,12 @@
   pane scrolls vertically. A button of the variant `primary` or `borderless` now keeps its text
   color, and the default Markdown component keeps its position in a scroll pane, after a change of
   the look and feel at run time.
+- `SwingBasicCatalog` now has Swing views for `List`, `Card`, `Tabs`, `Modal` and `Divider`. A list
+  in a parent with no limit has the size of its content, and a list that gets less space scrolls.
+  The selected tab of `Tabs` is state of its view. `Modal` shows its content with the
+  `modalPresenter` service: the default dialog now closes also for the Escape key, has the size of
+  its content and scrolls content that is too high. A button in the trigger of a modal does its
+  action and then opens the modal. Add `FlexLayout.STRETCH_PROPERTY` in
+  `com.google.a2ui.swing.catalog.basic`: a component with this client property fills the cross
+  axis with each `align`. The default Markdown component now has the correct width on a screen with
+  a scale when it gave its size before it came to a window.

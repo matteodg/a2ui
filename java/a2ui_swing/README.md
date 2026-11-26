@@ -65,13 +65,13 @@ from the services. Give the same services to the `A2uiSurface`.
 | `Text`          | The view of the `markdown` service. The default is a `JEditorPane`. | Available |
 | `Row`           | `FlexPanel` with a horizontal `FlexLayout`                          | Available |
 | `Column`        | `FlexPanel` with a vertical `FlexLayout`                            | Available |
+| `List`          | `FlexPanel` in a `JScrollPane`                                      | Available |
+| `Card`          | A `FlexPanel` that paints a rounded outline                         | Available |
+| `Tabs`          | `JTabbedPane`                                                       | Available |
+| `Modal`         | A `FlexPanel` for the trigger, and the `modalPresenter` service     | Available |
+| `Divider`       | `JSeparator`                                                        | Available |
 | `Button`        | `JButton` with the view of the child in it                          | Available |
 | `TextField`     | `JTextField`, `JTextArea` in a `JScrollPane`, or `JPasswordField`   | Available |
-| `List`          | `FlexPanel` in a `JScrollPane`                                      | Later     |
-| `Card`          | A panel with a border                                               | Later     |
-| `Tabs`          | `JTabbedPane`                                                       | Later     |
-| `Modal`         | The `modalPresenter` service. The default is a `JDialog`.           | Later     |
-| `Divider`       | `JSeparator`                                                        | Later     |
 | `CheckBox`      | `JCheckBox`                                                         | Later     |
 | `ChoicePicker`  | `JCheckBox`, `JRadioButton` or `JToggleButton` for each option      | Later     |
 | `Slider`        | `JSlider`                                                           | Later     |
@@ -98,12 +98,34 @@ These rules apply to the views:
 - **Text style.** The base font and the text color are those of the Swing component above a view.
   Thus `surface.setFont(font)` and `surface.setForeground(color)` on the `A2uiSurface` set the text
   style of the full surface. A button gives its text color to its content in the same way.
-- **Spacing.** A `Row` and a `Column` have no padding, no gap and no background. Each `Text`,
-  `Button` and `TextField` has a margin of 8 pixels on its four sides. Text in a button has no
-  margin. This is the leaf margin strategy of the implementation guide.
+- **Spacing.** A `Row`, a `Column` and a `List` have no padding, no gap and no background. Each
+  `Text`, `Divider`, `Card`, `Tabs`, `Button` and `TextField` has a margin of 8 pixels on its four
+  sides. Text in a button has no margin. This is the leaf margin strategy of the implementation
+  guide.
 - **Row and Column.** `justify`, `align` and the `weight` of each child go to the `FlexLayout`.
   With the default `align`, `stretch`, a child fills the cross axis. Thus a button in a column is as
   wide as the column. Use `align: start` for a button with its preferred width.
+- **Card.** The card paints a rounded outline with a border color of the look and feel. It has no
+  background of its own. The padding between the outline and the child is 8 pixels. With the margin
+  of a leaf, the space between the outline and a text is 16 pixels. Text in a card breaks at the
+  width of the card.
+- **Divider.** The line fills the cross axis of its container with each value of `align`. Thus a
+  vertical divider in a `Row` has the height of the row.
+- **List.** A list in a parent with no limit, for example a `Column` of a surface in a scroll pane,
+  has the size of its content and no scroll bar. Then the outer scroll pane scrolls. A list that
+  gets less than its content scrolls in its direction. Examples are a list that is the root of a
+  surface in a window, and a list in a `Column` that is higher than its window. A turn of the mouse
+  wheel that the list cannot use goes to the outer scroll pane. The list is not virtualized: each
+  child has a view. Do not use it for some thousand children.
+- **Tabs.** The selected tab is state of the view. It is an index, and it stays when the titles or
+  the other tabs change. The view mounts only the child of the selected tab. Thus a change of the
+  tab disposes the view of the child before. A title is plain text.
+- **Modal.** Only the trigger shows in the surface. A `Button` in the trigger does its own action,
+  and then the modal opens. A click on a different part of the trigger also opens the modal. A
+  trigger with no button gets the keyboard focus and opens with the Space key and the Enter key. The
+  view makes the view of the content when the modal opens, and the adapter disposes it when the
+  modal closes. The default presenter shows a modal dialog in the center of the window of the
+  surface. The user closes it with the close control of the dialog or with the Escape key.
 - **Button.** The view calls the action in the Swing listener of the gesture. The variant `default`
   is the button of the look and feel. The adapter paints `primary` with the accent color of the look
   and feel, and `borderless` as a link. The user cannot operate a button while a check of the
@@ -344,12 +366,20 @@ The components that have a weight share the space that the other components do n
 proportion to their weights. `Justify.STRETCH` gives the free space to all the components in equal
 parts. Each enum reads the text of the basic catalog: `Justify.fromWire("spaceBetween")`.
 
+A component with the client property `FlexLayout.STRETCH_PROPERTY` set to `Boolean.TRUE` fills the
+cross axis with each value of `align`, as an element with `align-self: stretch` does in CSS.
+
 `getPreferredSize()` of a Swing component has no width as its input. Thus text that wraps has the
 preferred height of one line. A component whose height depends on its width implements
 `HeightForWidth`. `FlexLayout` gives such a component the height for the width that it gets, in the
 same layout pass. `FlexPanel` is a `JPanel` with a `FlexLayout` that implements `HeightForWidth`
 for its content. It is not opaque, and it takes its font and its foreground color from the component
 above it. Use `FlexPanel` for a custom container. Then the text below it wraps correctly.
+
+A `JScrollPane` and a `JTabbedPane` do not pass the width to their content. The views of `List` and
+of `Tabs` show how a subclass of such a component implements `HeightForWidth`. A scroll pane is
+also the root of a layout for Swing. A scroll pane that must have the size of its content returns
+false from `isValidateRoot()`. Then a change of the content makes the parent do its layout again.
 
 ## Fallbacks
 
@@ -383,6 +413,14 @@ service has a default. `A2uiServices.DEFAULT.withImageLoader(loader)` replaces o
 
 A view gets the services from `ViewContext.services()`.
 
+The view of the `Modal` component gives its content to the `modalPresenter` service. The default
+dialog has the size of the content, and it is not larger than the window of the surface less 48
+pixels on each side. Text breaks at the width of the dialog, and the dialog scrolls content that is
+too high. An application that shows the content in a different way, for example in a layer of its
+window, implements `ModalPresenter`: `present(owner, content, onClosed)` shows the content and
+returns a handle. Call `onClosed` when the user closes the content. The view calls the handle when
+the surface stops to show the modal.
+
 ## Accessibility
 
 The adapter gives the `@accessibility` attributes of each component to the Swing component of its
@@ -404,18 +442,20 @@ view, after each update. A view does not do this work.
 The tests run with no display (`-Djava.awt.headless=true`). A test runs its Swing code on the EDT.
 It connects an `A2uiSurface` with a call of `addNotify()`, in a parent that is not in a window.
 Then `validate()` does the layout, and `print(Graphics)` paints the component on an image. The test
-helpers `Edt`, `Headless` and `Snapshots` in `src/test/java` do this work.
+helpers `Edt`, `Headless` and `Snapshots` in `src/test/java` do this work. `TestModalPresenter` is
+a `ModalPresenter` that needs no window: it keeps the content of each modal in a panel.
 
 `SurfaceSnapshotTest` and `BasicCatalogSnapshotTest` write PNG images of surfaces to
 `target/snapshots/`. The second test writes each surface in three look and feels: the look and feel
 of the test JVM, Nimbus and the look and feel of the system. Look at the images after a change of a
-view or of a layout. The build does not compare them.
+view or of a layout. The build does not compare them. The image of the content of a modal is a
+second file, with `-modal-content` in its name.
 
 The conformance harness of this module has the name `swing`. It registers each suite of the
 `adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
 only if the adapter has a view for each basic catalog component that the case uses. The harness
-records each other case as skipped, with the names of the absent views. In this version, 19 cases
-run: the 7 cases of the Markdown subset, 8 cases of the surface suite and 4 cases of the
+records each other case as skipped, with the names of the absent views. In this version, 31 cases
+run: the 7 cases of the Markdown subset, 19 cases of the surface suite and 5 cases of the
 accessibility suite. The harness does not run the `axeCore` rules, which need a DOM. See
 [the conformance section](../README.md#conformance) for the commands.
 
