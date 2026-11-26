@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
+import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 import javax.swing.text.JTextComponent;
 
@@ -49,8 +50,8 @@ import javax.swing.text.JTextComponent;
  * <p>The handler mounts an {@code A2uiSurface} with no window and runs the steps of the case. It
  * reads each expectation from the mounted Swing components where a component shows the value: the
  * text of a text component, the value of a control, the messages of the checks, the state of a
- * button. A step operates the Swing control: it sets the text of a text field, and it clicks a
- * button.
+ * button. A step operates the Swing control: it sets the text of a text field, it clicks a button,
+ * and it selects a tab of a tabbed pane.
  *
  * <p>An input step for a component type that has no view in this version fails. The registry skips
  * the cases that need such a component.
@@ -220,6 +221,21 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       session.gesture = true;
       try {
         field.setText(asString(value, "inputValue of " + where));
+      } finally {
+        session.gesture = false;
+      }
+      return;
+    }
+    if (node.node().type().equals("Tabs") && session.control(node) instanceof JTabbedPane tabs) {
+      // The input value of a Tabs component is the index of the tab that the user selects.
+      if (!(value instanceof Number index)
+          || index.intValue() < 0
+          || index.intValue() >= tabs.getTabCount()) {
+        throw new AssertionError(where + ": '" + value + "' is not the index of a tab.");
+      }
+      session.gesture = true;
+      try {
+        tabs.setSelectedIndex(index.intValue());
       } finally {
         session.gesture = false;
       }
