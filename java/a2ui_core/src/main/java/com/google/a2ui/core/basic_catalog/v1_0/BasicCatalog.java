@@ -74,8 +74,7 @@ public final class BasicCatalog {
   /**
    * Makes the catalog with the code of its functions, for a renderer.
    *
-   * <p>The components and the document of the result are those of {@link #api()}. A function that
-   * this SDK does not implement fails when a call runs it.
+   * <p>The components and the document of the result are those of {@link #api()}.
    *
    * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
    *     formatDate} and {@code pluralize} write
@@ -91,8 +90,18 @@ public final class BasicCatalog {
             .bodies());
   }
 
-  private static Catalog<ComponentApi, FunctionImplementation> implement(
-      Map<String, FunctionBody> bodies) {
+  /**
+   * Makes the catalog with the given code.
+   *
+   * <p>This SDK has the code of each function of the catalog document that it was built with. The
+   * build copies the document from the A2UI repository. If a newer document adds a function, that
+   * function has no code until the SDK adds it. Then the catalog still loads, and only a call of
+   * that function fails.
+   *
+   * @param bodies the code by function name
+   * @return the catalog
+   */
+  static Catalog<ComponentApi, FunctionImplementation> implement(Map<String, FunctionBody> bodies) {
     List<FunctionImplementation> functions = new ArrayList<>();
     for (FunctionApi function : api().functions().values()) {
       FunctionBody body = bodies.get(function.name());

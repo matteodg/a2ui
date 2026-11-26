@@ -474,12 +474,70 @@ class BasicFunctionsTest {
   }
 
   @Test
-  void aFunctionThatTheSdkDoesNotImplementFailsWhenItRuns() {
+  void regexTellsIfAPartOfTheValueMatchesThePattern() {
+    Map<String, Object> invalid = invalid("Value does not match required pattern.");
+
+    assertEquals(
+        VALID, evaluate("regex", "value", "94043-1234", "pattern", "^\\d{5}(?:-\\d{4})?$"));
+    assertEquals(invalid, evaluate("regex", "value", "9404", "pattern", "^\\d{5}(?:-\\d{4})?$"));
+    assertEquals(VALID, evaluate("regex", "value", "order 66", "pattern", "\\d+"));
+    assertEquals(invalid, evaluate("regex", "value", "abc\n", "pattern", "^abc$"));
+    assertEquals(VALID, evaluate("regex", "value", "anything", "pattern", ""));
+  }
+
+  @Test
+  void regexReadsTheValueAndThePatternAsText() {
+    assertEquals(VALID, evaluate("regex", "value", 12345, "pattern", "^\\d{5}$"));
+    assertEquals(VALID, evaluate("regex", "value", 2.5, "pattern", "^2\\.5$"));
+    assertEquals(VALID, evaluate("regex", "value", true, "pattern", "^true$"));
+    assertEquals(VALID, evaluate("regex", "value", null, "pattern", "^$"));
+    assertEquals(VALID, evaluate("regex", "pattern", "^$"));
+    assertEquals(VALID, evaluate("regex", "value", "7", "pattern", 7));
+    assertEquals(VALID, evaluate("regex", "value", "anything"));
+  }
+
+  @Test
+  void regexRefusesAPatternThatIsNotSafeBeforeItExaminesTheValue() {
+    String longValue = "a".repeat(4097);
+
+    A2uiExpressionError unsafe =
+        assertThrows(
+            A2uiExpressionError.class,
+            () -> evaluate("regex", "value", longValue, "pattern", "(a+)+$"));
+    A2uiExpressionError syntax =
+        assertThrows(
+            A2uiExpressionError.class, () -> evaluate("regex", "value", "aa", "pattern", "(a)\\1"));
+
+    assertTrue(unsafe.getMessage().contains("NESTED_QUANTIFIER"), unsafe.getMessage());
+    assertTrue(syntax.getMessage().contains("UNSUPPORTED_SYNTAX"), syntax.getMessage());
+  }
+
+  @Test
+  void regexDoesNotMatchAValueThatIsLongerThanTheLimit() {
+    Map<String, Object> invalid = invalid("Value does not match required pattern.");
+
+    assertEquals(VALID, evaluate("regex", "value", "a".repeat(4096), "pattern", "^a+$"));
+    assertEquals(invalid, evaluate("regex", "value", "a".repeat(4097), "pattern", "^a+$"));
+  }
+
+  @Test
+  void theSdkHasTheCodeOfEachFunctionOfTheCatalog() {
+    assertEquals(
+        BasicCatalog.api().functions().keySet(),
+        new BasicFunctions(Locale.US, null).bodies().keySet());
+  }
+
+  @Test
+  void aFunctionThatHasNoCodeFailsWhenItRuns() {
+    Catalog<ComponentApi, FunctionImplementation> catalog = BasicCatalog.implement(Map.of());
+
     A2uiExpressionError error =
         assertThrows(
-            A2uiExpressionError.class, () -> evaluate("regex", "value", "a", "pattern", "a"));
+            A2uiExpressionError.class,
+            () -> context(catalog, Map.of()).resolveDynamicValue(call("not", "value", true)));
 
-    assertTrue(error.getMessage().contains("'regex'"), error.getMessage());
-    assertTrue(error.getMessage().contains("not implemented"), error.getMessage());
+    assertEquals(
+        "The function 'not' of the basic catalog is not implemented in this SDK.",
+        error.getMessage());
   }
 }

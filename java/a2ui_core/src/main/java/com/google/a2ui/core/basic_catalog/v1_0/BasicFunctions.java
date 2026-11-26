@@ -17,6 +17,7 @@
 package com.google.a2ui.core.basic_catalog.v1_0;
 
 import com.google.a2ui.core.catalog.FunctionBody;
+import com.google.a2ui.core.common.A2uiRegex;
 import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.expressions.Expression;
@@ -82,6 +83,7 @@ final class BasicFunctions {
   Map<String, FunctionBody> bodies() {
     Map<String, FunctionBody> bodies = new LinkedHashMap<>();
     bodies.put("required", (args, context) -> required(args.get("value")));
+    bodies.put("regex", (args, context) -> regex(args.get("value"), args.get("pattern")));
     bodies.put(
         "length", (args, context) -> length(args.get("value"), args.get("min"), args.get("max")));
     bodies.put(
@@ -273,6 +275,19 @@ final class BasicFunctions {
             || "".equals(value)
             || (value instanceof Collection<?> list && list.isEmpty());
     return absent ? invalid("This field is required.") : valid();
+  }
+
+  /**
+   * Tells if a part of the value matches a pattern in the A2UI regex dialect.
+   *
+   * <p>The function examines the pattern before the value. Thus a pattern that is not safe always
+   * fails, also for a value that cannot match.
+   */
+  private static Map<String, Object> regex(Object value, Object pattern) {
+    A2uiRegex compiled = A2uiRegex.compile(Coercion.toText(pattern));
+    return compiled.test(Coercion.toText(value))
+        ? valid()
+        : invalid("Value does not match required pattern.");
   }
 
   /**
