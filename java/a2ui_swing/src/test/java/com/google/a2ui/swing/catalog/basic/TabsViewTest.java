@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.Insets;
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -238,6 +240,26 @@ class TabsViewTest {
               pane());
       assertTrue(child.y > 10, child.toString());
       assertTrue(new Rectangle(pane().getSize()).contains(child), child.toString());
+    });
+  }
+
+  @Test
+  void theContentOfATabHasTheTextStyleOfTheSurfaceAndNotOfTheHeaders() {
+    Edt.run(() -> {
+      show();
+      Font headers = pane().getFont().deriveFont(Font.BOLD | Font.ITALIC, 19f);
+      pane().setFont(headers);
+      pane().setForeground(Color.MAGENTA);
+      Font surface = new Font(Font.SERIF, Font.PLAIN, 15);
+      fixture.view.setFont(surface);
+      fixture.view.setForeground(Color.BLUE);
+      fixture.view.validate();
+      JComponent page = (JComponent) pane().getComponentAt(0);
+
+      assertEquals(surface, page.getFont());
+      assertEquals(Color.BLUE, page.getForeground());
+      assertEquals(surface, BasicStyle.fontOf(fixture.componentOf("one")));
+      assertEquals(Color.BLUE, BasicStyle.foregroundOf(fixture.componentOf("one")));
     });
   }
 

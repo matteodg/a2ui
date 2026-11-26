@@ -23,8 +23,13 @@ import com.google.a2ui.swing.catalog.ChildViews;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import java.awt.Color;
+import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import javax.swing.JComponent;
 import javax.swing.JTabbedPane;
@@ -202,9 +207,58 @@ final class TabsView implements SwingComponentView {
       flexLayout().setJustify(FlexLayout.Justify.STRETCH);
     }
 
+    /**
+     * Gives the panel the font and the text color of the component above the tabbed pane. The font
+     * of a tabbed pane is the font of its headers, which is bold in some look and feels. The
+     * content of a tab has the text style of the surface, as the content of each other container.
+     *
+     * <p>Swing does not tell a component that a property of a component above it changed. Thus the
+     * panel reads these values each time a layout asks for its size, and each time it paints.
+     */
+    private void sync() {
+      Container pane = getParent();
+      Container above = pane == null ? null : pane.getParent();
+      Font font = above == null ? null : above.getFont();
+      Color color = above == null ? null : above.getForeground();
+      if (!Objects.equals(font, isFontSet() ? getFont() : null)) {
+        setFont(font);
+      }
+      if (!Objects.equals(color, isForegroundSet() ? getForeground() : null)) {
+        setForeground(color);
+      }
+    }
+
     @Override
     public Dimension getPreferredSize() {
-      return probing ? new Dimension(PROBE, PROBE) : super.getPreferredSize();
+      if (probing) {
+        return new Dimension(PROBE, PROBE);
+      }
+      sync();
+      return super.getPreferredSize();
+    }
+
+    @Override
+    public Dimension getMinimumSize() {
+      sync();
+      return super.getMinimumSize();
+    }
+
+    @Override
+    public int preferredHeightFor(int width) {
+      sync();
+      return super.preferredHeightFor(width);
+    }
+
+    @Override
+    public void doLayout() {
+      sync();
+      super.doLayout();
+    }
+
+    @Override
+    protected void paintComponent(Graphics graphics) {
+      sync();
+      super.paintComponent(graphics);
     }
   }
 
