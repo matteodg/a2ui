@@ -63,9 +63,8 @@ The harness `java-core` records the cases of protocol versions before 1.0 and th
 framework adapter suites as skipped, each with its reason.
 
 The harness `swing` runs the four suites of the `adapter` corpus. It runs a case only if the adapter
-has a view for each basic catalog component that the case uses. It records each other case as
-skipped, with the names of the components that have no view. It also records the cases of protocol
-v0.9 as skipped.
+has a view for each basic catalog component that the case uses. The adapter has each view, thus the
+harness runs each case of protocol v1.0. It records the cases of protocol v0.9 as skipped.
 
 The timing cases of `core/message_processor_scaling.yaml` run only in the `performance` profile. The
 usual build records them as skipped. Give the two builds different manifest directories:

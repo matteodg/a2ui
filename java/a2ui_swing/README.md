@@ -97,9 +97,8 @@ These rules apply to the views:
   Thus `surface.setFont(font)` and `surface.setForeground(color)` on the `A2uiSurface` set the text
   style of the full surface. A button gives its text color to its content in the same way.
 - **Spacing.** A `Row`, a `Column` and a `List` have no padding, no gap and no background. Each
-  `Text`, `Divider`, `Card`, `Tabs`, `Button`, `TextField`, `CheckBox`, `ChoicePicker`, `Slider` and
-  `DateTimeInput` has a margin of 8 pixels on its four sides. Text in a button has no margin. This is the leaf margin strategy of the implementation
-  guide.
+  other component has a margin of 8 pixels on its four sides. Text and an icon in a button have no
+  margin. This is the leaf margin strategy of the implementation guide.
 - **Row and Column.** `justify`, `align` and the `weight` of each child go to the `FlexLayout`.
   With the default `align`, `stretch`, a child fills the cross axis. Thus a button in a column is as
   wide as the column. Use `align: start` for a button with its preferred width.
@@ -157,6 +156,38 @@ These rules apply to the views:
   and no `enableTime`, the field has a date. The view writes ISO 8601 text in the form of the
   enabled parts, and it keeps the seconds and the zone of the value. It never changes a value to a
   different zone. A value that is not ISO 8601 text shows as it is and is not written back.
+- **Icon.** The icon is a square of 24 pixels, or of 1.5 times the font size if that is larger. Its
+  color is the text color of the component above it. Thus an icon in a primary button has the color
+  of the text of the button. A name of the catalog shows a shape of the module. See
+  [the shapes of the icons](#the-shapes-of-the-icons). An object with `svgPath` shows the SVG path
+  data of the agent, in a view box of 24 by 24 units and with the non-zero fill rule. The view
+  accepts at most 16 384 characters of path data. A name that the catalog does not have, and path
+  data that is not correct, show nothing, and the icon keeps its space. The accessible name of a
+  named icon is its name as words, for example `arrow back`. A button that shows only icons takes
+  its name from them.
+- **Image.** The view asks the `imageLoader` service for the image and shows a neutral area until
+  the image arrives. The area gets a small mark when the loader gives no image. The view cancels
+  the request when the URL changes and when the surface stops to show the component. The variants
+  `icon` (24 pixels) and `avatar` (a circle of 40 pixels) have a fixed box. `header` has the width
+  of its container and a height of 200 pixels. `smallFeature` (at most 100 by 100 pixels),
+  `mediumFeature` (at most 300 by 400 pixels) and `largeFeature` (at most the width of the
+  container by 400 pixels) have a box with the proportions of the image, which is never larger than
+  the image. `fit` applies as CSS `object-fit`. Its default is `fill`, and `cover` for `avatar` and
+  `header`. `description` is the accessible name and the tool tip.
+- **Video and AudioPlayer.** Swing cannot play media. If the `mediaPlayer` service gives a
+  `MediaView`, the view shows its component and gives the URLs to it. The default service gives
+  none. Then `Video` shows an area of 16 to 9, at most 480 pixels wide, with the poster image and a
+  play mark, and `AudioPlayer` shows a button with a play mark and the description. The area and
+  the button open the URL in an external application with the `urlOpener` service. This occurs only
+  when the user operates them, and only for an absolute `http` or `https` URL. The accessible name
+  tells what the control does.
+- **Media URLs.** The URLs of `Image`, `Video` and `AudioPlayer` come from the agent. Each view
+  examines them with `MediaUrls.safe`, which applies the rules of the implementation guide: only
+  `http`, `https` and `data` URLs and relative paths, a host after the scheme, and no path that
+  starts with two slashes. A URL that is not safe shows the neutral area or a control that the user
+  cannot operate. That is not an error of the surface. A relative path is safe, but the default
+  services have no base location and load nothing for it. The accessible component of each of
+  these views has the accepted URL as the client property `SwingBasicCatalog.MEDIA_URL_PROPERTY`.
 
 To replace the view of one component, make a catalog with a different list:
 
@@ -429,12 +460,31 @@ service has a default. `A2uiServices.DEFAULT.withImageLoader(loader)` replaces o
 | Service          | Interface          | Default                                                                                         |
 | :--------------- | :----------------- | :---------------------------------------------------------------------------------------------- |
 | `markdown`       | `MarkdownRenderer` | Shows the Markdown subset of the protocol in a `JEditorPane` that the user cannot edit.         |
-| `imageLoader`    | `ImageLoader`      | Reads `http`, `https` and `data` URLs with `ImageIO`, not on the EDT. It has no cache.          |
+| `imageLoader`    | `ImageLoader`      | Reads `http`, `https` and `data` URLs with `ImageIO`, not on the EDT, with limits. No cache.    |
 | `mediaPlayer`    | `MediaPlayer`      | `MediaPlayer.NONE`. Swing cannot play media. An application can supply a JavaFX or vlcj player. |
 | `modalPresenter` | `ModalPresenter`   | Shows a modal `JDialog` above the window of the surface. It needs a display.                    |
 | `urlOpener`      | `UrlOpener`        | Opens the URL in the browser of the system with `java.awt.Desktop`.                             |
 
 A view gets the services from `ViewContext.services()`.
+
+The default image loader does not trust the server of an image. It has a timeout of 10 seconds to
+connect and of 20 seconds for each read. It reads at most 16 MiB and decodes at most 40 million
+pixels. It follows at most 5 redirections, each one only to an `http` or `https` URL that
+`MediaUrls` accepts. It accepts only the status 200, and it keeps no temporary file. It reads the
+formats of `ImageIO`, for example PNG, JPEG, GIF and BMP, but not WebP, AVIF or SVG. An application
+that needs a cache, more formats or a base location for relative paths gives its own `ImageLoader`.
+The loader gets each URL after the check of `MediaUrls`. It calls its result function one time, on
+the EDT, and it stops when the view cancels the request.
+
+To play media in the surface, give a `MediaPlayer`. `createView(kind)` makes one `MediaView` for
+each `Video` and each `AudioPlayer`: a Swing component with the controls of the player,
+`setSource(url)`, `setPoster(url)` and `dispose()`. The adapter does not start the media. A failure
+of a media view does not fail the surface.
+
+```java
+A2uiServices services =
+    A2uiServices.DEFAULT.withImageLoader(myCachingLoader).withMediaPlayer(myPlayer);
+```
 
 The view of the `Modal` component gives its content to the `modalPresenter` service. The default
 dialog has the size of the content, and it is not larger than the window of the surface less 48
@@ -456,9 +506,28 @@ view, after each update. A view does not do this work.
   button. An explicit label is before the inferred name.
 - The Java Accessibility API has no equivalent of `hidden` and of `live`. The adapter keeps all the
   attributes as a client property of the Swing component. `A2uiAccessibility.of(component)` reads
-  them. A hidden component also gets an empty accessible name. A live component fires an accessible
-  property change after each update. A screen reader can ignore the two.
+  them. A live component fires an accessible property change after each update. A screen reader
+  can ignore it.
+- `hidden` applies to a component and to all the components below it. Swing cannot remove a
+  component from the accessible tree. Thus the adapter gives an empty accessible name and an empty
+  accessible description to the component of each view in the hidden part, sends no change event
+  for a live component there, and marks each of these components.
+  `A2uiAccessibility.isHidden(component)` reads the mark. The user can still give the focus to a
+  control in a hidden part. A Swing component that a view makes for its own use, for example the
+  label of a field, keeps its name.
 - A view whose control is in a panel overrides `accessibleComponent()` and returns the control.
+
+## The shapes of the icons
+
+The module has no icon font, no dependency and no network access. Thus it has the resource
+`com/google/a2ui/swing/catalog/basic/icons.properties`, with one line for each of the 59 icon names
+of the basic catalog: the name and the SVG path data of its shape, in a view box of 24 by 24 units,
+with the non-zero fill rule.
+
+The shapes are original drawings for this module. They are simple shapes for the usual meaning of
+each name. They are not copies of the Material Symbols or of the Material Icons, and they are not
+equal to them. Thus the resource has the license of this repository and no other notice. To show a
+different shape, replace the view of the `Icon` component, or send the shape as `svgPath`.
 
 ## Tests
 
@@ -467,6 +536,12 @@ It connects an `A2uiSurface` with a call of `addNotify()`, in a parent that is n
 Then `validate()` does the layout, and `print(Graphics)` paints the component on an image. The test
 helpers `Edt`, `Headless` and `Snapshots` in `src/test/java` do this work. `TestModalPresenter` is
 a `ModalPresenter` that needs no window: it keeps the content of each modal in a panel.
+`TestImageLoader` is an `ImageLoader` that gives generated images, and `TestMediaPlayer` is a
+`MediaPlayer` that plays nothing.
+
+The tests do not use the network. The test JVM has proxy settings that send each HTTP request to a
+closed port of the computer. The tests of the HTTP part of the default image loader use a server
+socket on the loopback address.
 
 `SurfaceSnapshotTest` and `BasicCatalogSnapshotTest` write PNG images of surfaces to
 `target/snapshots/`. The second test writes each surface in three look and feels: the look and feel
