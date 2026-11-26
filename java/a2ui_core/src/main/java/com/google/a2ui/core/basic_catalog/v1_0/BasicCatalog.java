@@ -19,7 +19,13 @@ package com.google.a2ui.core.basic_catalog.v1_0;
 import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionApi;
+import com.google.a2ui.core.catalog.FunctionBody;
+import com.google.a2ui.core.catalog.FunctionImplementation;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.internal.Json;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /** The basic catalog for protocol v1.0. It has 18 components and 14 functions. */
 public final class BasicCatalog {
@@ -38,6 +44,37 @@ public final class BasicCatalog {
    */
   public static Catalog<ComponentApi, FunctionApi> api() {
     return Api.CATALOG;
+  }
+
+  /**
+   * Makes the catalog with the code of its functions, for a renderer.
+   *
+   * <p>The components and the document of the result are those of {@link #api()}. A function that
+   * this SDK does not implement fails when a call runs it.
+   *
+   * @return the catalog
+   */
+  public static Catalog<ComponentApi, FunctionImplementation> withFunctions() {
+    return implement(new BasicFunctions().bodies());
+  }
+
+  private static Catalog<ComponentApi, FunctionImplementation> implement(
+      Map<String, FunctionBody> bodies) {
+    List<FunctionImplementation> functions = new ArrayList<>();
+    for (FunctionApi function : api().functions().values()) {
+      FunctionBody body = bodies.get(function.name());
+      functions.add(
+          new FunctionImplementation(
+              function, body != null ? body : notImplemented(function.name())));
+    }
+    return api().withFunctions(functions);
+  }
+
+  private static FunctionBody notImplemented(String name) {
+    return (args, context) -> {
+      throw new A2uiExpressionError(
+          "The function '" + name + "' of the basic catalog is not implemented in this SDK.");
+    };
   }
 
   /** Reads the document at the first call of {@link #api()}. */
