@@ -38,6 +38,7 @@ import com.google.a2ui.swing.surface.A2uiPendingInfo;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.LogCapture;
+import com.google.a2ui.swing.testing.TestCatalog;
 import com.google.a2ui.swing.testing.TestSurface;
 import java.util.ArrayList;
 import java.util.List;
@@ -353,6 +354,40 @@ class NodeHostTest {
 
       assertNull(field.getToolTipText());
       assertTrue(host.node().props().get().isValid());
+    });
+  }
+
+  @Test
+  void aViewThatFailsInAnUpdateStaysAndTheFailureGoesToTheLog() {
+    Edt.run(() -> {
+      NodeHost host =
+          rootHost(Map.of("text", "One"), component("root", "Label", "text", path("/text")));
+      JLabel label = (JLabel) host.component().orElseThrow();
+
+      try (LogCapture log = new LogCapture()) {
+        surface.setData("/text", TestCatalog.FAILING_TEXT);
+
+        assertEquals(
+            List.of("The view of the component 'root' failed in an update."), log.messages);
+      }
+      surface.setData("/text", "Two");
+
+      assertSame(label, host.component().orElseThrow());
+      assertEquals("Two", label.getText());
+    });
+  }
+
+  @Test
+  void anImplementationThatMakesNoViewShowsNothingAndTheFailureGoesToTheLog() {
+    Edt.run(() -> {
+      try (LogCapture log = new LogCapture()) {
+        NodeHost host = rootHost(Map.of(), component("root", "Broken"));
+
+        assertEquals(Optional.empty(), host.component());
+        assertEquals(Optional.empty(), host.view());
+        assertEquals(List.of("The implementation of 'Broken' did not make a view."), log.messages);
+        assertEquals(0, scope.activeSubscriptions());
+      }
     });
   }
 

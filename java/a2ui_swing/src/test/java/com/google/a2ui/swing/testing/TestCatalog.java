@@ -46,7 +46,8 @@ import javax.swing.JTextField;
 /**
  * A small custom catalog for the tests of the adapter. It shows that the public API is sufficient
  * to write components: a label, a text field with a two-way binding and checks, a button with an
- * action and one child, and a container with a list of children.
+ * action and one child, and a container with a list of children. The component {@code Broken} makes
+ * no view, for the tests of a failure.
  *
  * <p>The catalog has the functions of the basic catalog with their code. It has none of the
  * components of the basic catalog.
@@ -54,6 +55,9 @@ import javax.swing.JTextField;
 public final class TestCatalog {
   /** The ID of the catalog. */
   public static final String ID = "https://example.com/catalogs/swing-test/v1/catalog.json";
+
+  /** The text that makes the view of a {@code Label} fail in its update. */
+  public static final String FAILING_TEXT = "boom";
 
   /** The URLs that the function {@code openUrl} opened. */
   public final List<URI> opened = new ArrayList<>();
@@ -98,7 +102,13 @@ public final class TestCatalog {
                         "justify", Map.of("type", "string"),
                         "align", Map.of("type", "string"),
                         "gap", Map.of("type", "number"))),
-                context -> track(new BoxView(context))));
+                context -> track(new BoxView(context))),
+            SwingComponentImplementation.of(
+                "Broken",
+                schema("Broken", Map.of()),
+                context -> {
+                  throw new IllegalStateException("This component cannot make a view.");
+                }));
     this.catalog =
         BasicCatalog.withFunctions(Locale.US, opened::add)
             .derive(ID, List.of(), List.of(), null, List.of(), null)
@@ -182,7 +192,11 @@ public final class TestCatalog {
 
     @Override
     void show(NodeProps<?> props) {
-      label.setText(Coercion.toText(props.value("text")));
+      String text = Coercion.toText(props.value("text"));
+      if (text.equals(FAILING_TEXT)) {
+        throw new IllegalStateException("The label cannot show this text.");
+      }
+      label.setText(text);
     }
   }
 
