@@ -74,14 +74,19 @@ final class SuiteRegistry {
   private static final String NEEDS_RESOLUTION =
       "Expects resolved property values, and java-core does not resolve nodes yet";
 
+  private static final String V1_ONLY = "java-core implements protocol v1.0 only";
+
   /** The cases that the harness skips, by name. Each case has its reason. */
   static final Map<String, String> SKIP_TEST_NAMES =
       Map.of(
-          "test_escaped_doubled_at_unescaping", NEEDS_RESOLUTION,
-          "test_escaped_doubled_at_metadata_unescaping", NEEDS_RESOLUTION);
+          "test_escaped_doubled_at_unescaping",
+          NEEDS_RESOLUTION,
+          "test_escaped_doubled_at_metadata_unescaping",
+          NEEDS_RESOLUTION,
+          "test_v10_get_renderer_data_model_filters_by_surface_protocol_version",
+          "Creates a v0.9 surface; " + V1_ONLY);
 
   private static final String NOT_YET = "Not implemented in java-core yet";
-  private static final String V1_ONLY = "java-core implements protocol v1.0 only";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
   private static final String PROCESS = "process_messages";
@@ -193,15 +198,27 @@ final class SuiteRegistry {
    *
    * @param actions the actions of the suite that the harness runs: {@code process_messages}, {@code
    *     validate}, or the two
-   * @param alsoUnsupported the entries for {@link Supported#unsupported()}: each key, and after it
-   *     its reason
    */
-  private static Supported processorSuite(List<String> actions, String... alsoUnsupported) {
+  private static Supported processorSuite(List<String> actions) {
+    return processorSuite(actions, Map.of());
+  }
+
+  /**
+   * Makes the support for a suite whose cases give messages to a message processor or ask a
+   * processor a question.
+   *
+   * @param actions the actions of the suite that give messages: {@code process_messages}, {@code
+   *     validate}, or the two
+   * @param otherActions the handler for each other action of the suite
+   */
+  private static Supported processorSuite(
+      List<String> actions, Map<String, CaseHandler> otherActions) {
     Map<String, CaseHandler> handlers = new LinkedHashMap<>();
     for (String action : actions) {
       handlers.put(action, new ProcessMessagesHandler(action.equals(VALIDATE)));
     }
-    return new Supported(handlers, reasons(alsoUnsupported), Set.of());
+    handlers.putAll(otherActions);
+    return new Supported(handlers);
   }
 
   private static Map<String, SuiteSupport> coreSuites() {
@@ -259,10 +276,9 @@ final class SuiteRegistry {
         "core/message_processor_v1_0.yaml",
         processorSuite(
             List.of(PROCESS, VALIDATE),
-            "get_renderer_capabilities",
-            NOT_YET,
-            "get_renderer_data_model",
-            NOT_YET));
+            Map.of(
+                "get_renderer_capabilities", new RendererCapabilitiesHandler(),
+                "get_renderer_data_model", new RendererDataModelHandler())));
     suites.put("core/multi_catalog.yaml", new Unsupported(NOT_YET));
     suites.put("core/node_resolution.yaml", new Unsupported(NOT_YET));
     suites.put("core/reserved_keys.yaml", processorSuite(List.of(PROCESS, VALIDATE)));
