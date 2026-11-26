@@ -17,6 +17,8 @@
 package com.google.a2ui.swing.conformance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -153,15 +155,27 @@ class SuiteRegistryTest {
   }
 
   @Test
-  void eachCaseOfTheCorpusSkipsWithAReasonInThisVersion() {
+  void eachCaseOfTheCorpusRunsWithAHandlerOrSkipsWithAReason() {
     SuiteRegistry.ADAPTER_SUITES.forEach((suite, support) -> {
       for (ConformanceCase testCase : ConformanceLoader.loadSuite(suite)) {
         String reason = SuiteRegistry.skipReason(testCase, support);
-        assertTrue(reason != null && !reason.isBlank(), testCase.location());
-        if (support instanceof Supported) {
-          assertTrue(reason.startsWith(SuiteRegistry.NEEDS_BASIC_VIEWS + ": "), reason);
+        if (reason == null) {
+          assertNotNull(
+              SuiteRegistry.handlerFor(testCase, (Supported) support), testCase.location());
+        } else {
+          assertFalse(reason.isBlank(), testCase.location());
         }
       }
     });
+  }
+
+  @Test
+  void eachCaseOfTheMarkdownSuiteRuns() {
+    String suite = "adapter/markdown_subset.yaml";
+    for (ConformanceCase testCase : ConformanceLoader.loadSuite(suite)) {
+      assertNull(
+          SuiteRegistry.skipReason(testCase, SuiteRegistry.ADAPTER_SUITES.get(suite)),
+          testCase.location());
+    }
   }
 }

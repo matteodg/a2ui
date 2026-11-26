@@ -74,9 +74,6 @@ final class SuiteRegistry {
 
   private static final String V1_ONLY = "the Swing adapter shows protocol v1.0 only";
 
-  private static final String NEEDS_MARKDOWN =
-      "needs the Markdown view of the Swing Text component of the basic catalog";
-
   /**
    * Each suite of the {@code adapter} corpus of {@code conformance/manifest_corpora.json}.
    *
@@ -91,7 +88,10 @@ final class SuiteRegistry {
     Map<String, SuiteSupport> suites = new LinkedHashMap<>();
     suites.put("core/adapter_conformance.yaml", new Supported(Set.of("render_surface"), Map.of()));
     suites.put("core/accessibility.yaml", new Supported(Set.of("accessibility_check"), Map.of()));
-    suites.put("adapter/markdown_subset.yaml", new Unsupported(NEEDS_MARKDOWN));
+    suites.put(
+        "adapter/markdown_subset.yaml",
+        new Supported(
+            Set.of("render_markdown"), Map.of("render_markdown", new RenderMarkdownHandler())));
     suites.put("adapter/adapter_conformance_v0_9.yaml", new Unsupported(V1_ONLY));
     return Collections.unmodifiableMap(suites);
   }
