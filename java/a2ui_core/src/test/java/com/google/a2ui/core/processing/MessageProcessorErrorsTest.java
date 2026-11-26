@@ -165,6 +165,34 @@ class MessageProcessorErrorsTest {
   }
 
   @Test
+  void aComponentIdAndATypeNameMustBeIdentifiers() {
+    processor.processMessages(create("s"));
+    Map<String, Object> badId = map("id", "123-invalid", "component", "Text", "text", "x");
+    Map<String, Object> badType = map("id", "root", "component", "My-Widget");
+
+    A2uiValidationError id = rejected(update(badId));
+    A2uiValidationError type =
+        assertThrows(
+            A2uiValidationError.class,
+            () -> processor.processMessages(update(badType), ValidationConfig.RELAXED));
+
+    assertEquals(Optional.of("/components/0/id"), id.path());
+    assertEquals(
+        List.of(
+            new A2uiErrorDetail(
+                "/id",
+                "invalid_value",
+                "Component id '123-invalid' must be a valid UAX #31 identifier")),
+        id.details());
+    assertEquals(Optional.of("/components/0/component"), type.path());
+    assertEquals(
+        "Component type 'My-Widget' must be a valid UAX #31 identifier",
+        type.details().get(0).message());
+    // A processor with no validation configuration trusts its agent.
+    processor.processMessages(update(badType), null);
+  }
+
+  @Test
   void anUpdateDataModelPathThatIsNotCorrectHasThePathOfItsField() {
     processor.processMessages(create("s"));
 

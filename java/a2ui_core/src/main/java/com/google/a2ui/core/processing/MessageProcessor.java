@@ -21,6 +21,7 @@ import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.common.Reactive;
+import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
 import com.google.a2ui.core.exceptions.A2uiError;
@@ -521,6 +522,25 @@ public final class MessageProcessor<C extends ComponentApi> {
       if (!ids.add(id)) {
         throw new A2uiIntegrityError(
             "Duplicate component ID '" + id + "' in one update of surface '" + surface.id() + "'.");
+      }
+      String type = (String) component.get("component");
+      if (config != null && !Uax31.isIdentifier(type)) {
+        problems.add(
+            new Located(
+                at,
+                new Problem(
+                    "/component",
+                    Problem.INVALID_VALUE,
+                    "Component type '" + type + "' must be a valid UAX #31 identifier")));
+      }
+      if (config != null && !Uax31.isIdentifier(id)) {
+        problems.add(
+            new Located(
+                at,
+                new Problem(
+                    "/id",
+                    Problem.INVALID_VALUE,
+                    "Component id '" + id + "' must be a valid UAX #31 identifier")));
       }
       Planned entry = normalize(surface, id, component);
       planned.add(entry);
