@@ -25,6 +25,9 @@ import com.google.a2ui.core.common.ReadonlySignal;
 import com.google.a2ui.core.common.Signal;
 import com.google.a2ui.core.common.Subscription;
 import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiRecursionError;
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.resolution.ComponentNode.ChildKey;
 import com.google.a2ui.core.state.ComponentModel;
 import com.google.a2ui.core.state.SurfaceComponentsModel;
@@ -32,6 +35,7 @@ import com.google.a2ui.core.state.SurfaceModel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,8 +55,8 @@ import java.util.Set;
  *
  * <p>These references resolve to a placeholder node: a component that the surface does not have at
  * this time, a component of an unknown type, and a cycle of references. Thus a surface that is not
- * complete has a tree. The resolver reports a binding that it cannot evaluate to the {@code
- * onError} of the surface. Such a binding resolves to null.
+ * complete has a tree. The resolver reports an unknown type, a cycle and a binding that it cannot
+ * evaluate to the {@code onError} of the surface. Such a binding resolves to null.
  *
  * <p>A resolver is not thread-safe. Use it on the thread that owns its surface.
  *
@@ -69,6 +73,7 @@ public final class NodeResolver<C extends ComponentApi> {
   private final Signal<Optional<ComponentNode<C>>> root = new Signal<>(Optional.empty());
   private final Map<String, Set<ComponentNode<C>>> nodesByComponent = new HashMap<>();
   private final Map<Catalog<?, ?>, PropertyBehaviors> behaviors = new HashMap<>();
+  private final Set<String> reportedStructure = new HashSet<>();
   private final List<Subscription> subscriptions = new ArrayList<>();
   private boolean disposed;
 
@@ -143,6 +148,9 @@ public final class NodeResolver<C extends ComponentApi> {
   private void componentChanged(String componentId) {
     if (disposed) {
       return;
+    }
+    if (surface.componentsModel().get(componentId).isEmpty()) {
+      reportedStructure.removeIf(key -> key.startsWith(componentId + "\u0000"));
     }
     if (componentId.equals(surface.rootId())) {
       syncRoot();
@@ -226,6 +234,7 @@ public final class NodeResolver<C extends ComponentApi> {
             model,
             index);
     nodesByComponent.computeIfAbsent(componentId, key -> new LinkedHashSet<>()).add(node);
+    reportStructure(node);
     if (model != null) {
       node.modelSubscription =
           model
@@ -242,6 +251,44 @@ public final class NodeResolver<C extends ComponentApi> {
       nodeCreated.onEvent(node);
     }
     return node;
+  }
+
+  /**
+   * Reports an unknown type or a cycle to the surface. The resolver reports a problem one time for
+   * each component at each data scope, until the problem goes away.
+   */
+  private void reportStructure(ComponentNode<C> node) {
+    String key = node.componentId() + "\u0000" + node.dataPath();
+    switch (node.state()) {
+      case RESOLVED -> reportedStructure.remove(key);
+      case PENDING -> {}
+      case UNKNOWN_TYPE -> {
+        if (reportedStructure.add(key)) {
+          surface.dispatchError(
+              ErrorFields.errorCode(
+                  new A2uiValidationError(
+                      "Component '"
+                          + node.componentId()
+                          + "' has unknown type '"
+                          + node.type()
+                          + "'."),
+                  "UNKNOWN_COMPONENT_TYPE"));
+        }
+      }
+      case CYCLIC -> {
+        if (reportedStructure.add(key)) {
+          surface.dispatchError(
+              ErrorFields.errorCode(
+                  new A2uiRecursionError(
+                      "Component '"
+                          + node.componentId()
+                          + "' is referenced from inside itself at data path '"
+                          + node.dataPath()
+                          + "'."),
+                  "CYCLIC_REFERENCE"));
+        }
+      }
+    }
   }
 
   private void disposeNode(ComponentNode<C> node) {
