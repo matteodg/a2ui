@@ -91,6 +91,23 @@ class SurfaceGroupModelTest {
     assertEquals(List.of(), deleted);
   }
 
+  @Test
+  void theModelSendsTheActionsOfEachSurfaceAgain() {
+    SurfaceModel<ComponentApi> first = surface("first");
+    SurfaceModel<ComponentApi> second = surface("second");
+    model.addSurface(first);
+    model.addSurface(second);
+    List<String> actions = new ArrayList<>();
+    model.onAction().subscribe(action -> actions.add(action.surfaceId() + ":" + action.name()));
+
+    first.dispatchAction(Map.of("event", Map.of("name", "save")), "root");
+    second.dispatchAction(Map.of("event", Map.of("name", "open")), "root");
+    model.deleteSurface("first");
+    first.dispatchAction(Map.of("event", Map.of("name", "late")), "root");
+
+    assertEquals(List.of("first:save", "second:open"), actions);
+  }
+
   private static SurfaceModel<ComponentApi> surface(String id) {
     return new SurfaceModel<>(
         id,

@@ -38,6 +38,7 @@ public final class SurfaceGroupModel<C extends ComponentApi> {
   private final Map<String, SurfaceModel<C>> view = Collections.unmodifiableMap(surfaces);
   private final EventNotifier<SurfaceModel<C>> created = new EventNotifier<>();
   private final EventNotifier<String> deleted = new EventNotifier<>();
+  private final EventNotifier<RendererAction> actions = new EventNotifier<>();
 
   /** Makes a model that has no surfaces. */
   public SurfaceGroupModel() {}
@@ -82,6 +83,16 @@ public final class SurfaceGroupModel<C extends ComponentApi> {
   }
 
   /**
+   * Gets the source of the action events of all the surfaces. An event occurs when a surface of
+   * this model reports an action for the agent.
+   *
+   * @return the event source
+   */
+  public EventSource<RendererAction> onAction() {
+    return actions;
+  }
+
+  /**
    * Adds a surface and then notifies the listeners.
    *
    * @param surface the surface to add
@@ -93,6 +104,8 @@ public final class SurfaceGroupModel<C extends ComponentApi> {
       throw new A2uiIntegrityError("Surface already exists: " + surface.id());
     }
     surfaces.put(surface.id(), surface);
+    // The dispose operation of the surface removes this listener.
+    surface.onAction().subscribe(actions::emit);
     created.emit(surface);
   }
 
@@ -117,5 +130,6 @@ public final class SurfaceGroupModel<C extends ComponentApi> {
     surfaces.clear();
     created.dispose();
     deleted.dispose();
+    actions.dispose();
   }
 }
