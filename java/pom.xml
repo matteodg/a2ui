@@ -38,6 +38,8 @@
   <modules>
     <module>a2ui_core</module>
     <module>a2ui_swing</module>
+    <!-- The gallery sample of the Swing adapter. It is in the directory of the sample clients. -->
+    <module>../samples/client/swing</module>
   </modules>
 
   <properties>
@@ -62,6 +64,7 @@
     <slf4j.version>2.0.20</slf4j.version>
     <snakeyaml-engine.version>3.2</snakeyaml-engine.version>
 
+    <exec-maven-plugin.version>3.7.0</exec-maven-plugin.version>
     <google-java-format.version>2.0.0</google-java-format.version>
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
     <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
@@ -144,6 +147,18 @@
             <useModulePath>false</useModulePath>
             <groups>${a2ui.test.groups}</groups>
             <excludedGroups>${a2ui.test.excludedGroups}</excludedGroups>
+          </configuration>
+        </plugin>
+        <plugin>
+          <!--
+            Starts a sample application. A module that has no application does not run the goal.
+            Thus `exec:java` works for a reactor build with `-am`.
+          -->
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>${exec-maven-plugin.version}</version>
+          <configuration>
+            <skip>true</skip>
           </configuration>
         </plugin>
         <plugin>
