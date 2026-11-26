@@ -91,13 +91,17 @@ final class SuiteRegistry {
           Map.entry("test_action_event_with_data_binding", V0_9_ACTION),
           Map.entry("test_action_event_with_relative_scope", V0_9_ACTION),
           Map.entry("test_action_event_with_user_message", V0_9_ACTION),
-          Map.entry("test_action_direct_name_shorthand", V0_9_ACTION));
+          Map.entry("test_action_direct_name_shorthand", V0_9_ACTION),
+          // The suite has two cases for one rule, and each core runs the case that agrees with
+          // its data model. See "Writing cases for route_agent_function" in conformance/README.md.
+          Map.entry(
+              "test_agent_routing_cancelled_call_is_sent_again_when_its_value_is_rewritten",
+              "The data model of java-core does not notify a subscriber when a value is replaced"
+                  + " by an equal value, and the blueprint does not require that. java-core runs"
+                  + " test_agent_routing_cancelled_call_is_sent_again_on_unrelated_change, as the"
+                  + " suite permits"));
 
   private static final String NOT_YET = "Not implemented in java-core yet";
-
-  private static final String UI_RPC =
-      "Starts a call to the agent from a binding or from an action. java-core does not send"
-          + " such a call to the agent yet";
 
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
@@ -249,7 +253,9 @@ final class SuiteRegistry {
         "core/actions.yaml", new Supported(Map.of("dispatch_action", new DispatchActionHandler())));
     suites.put("core/adapter_conformance.yaml", new Unsupported(ADAPTER));
     suites.put("core/add_catalog.yaml", processorSuite(List.of(PROCESS)));
-    suites.put("core/agent_function_routing.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/agent_function_routing.yaml",
+        new Supported(Map.of("route_agent_function", new RouteAgentFunctionHandler())));
     suites.put(
         "core/agent_to_renderer.yaml",
         new Supported(
@@ -327,13 +333,7 @@ final class SuiteRegistry {
         new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));
     suites.put("core/reserved_keys.yaml", processorSuite(List.of(PROCESS, VALIDATE)));
     suites.put(
-        "core/rpc_functions.yaml",
-        new Supported(
-            Map.of("handle_rpc", new HandleRpcHandler()),
-            reasons(
-                "handle_rpc.args.uiBindingScenario", UI_RPC,
-                "handle_rpc.args.uiActionFallbackScenario", UI_RPC),
-            Set.of()));
+        "core/rpc_functions.yaml", new Supported(Map.of("handle_rpc", new HandleRpcHandler())));
     suites.put("core/validation_result.yaml", processorSuite(List.of(VALIDATE)));
     suites.put("core/validator_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/validator_v0_9.yaml", new Unsupported(V1_ONLY));

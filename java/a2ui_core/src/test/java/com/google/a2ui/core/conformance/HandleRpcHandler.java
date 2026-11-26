@@ -53,8 +53,8 @@ import java.util.concurrent.CompletionException;
  * {@code functionMetadata} get the behavior that their name tells. The timeouts use a scheduler
  * that the handler controls. Thus no case waits.
  *
- * <p>The registry skips the cases that start a call from a binding or from an action ({@code
- * uiBindingScenario}, {@code uiActionFallbackScenario}).
+ * <p>{@link UiRoutingScenarios} runs the cases that start a call from a binding or from an action
+ * ({@code uiBindingScenario}, {@code uiActionFallbackScenario}).
  */
 final class HandleRpcHandler implements CaseHandler {
   private static final Set<String> CASE_KEYS =
@@ -166,6 +166,10 @@ final class HandleRpcHandler implements CaseHandler {
     Map<String, Object> fields = testCase.fields();
     KnownKeys.assertKnownKeys(fields, CASE_KEYS, location);
     Map<String, Object> args = asObject(fields.get("args"), "args in " + location);
+    if (UiRoutingScenarios.applies(args)) {
+      UiRoutingScenarios.run(testCase, args);
+      return;
+    }
     KnownKeys.assertKnownKeys(args, ARG_KEYS, "args in " + location);
     Map<String, Object> expected = optionalObject(fields.get("expect"), "expect in " + location);
     if (expected != null) {
