@@ -7,6 +7,11 @@ This directory contains the Java client SDK for the A2UI protocol v1.0.
 | [`a2ui_core`](a2ui_core)   | `com.google.a2ui:a2ui-java-core`  | The state model and the protocol logic. It has no UI code.                  |
 | [`a2ui_swing`](a2ui_swing) | `com.google.a2ui:a2ui-java-swing` | The Swing adapter. It shows the surfaces of the core with Swing components. |
 
+The Maven build also has the module
+[`samples/client/swing`](../samples/client/swing), `com.google.a2ui:a2ui-java-swing-gallery`. It is
+a sample application that shows the examples of the basic catalog with the Swing adapter. To start
+it, run `./mvnw -q -pl ../samples/client/swing -am compile exec:java` from the `java/` directory.
+
 The SDK is in development. It is not released.
 
 ## Requirements
