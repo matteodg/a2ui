@@ -17,3 +17,10 @@
   `ValidationConfig` in `com.google.a2ui.core.validation`. A v1.0 catalog document can now name a
   common type as a local reference, for example `#/$defs/DynamicString`. The messages of
   `PayloadValidator.validateComponent` for an absent type and for an unknown type have a new text.
+- Add `surfaceId()`, `functionCallId()`, `path()`, `errorCode()` and `details()` to `A2uiError`, and
+  add `A2uiErrorDetail`. `MessageProcessor` sends the `error` message of the protocol for a rejected
+  message to an `OutboundMessageListener`. Add `MessageProcessor.getRendererCapabilities` and
+  `MessageProcessor.getRendererDataModel`. `MessageProcessor` and `PayloadValidator` reject a
+  component call of an `agentOnly` function. `MessageProcessor` also rejects a component ID or a
+  component type that is not a UAX #31 identifier. The message of a component problem has a new
+  text.

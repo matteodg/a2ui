@@ -12,7 +12,7 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 
 | Package                                   | Contents                                                                                                                                                                                      |
 | :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these.                                                                                                                     |
+| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                      |
 | `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                                                                                                              |
 | `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces.                                                                      |
 | `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                        |
@@ -20,13 +20,13 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog.                                                                                             |
 | `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                       |
 | `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts. |
-| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces.                                                                                                   |
+| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent.                                    |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain function implementations, node resolution, and the messages from the
-renderer to the agent.
+The core does not yet contain function implementations, actions, node resolution and the
+function-call messages (`callRendererFunction`, `agentFunctionResponse`).
 
 ## Threads
 
@@ -141,6 +141,56 @@ A surface can use each v1.0 catalog that the processor has at the creation of th
 The models have public methods that change them, for example `SurfaceComponentsModel.addComponent`.
 These methods do not examine a schema or the graph of the surface. Only the message processor makes
 these checks.
+
+### A rejected message
+
+`processMessages` throws an `A2uiError` for a message that it rejects. The error tells the surface
+of the message (`surfaceId()`) and the location of the problem (`path()`, for example
+`/components/0/text`). `details()` lists each problem with its path and its code: `missing_field`,
+`type_mismatch` or `invalid_value`. `errorCode()` gives the protocol error code if the error has its
+own code, for example `UNALLOWED_PARENT`. Each of these values can be absent.
+
+```java
+try {
+  processor.processMessages(messagesFromTheAgent);
+} catch (A2uiValidationError e) {
+  e.surfaceId(); // Optional[main]
+  e.path(); // Optional[/components/0/text]
+  for (A2uiErrorDetail detail : e.details()) {
+    System.out.println(detail.path() + " " + detail.code() + " " + detail.message());
+  }
+}
+```
+
+To also get the `error` message of the protocol, give an `OutboundMessageListener` to the processor.
+The processor sends the message to the listener before it throws the error. The message is a
+read-only map of plain JSON values.
+
+```java
+MessageProcessor<ComponentApi> processor =
+    new MessageProcessor<>(
+        List.of(BasicCatalog.api()),
+        ValidationConfig.STRICT,
+        message -> transport.send(message));
+// {"version": "1.0", "error": {"code": "VALIDATION_FAILED", "surfaceId": "main", ...}}
+```
+
+The processor also rejects a component ID or a component type that is not a UAX #31 identifier, a
+component that calls an `agentOnly` function, and an `updateDataModel` path that does not start with
+`/`.
+
+### Data for the agent
+
+`getRendererCapabilities` gives the catalogs that this renderer supports. `getRendererDataModel`
+gives the data of the surfaces that asked for it with `sendDataModel`. The two results are plain
+JSON values that a transport attaches to the messages for the agent.
+
+```java
+processor.getRendererCapabilities(List.of(ProtocolVersion.V1_0));
+// {1.0={supportedCatalogIds=[https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json]}}
+
+processor.getRendererDataModel(); // Optional[{version=1.0, surfaces={main={...}}}]
+```
 
 ## Validation
 

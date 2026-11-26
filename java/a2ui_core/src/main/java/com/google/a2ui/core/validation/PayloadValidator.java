@@ -84,8 +84,9 @@ public final class PayloadValidator {
    *
    * @param name the name of the function
    * @param args the arguments of the call as plain JSON values
-   * @throws A2uiValidationError if the catalog does not define the function, or if the arguments do
-   *     not agree with its schema. The message lists each problem.
+   * @throws A2uiValidationError if the catalog does not define the function, if only the agent can
+   *     call the function, or if the arguments do not agree with its schema. The message lists each
+   *     problem.
    * @throws A2uiCatalogError if the schema of the function has a reference that names nothing
    */
   public void validateFunction(String name, Map<String, ?> args) {

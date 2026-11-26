@@ -16,6 +16,7 @@
 
 /**
  * Message processing: {@link com.google.a2ui.core.processing.MessageProcessor} applies the v1.0
- * messages of the agent to the surfaces.
+ * messages of the agent to the surfaces. {@link
+ * com.google.a2ui.core.processing.OutboundMessageListener} receives the messages for the agent.
  */
 package com.google.a2ui.core.processing;
