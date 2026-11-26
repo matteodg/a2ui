@@ -1,0 +1,161 @@
+/*
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.a2ui.swing.catalog.basic;
+
+import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
+import com.google.a2ui.core.catalog.Catalog;
+import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.catalog.FunctionImplementation;
+import com.google.a2ui.swing.catalog.SwingComponentImplementation;
+import com.google.a2ui.swing.catalog.SwingComponentView;
+import com.google.a2ui.swing.catalog.ViewContext;
+import com.google.a2ui.swing.surface.A2uiServices;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+
+/**
+ * The basic catalog of protocol v1.0 for Swing: the components with their Swing views, and the
+ * functions with their code.
+ *
+ * <pre>{@code
+ * MessageProcessor<SwingComponentImplementation> processor =
+ *     new MessageProcessor<>(List.of(SwingBasicCatalog.create()));
+ * A2uiSwing.install(processor);
+ * }</pre>
+ *
+ * <p>The catalog has the ID and the document of {@code BasicCatalog}. It declares each component of
+ * the catalog document. This version has a view for these components:
+ *
+ * <table>
+ *   <caption>Components that have a view</caption>
+ *   <tr><th>Component</th><th>Swing component</th></tr>
+ *   <tr><td>{@code Text}</td><td>The view of the {@code markdown} service. The default is a {@code
+ *       JEditorPane} that shows the Markdown subset.</td></tr>
+ *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
+ *   <tr><td>{@code Button}</td><td>{@code JButton}</td></tr>
+ *   <tr><td>{@code TextField}</td><td>{@code JTextField}, {@code JTextArea} or {@code
+ *       JPasswordField}</td></tr>
+ * </table>
+ *
+ * <p>Each other component of the catalog document has an implementation with no view. See {@link
+ * SwingComponentImplementation#withoutView(ComponentApi)}. A message that uses such a component is
+ * correct. The surface shows its {@code error} fallback with the error type {@code no-view} for the
+ * component, or nothing, and the component uses no layout space. This is what the adapter does for
+ * each node that cannot show. A later version adds the views. {@link #viewNames()} gives the
+ * components that have a view.
+ *
+ * <p>To replace the view of one component, make a catalog with a different list:
+ *
+ * <pre>{@code
+ * List<SwingComponentImplementation> components = new ArrayList<>(SwingBasicCatalog.components());
+ * components.replaceAll(c -> c.name().equals("Button") ? myButton : c);
+ * Catalog<SwingComponentImplementation, FunctionImplementation> catalog =
+ *     SwingBasicCatalog.create().withComponents(components);
+ * }</pre>
+ */
+public final class SwingBasicCatalog {
+  /** The function that makes the view of each component that has one, in the catalog sequence. */
+  private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS = views();
+
+  private SwingBasicCatalog() {}
+
+  private static Map<String, Function<ViewContext, SwingComponentView>> views() {
+    Map<String, Function<ViewContext, SwingComponentView>> views = new LinkedHashMap<>();
+    views.put("Text", TextView::new);
+    views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
+    views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
+    views.put("Button", ButtonView::new);
+    views.put("TextField", TextFieldView::new);
+    return Collections.unmodifiableMap(views);
+  }
+
+  /**
+   * Makes the catalog with the default services. The functions write text for the locale {@link
+   * Locale#US}, as {@code BasicCatalog.withFunctions()} does. The function {@code openUrl} opens
+   * the browser of the system.
+   *
+   * @return the catalog
+   */
+  public static Catalog<SwingComponentImplementation, FunctionImplementation> create() {
+    return create(Locale.US);
+  }
+
+  /**
+   * Makes the catalog with the default services.
+   *
+   * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
+   *     formatDate} and {@code pluralize} write
+   * @return the catalog
+   */
+  public static Catalog<SwingComponentImplementation, FunctionImplementation> create(
+      Locale locale) {
+    return create(locale, A2uiServices.DEFAULT);
+  }
+
+  /**
+   * Makes the catalog.
+   *
+   * <p>The catalog uses only the URL opener of the services, for the function {@code openUrl}. The
+   * views get the other services from the surface component. Thus give the same services to the
+   * {@code A2uiSurface}.
+   *
+   * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
+   *     formatDate} and {@code pluralize} write
+   * @param services the services of the application
+   * @return the catalog
+   */
+  public static Catalog<SwingComponentImplementation, FunctionImplementation> create(
+      Locale locale, A2uiServices services) {
+    Objects.requireNonNull(locale, "locale");
+    Objects.requireNonNull(services, "services");
+    return BasicCatalog.withFunctions(locale, services.urlOpener()).withComponents(components());
+  }
+
+  /**
+   * Gets the implementation of each component of the catalog document, in the sequence of the
+   * document.
+   *
+   * @return the implementations. The list is read-only. Each call makes new objects.
+   */
+  public static List<SwingComponentImplementation> components() {
+    List<SwingComponentImplementation> components = new ArrayList<>();
+    for (ComponentApi api : BasicCatalog.api().components().values()) {
+      Function<ViewContext, SwingComponentView> view = VIEWS.get(api.name());
+      components.add(
+          view == null
+              ? SwingComponentImplementation.withoutView(api)
+              : SwingComponentImplementation.of(api, view));
+    }
+    return Collections.unmodifiableList(components);
+  }
+
+  /**
+   * Gets the names of the components that have a view in this version.
+   *
+   * @return the names. The set is read-only.
+   */
+  public static Set<String> viewNames() {
+    return VIEWS.keySet();
+  }
+}

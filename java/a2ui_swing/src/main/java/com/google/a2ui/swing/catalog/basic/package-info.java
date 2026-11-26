@@ -15,8 +15,10 @@
  */
 
 /**
- * The Swing implementation of the basic catalog. This version has the layout of the containers,
- * {@link com.google.a2ui.swing.catalog.basic.FlexLayout}. A later version adds the views of the
- * components.
+ * The Swing implementation of the basic catalog. {@link
+ * com.google.a2ui.swing.catalog.basic.SwingBasicCatalog} makes the catalog. {@link
+ * com.google.a2ui.swing.catalog.basic.FlexLayout} and {@link
+ * com.google.a2ui.swing.catalog.basic.FlexPanel} are the layout of the containers. A custom
+ * container can also use them.
  */
 package com.google.a2ui.swing.catalog.basic;

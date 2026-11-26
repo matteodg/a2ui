@@ -20,7 +20,6 @@ import static com.google.a2ui.swing.testing.TestSurface.object;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
 import com.google.a2ui.core.catalog.Catalog;
-import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionImplementation;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.processing.MessageProcessor;
@@ -29,7 +28,6 @@ import com.google.a2ui.core.state.SurfaceModel;
 import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
-import com.google.a2ui.swing.catalog.ViewContext;
 import com.google.a2ui.swing.surface.A2uiFallbacks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
@@ -41,7 +39,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
@@ -59,20 +56,6 @@ final class BasicFixture {
 
   /** The height of the mounted surface. */
   static final int HEIGHT = 300;
-
-  /** The view of each component of the basic catalog that the adapter can show. */
-  private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS =
-      Map.of(
-          "Text",
-          TextView::new,
-          "Button",
-          ButtonView::new,
-          "TextField",
-          TextFieldView::new,
-          "Row",
-          context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL),
-          "Column",
-          context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
 
   /** The URLs that the function {@code openUrl} opened. */
   final List<URI> opened = new ArrayList<>();
@@ -103,17 +86,7 @@ final class BasicFixture {
   }
 
   private Catalog<SwingComponentImplementation, FunctionImplementation> catalog() {
-    Catalog<ComponentApi, FunctionImplementation> functions =
-        BasicCatalog.withFunctions(Locale.US, opened::add);
-    List<SwingComponentImplementation> components = new ArrayList<>();
-    for (ComponentApi api : functions.components().values()) {
-      Function<ViewContext, SwingComponentView> factory = VIEWS.get(api.name());
-      components.add(
-          factory == null
-              ? SwingComponentImplementation.withoutView(api)
-              : SwingComponentImplementation.of(api, factory));
-    }
-    return functions.withComponents(components);
+    return SwingBasicCatalog.create(Locale.US, A2uiServices.DEFAULT.withUrlOpener(opened::add));
   }
 
   /** Makes the surface with data and components, and mounts it at the default size. */
