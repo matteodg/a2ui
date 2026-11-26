@@ -74,8 +74,6 @@ final class SuiteRegistry {
   static final Map<String, String> SKIP_TEST_NAMES = Map.of();
 
   private static final String NOT_YET = "Not implemented in java-core yet";
-  private static final String NEEDS_VALIDATOR =
-      "Needs the JSON Schema validator, which java-core does not have yet";
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
@@ -199,9 +197,9 @@ final class SuiteRegistry {
     suites.put(
         "core/common_types.yaml",
         new Supported(
-            Map.of("common_types_schema", new SchemaDocumentHandler(SchemaDocuments::commonTypes)),
-            reasons("validate_common_type", NEEDS_VALIDATOR),
-            Set.of()));
+            Map.of(
+                "common_types_schema", new SchemaDocumentHandler(SchemaDocuments::commonTypes),
+                "validate_common_type", new ValidateCommonTypeHandler())));
     suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/data_context.yaml",
