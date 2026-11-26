@@ -234,7 +234,7 @@ final class SuiteRegistry {
     suites.put("core/accessibility.yaml", new Unsupported(ADAPTER));
     suites.put("core/actions.yaml", new Unsupported(NOT_YET));
     suites.put("core/adapter_conformance.yaml", new Unsupported(ADAPTER));
-    suites.put("core/add_catalog.yaml", new Unsupported(NOT_YET));
+    suites.put("core/add_catalog.yaml", processorSuite("core/add_catalog.yaml", List.of(PROCESS)));
     suites.put("core/agent_function_routing.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/agent_to_renderer.yaml",
