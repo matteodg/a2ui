@@ -45,13 +45,21 @@ import javax.swing.JComponent;
  *       container.add(component, 2.0)}. The components that have a weight share the space that the
  *       other components and the gaps do not use, in proportion to their weights. Their preferred
  *       size on the main axis has no effect then.
+ *   <li>A component that has a weight is not smaller than its minimum size on the main axis, as a
+ *       flex item with {@code min-width: auto} in CSS. Text that wraps has the width of its longest
+ *       word as its minimum width. Thus a column of a row does not cut a word. If the share of a
+ *       component is less than its minimum size, the component gets its minimum size, and the other
+ *       components that have a weight share the space that stays.
  *   <li>If no component has a weight, {@link Justify} tells where the free space of the main axis
  *       goes.
  *   <li>{@link Align} gives the position and the size of each component on the cross axis. A
  *       component that has the client property {@link #STRETCH_PROPERTY} always fills the cross
  *       axis.
- *   <li>If the container is too small, the layout makes the components without a weight smaller,
- *       down to their minimum size. Then the components that have a weight get no space.
+ *   <li>If the container is too small, each component that has a weight gets its minimum size, and
+ *       the layout makes the components without a weight smaller, down to their minimum size. If
+ *       the container is too small for the minimum sizes, the components that have a weight share
+ *       the space that stays in proportion to their weights, and their minimum sizes have no
+ *       effect. Then the content of a component can be cut.
  * </ul>
  *
  * <p>The layout gives its width to a component that implements {@link HeightForWidth}, and gets the
@@ -510,15 +518,19 @@ public final class FlexLayout implements LayoutManager2 {
       Component item = items.get(i);
       itemWeights[i] = weightOf(item);
       totalWeight += itemWeights[i];
+      int preferred =
+          axis == Axis.HORIZONTAL
+              ? item.getPreferredSize().width
+              : heightAt(item, crossSizeOfWidth(item, innerWidth));
+      minimums[i] = Math.min(main(item.getMinimumSize()), preferred);
       if (itemWeights[i] == 0) {
-        sizes[i] =
-            axis == Axis.HORIZONTAL
-                ? item.getPreferredSize().width
-                : heightAt(item, crossSizeOfWidth(item, innerWidth));
-        minimums[i] = Math.min(main(item.getMinimumSize()), sizes[i]);
-        used += sizes[i];
+        sizes[i] = preferred;
         shrinkable += sizes[i] - minimums[i];
+      } else {
+        // A component that has a weight starts at its minimum size and gets a part of the space.
+        sizes[i] = minimums[i];
       }
+      used += sizes[i];
     }
     int free = mainSpace - used;
     if (free < 0) {
@@ -532,10 +544,24 @@ public final class FlexLayout implements LayoutManager2 {
       if (shrinkable > 0) {
         share(-missing, shares, shrinkable, sizes);
       }
+      if (-free > shrinkable && totalWeight > 0) {
+        // The minimum sizes do not fit. The components that have a weight share the space that
+        // the other components and the gaps do not use, in proportion to their weights. A control
+        // such as a text field can be smaller than the minimum size that Swing gives it.
+        int weightedMinimums = 0;
+        for (int i = 0; i < count; i++) {
+          if (itemWeights[i] > 0) {
+            weightedMinimums += minimums[i];
+            sizes[i] = 0;
+          }
+        }
+        int space = Math.max(0, weightedMinimums - (-free - shrinkable));
+        share(space, itemWeights, totalWeight, sizes);
+      }
       return 0;
     }
     if (totalWeight > 0) {
-      share(free, itemWeights, totalWeight, sizes);
+      shareByWeight(free, itemWeights, minimums, sizes);
       return 0;
     }
     if (justify == Justify.STRETCH) {
@@ -545,6 +571,51 @@ public final class FlexLayout implements LayoutManager2 {
       return 0;
     }
     return free;
+  }
+
+  /**
+   * Gives the components that have a weight their sizes. Each such component has its minimum size
+   * when the method starts. The method shares the space of all these components in proportion to
+   * their weights. A component whose part is less than its minimum size keeps its minimum size, and
+   * the method shares the space again between the other components.
+   *
+   * @param free the space that no component uses
+   * @param itemWeights the weight of each component, or 0
+   * @param minimums the minimum size of each component
+   * @param sizes the size of each component. The method changes the sizes of the components that
+   *     have a weight.
+   */
+  private static void shareByWeight(int free, double[] itemWeights, int[] minimums, int[] sizes) {
+    int count = sizes.length;
+    double[] shares = new double[count];
+    int space = free;
+    double totalShare = 0;
+    for (int i = 0; i < count; i++) {
+      if (itemWeights[i] > 0) {
+        shares[i] = itemWeights[i];
+        totalShare += shares[i];
+        space += minimums[i];
+        sizes[i] = 0;
+      }
+    }
+    boolean changed = true;
+    while (changed && totalShare > 0) {
+      changed = false;
+      for (int i = 0; i < count; i++) {
+        if (shares[i] > 0 && space * shares[i] / totalShare < minimums[i]) {
+          // The part is too small. The component keeps its minimum size and leaves the group.
+          sizes[i] = minimums[i];
+          space -= minimums[i];
+          totalShare -= shares[i];
+          shares[i] = 0;
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (totalShare > 0) {
+      share(space, shares, totalShare, sizes);
+    }
   }
 
   /**

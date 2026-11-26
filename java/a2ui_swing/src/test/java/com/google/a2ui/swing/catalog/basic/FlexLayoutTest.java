@@ -19,6 +19,7 @@ package com.google.a2ui.swing.catalog.basic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.basic.FlexLayout.Align;
 import com.google.a2ui.swing.catalog.basic.FlexLayout.Axis;
 import com.google.a2ui.swing.catalog.basic.FlexLayout.Justify;
@@ -366,7 +367,7 @@ class FlexLayoutTest {
   }
 
   @Test
-  void aComponentWithAWeightGetsNoSpaceInAContainerThatIsTooSmall() {
+  void aComponentWithAWeightKeepsItsMinimumSizeInAContainerThatIsTooSmall() {
     JPanel panel = new JPanel(new FlexLayout(Axis.HORIZONTAL));
     panel.add(a);
     panel.add(b, 1.0);
@@ -374,8 +375,113 @@ class FlexLayoutTest {
     panel.setSize(60, 100);
     panel.doLayout();
 
-    // 20 pixels are missing. The two components without a weight can give 40 and 20.
-    assertColumns(0, 37, 37, 0, 37, 23);
+    // The component with a weight has its minimum width of 10. Then 30 pixels are missing. The
+    // two components without a weight can give 40 and 20.
+    assertColumns(0, 30, 30, 10, 40, 20);
+  }
+
+  @Test
+  void aComponentWithAWeightIsNotSmallerThanItsMinimumSize() {
+    b.setMinimumSize(new Dimension(60, 5));
+    JPanel panel = new JPanel(new FlexLayout(Axis.HORIZONTAL));
+    panel.add(a, 1.0);
+    panel.add(b, 1.0);
+    panel.add(c);
+    panel.setSize(120, 100);
+    panel.doLayout();
+
+    // The two components with a weight have 90 pixels. One half is less than the minimum width
+    // of the second component. Thus the second gets 60 and the first gets the 30 that stay.
+    assertColumns(0, 30, 30, 60, 90, 30);
+  }
+
+  @Test
+  void theComponentsWithAWeightShareTheSpaceThatAMinimumSizeDoesNotUse() {
+    a.setPreferredSize(new Dimension(120, 20));
+    a.setMinimumSize(new Dimension(100, 5));
+    JPanel panel = new JPanel(new FlexLayout(Axis.HORIZONTAL));
+    panel.add(a, 1.0);
+    panel.add(b, 1.0);
+    panel.add(c, 3.0);
+    panel.setSize(300, 100);
+    panel.doLayout();
+
+    // One fifth of 300 is less than 100. The two other components share 200 as 1 to 3.
+    assertColumns(0, 100, 100, 50, 150, 150);
+  }
+
+  @Test
+  void aMinimumSizeHasNoEffectOnAWeightThatGivesMoreSpace() {
+    a.setPreferredSize(new Dimension(120, 20));
+    a.setMinimumSize(new Dimension(100, 5));
+    JPanel panel = new JPanel(new FlexLayout(Axis.HORIZONTAL));
+    panel.add(a, 2.0);
+    panel.add(b, 1.0);
+    panel.add(c, 1.0);
+    panel.setSize(300, 100);
+    panel.doLayout();
+
+    assertColumns(0, 150, 150, 75, 225, 75);
+  }
+
+  @Test
+  void aComponentWithAWeightInAColumnIsNotSmallerThanItsMinimumSize() {
+    a.setPreferredSize(new Dimension(50, 50));
+    a.setMinimumSize(new Dimension(10, 40));
+    JPanel panel = new JPanel(new FlexLayout(Axis.VERTICAL));
+    panel.add(a, 1.0);
+    panel.add(b, 1.0);
+    panel.setSize(100, 60);
+    panel.doLayout();
+
+    assertEquals(new Rectangle(0, 0, 100, 40), a.getBounds());
+    assertEquals(new Rectangle(0, 40, 100, 20), b.getBounds());
+  }
+
+  @Test
+  void theComponentsWithAWeightShareAContainerThatIsTooSmallForTheirMinimumSizes() {
+    a.setMinimumSize(new Dimension(40, 5));
+    b.setMinimumSize(new Dimension(20, 5));
+    JPanel panel = new JPanel(new FlexLayout(Axis.HORIZONTAL));
+    panel.add(a, 1.0);
+    panel.add(b, 3.0);
+    panel.add(c);
+    panel.setSize(40, 100);
+    panel.doLayout();
+
+    // The component without a weight has its minimum width of 10. The 30 pixels that stay are
+    // less than the minimum widths of 40 and 20. The two components share them as 1 to 3.
+    assertColumns(0, 8, 8, 22, 30, 10);
+  }
+
+  @Test
+  void thePreferredHeightOfARowUsesTheWidthsThatTheLayoutGives() {
+    b.setMinimumSize(new Dimension(60, 5));
+    FlexLayout layout = new FlexLayout(Axis.HORIZONTAL);
+    JPanel panel = new JPanel(layout);
+    panel.add(a, 1.0);
+    panel.add(b, 1.0);
+    HeightAsWidth tall = new HeightAsWidth();
+    panel.add(tall, 1.0);
+
+    // The three components share 120 pixels. The second component keeps 60, and the two other
+    // components get 30 each.
+    assertEquals(30, layout.preferredHeight(panel, 120));
+  }
+
+  /** A component whose preferred height at a width is that width. */
+  private static final class HeightAsWidth extends JPanel implements HeightForWidth {
+    private static final long serialVersionUID = 1L;
+
+    HeightAsWidth() {
+      setMinimumSize(new Dimension(0, 0));
+      setPreferredSize(new Dimension(10, 10));
+    }
+
+    @Override
+    public int preferredHeightFor(int width) {
+      return width;
+    }
   }
 
   @Test

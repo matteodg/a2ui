@@ -288,6 +288,27 @@ class FlexContainerViewTest {
   }
 
   @Test
+  void aChildWithAWeightIsNotNarrowerThanItsLongestWord() {
+    Edt.run(() -> {
+      fixture.create(
+          Map.of(),
+          component("root", "Row", "children", List.of("a", "b", "c")),
+          text("a", "one", "weight", 2),
+          text("b", "two", "weight", 1),
+          text("c", "$850,000,000,000.00 total", "weight", 1));
+      // One quarter of this width is less than the width of the first word of the last child.
+      int word = fixture.componentOf("c").getMinimumSize().width;
+      fixture.resize(2 * word, 300);
+
+      assertEquals(word, c().width);
+      assertEquals(2 * word, c().x + c().width);
+      // The two other children share the space that stays as 2 to 1.
+      assertEquals(2.0 * b().width, a().width, 2);
+      assertEquals(c().x, b().x + b().width);
+    });
+  }
+
+  @Test
   void aWeightInAColumnGivesTheFreeHeight() {
     Edt.run(() -> {
       fixture.create(
