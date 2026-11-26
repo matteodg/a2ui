@@ -37,6 +37,7 @@
 
   <modules>
     <module>a2ui_core</module>
+    <module>a2ui_swing</module>
   </modules>
 
   <properties>
