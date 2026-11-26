@@ -30,6 +30,14 @@ To correct the format of the sources, run:
 ./mvnw spotless:apply
 ```
 
+Some tests measure a time. They have the JUnit tag `performance`, and the `verify` phase does not
+run them. To run only these tests, use the Maven profile `performance` on a computer that does no
+other work:
+
+```sh
+./mvnw -Pperformance verify
+```
+
 ## Conformance
 
 The tests of each module run the shared suites in [`conformance/`](../conformance). The harness of
@@ -41,6 +49,19 @@ To write the manifest of the executed cases, set `A2UI_CONFORMANCE_MANIFEST_DIR`
 A2UI_CONFORMANCE_MANIFEST_DIR=/tmp/a2ui-manifest ./mvnw verify
 uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
   --manifest-dir /tmp/a2ui-manifest --harness java-core --corpus core
+```
+
+The harness records the cases of protocol versions before 1.0 and the cases of the two framework
+adapter suites as skipped, each with its reason.
+
+The timing cases of `core/message_processor_scaling.yaml` run only in the `performance` profile. The
+usual build records them as skipped. Give the two builds different manifest directories:
+
+```sh
+A2UI_CONFORMANCE_MANIFEST_DIR=/tmp/a2ui-timing ./mvnw -Pperformance verify
+uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
+  --manifest-dir /tmp/a2ui-timing --harness java-core --corpus core \
+  --only core/message_processor_scaling.yaml
 ```
 
 ## References

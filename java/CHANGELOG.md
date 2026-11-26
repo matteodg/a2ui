@@ -52,3 +52,13 @@
   `A2uiStateError`. Add `DataContext.evaluateTemplate`. A function whose schema describes no
   arguments now accepts all arguments. The `SurfaceModel` constructor now throws an
   `A2uiCatalogError` for a catalog that is not for the protocol version of the surface.
+- Add `AgentFunctionCaller` in `com.google.a2ui.core.state`, and add `agentFunctionCaller()`,
+  `setAgentFunctionCaller` and `isDisposed()` to `SurfaceModel`. A `MessageProcessor` that has an
+  outbound listener sets a caller on each surface that it makes. A binding, a check or an action
+  that calls a function that its catalog does not implement now sends the call to the agent. Before,
+  such a call failed. A binding is null and a check passes until the agent answers.
+  `DataContext.resolveDynamicValue` now refuses a local call that omits a required argument, and it
+  throws an `A2uiExpressionError` for a literal object with a key that starts with one `@`.
+  `SurfaceModel.dispatchAction` now omits a `userMessage` that is not a text with content.
+  `MessageProcessor` now examines only the changed part of the component graph of a surface for an
+  update, if the validation configuration accepts dangling references and orphans.

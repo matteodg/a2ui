@@ -14,7 +14,7 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                                                                                               |
 | `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text. `A2uiRegex` is the A2UI regex dialect.                                                                                 |
-| `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces. A `RendererAction` is an action that a surface reports.                                                                                       |
+| `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces. A `RendererAction` is an action that a surface reports. An `AgentFunctionCaller` sends a function call of a surface to the agent.             |
 | `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                                                                                                 |
 | `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents. A `FunctionImplementation` is a function with its code.                                                                                                                    |
 | `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog. `BasicCatalog.withFunctions()`, the catalog with the code of its functions.                                                                                          |
@@ -27,15 +27,13 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet send a function call from a binding or from an action to the agent.
-
 ## Threads
 
 The core is not thread-safe. Use one thread for all the calls to one model. A Swing application uses
 the event dispatch thread.
 
 The timeout of a call to the agent is the only work that can run on a different thread. See
-[Function calls](#function-calls).
+[Threads and timeouts](#threads-and-timeouts).
 
 ## Signals
 
@@ -286,6 +284,61 @@ The future fails with an `A2uiRpcError`. Its `code()` is an `RpcErrorCode`:
 
 The handler ignores a response that comes after its call ended.
 
+### A component calls the agent
+
+A binding, a check or an action of a component can call a function that the renderer cannot run:
+a function that the catalog of the call does not declare, or a function that the catalog declares
+with no code. A processor that has an outbound listener sends such a call to the agent as a
+`callAgentFunction` message. A UI adapter writes no code for this.
+
+```java
+// The catalog has no code for `fetchTitle`. Thus the agent runs it.
+Map<String, Object> text = Map.of("@call", "fetchTitle", "args", Map.of("id", Map.of("@path", "/id")));
+processor.processMessages(
+    Map.of(
+        "version", "1.0",
+        "updateComponents",
+        Map.of(
+            "surfaceId", "main",
+            "components", List.of(Map.of("id", "root", "component", "Text", "text", text)))));
+// When a NodeResolver resolves the node, the listener gets {version=1.0,
+// callAgentFunction={surfaceId=main, functionCallId=..., callFunction={@call=fetchTitle,
+// catalogId=..., args={id=7}}}}.
+// node.props().get().value("text") is null until the agentFunctionResponse message comes.
+```
+
+`ValidationConfig.STRICT` rejects a message that calls a function that the catalog does not declare.
+To use functions of the agent with strict validation, declare them in the catalog with no code, or
+set `allowUnknownElements`.
+
+- **Bindings.** The value of the binding is null until the agent answers. Then the resolver resolves
+  the node again, and the `props` signal of the node notifies. The surface shares one request between
+  the identical calls that bindings make while the request waits. It keeps the last 256 answers,
+  thus a binding that makes an identical call later sends nothing.
+- **Checks.** A check that waits for the agent passes. If the agent fails the call, the check fails.
+- **Actions.** An action sends each call as a request of its own, and continues when the agent
+  answers. An event sends the call of a context entry only after the agent answered the calls of
+  the entries before it.
+- **Failures.** An error response and a timeout go to `onError` of the surface, with the code
+  `EXPRESSION_ERROR`, the message of the agent and the `functionCallId`. The value stays null. A
+  node sends a failed call again only when the call changes. A call that the deletion of its surface
+  cancels reports nothing.
+- **Declared functions.** For a function that the catalog declares with no code, the core applies
+  `allowedCallers` and `requiresUserActivation`, adds the defaults of the argument schema and
+  examines the arguments against the schema before it sends the call.
+- **No routing.** These evaluations send nothing: a part of a `${...}` template, the arguments of a
+  `callRendererFunction` of the agent, a call with arguments that are not JSON, and a `DataContext`
+  that your code makes. Such a `DataContext` gives the answer that the surface keeps for an
+  identical call, or it fails.
+
+A surface sends its calls through its `AgentFunctionCaller`. A processor with no outbound listener
+sets none, and the call fails on the surface. An application that sends its messages to the agent
+in a different way sets its own caller:
+
+```java
+surface.setAgentFunctionCaller(call -> myTransport.send(surface.id(), call)); // A CompletableFuture.
+```
+
 ### Threads and timeouts
 
 Call the processor and the handler on one thread. The future of a call completes on the thread that
@@ -304,6 +357,13 @@ that is the thread of the `RpcScheduler` of the handler.
 
 - A UI adapter can implement `RpcScheduler` with the timer of its toolkit. A test can implement it
   with a list of tasks, thus the test does not wait.
+
+The answer to a call of a component changes the nodes of its surface. The processor gives such an
+answer to the surface only on the thread that made the call. With the default scheduler, a timeout
+of such a call completes on the timer thread. Then the processor keeps the timeout and gives it to
+the surface at the subsequent `processMessages` call. A UI adapter sets a scheduler that runs on its
+thread, as the example above shows. Then the surface gets each timeout immediately. An
+`AgentFunctionCaller` of your own must complete its futures on the thread that owns the surface.
 
 ## Functions and bindings
 
@@ -480,15 +540,16 @@ a key of its extensions is not a UAX #31 identifier, `invoke` throws an `A2uiVal
 An action that fails reports no action. The failure goes to `onError`, and `errorCode()` tells its
 cause:
 
-| Code               | Cause                                                                                       |
-| :----------------- | :------------------------------------------------------------------------------------------ |
-| `INVALID_ACTION`   | The event has no name, or its `userMessage` is not text.                                    |
-| `EXECUTION_ERROR`  | A function ran and failed.                                                                  |
-| `EXPRESSION_ERROR` | The core refused a call before the function ran, for example a call of an unknown function. |
-| `CATALOG_ERROR`    | The surface cannot use the catalog of a call.                                               |
+| Code               | Cause                                                                                      |
+| :----------------- | :----------------------------------------------------------------------------------------- |
+| `INVALID_ACTION`   | The event has no name, or its `userMessage` is not text.                                   |
+| `EXECUTION_ERROR`  | A function ran and failed.                                                                 |
+| `EXPRESSION_ERROR` | The core refused a call before the function ran, or the agent failed a call of the action. |
+| `CATALOG_ERROR`    | The surface cannot use the catalog of a call.                                              |
 
 The core resolves the context entries of an event in their sequence, and then the `userMessage`. The
-first failure stops the action. A `userMessage` that has no value is absent from the action.
+first failure stops the action. A `userMessage` that has no value is absent from the action. An
+action can wait for the agent. See [A component calls the agent](#a-component-calls-the-agent).
 
 **Checks.** A component that has `@checks` has three more properties. `props.isValid()` is false if
 a check of the severity `error` failed. `props.validationErrors()` has the messages of these checks.
