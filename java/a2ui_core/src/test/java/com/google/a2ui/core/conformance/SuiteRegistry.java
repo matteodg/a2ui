@@ -243,7 +243,7 @@ final class SuiteRegistry {
         new Supported(
             Map.of("data_model", new DataModelHandler()), reasons(), Set.of("data_model")));
     suites.put("core/data_model_pointers.yaml", processorSuite(List.of(VALIDATE)));
-    suites.put("core/error_responses.yaml", new Unsupported(NOT_YET));
+    suites.put("core/error_responses.yaml", processorSuite(List.of(VALIDATE)));
     suites.put(
         "core/expressions.yaml",
         new Supported(
