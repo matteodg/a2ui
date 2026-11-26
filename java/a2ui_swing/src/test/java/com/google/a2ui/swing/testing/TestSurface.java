@@ -87,22 +87,14 @@ public final class TestSurface {
     return Map.of("event", object("name", name, "context", object(contextNamesAndValues)));
   }
 
-  /** Makes the surface with data and components. */
+  /** Makes the surface with data and components. A surface can start with no components. */
   public TestSurface create(Map<String, Object> data, Object... components) {
-    processor.processMessages(
-        Map.of(
-            "version",
-            "1.0",
-            "createSurface",
-            object(
-                "surfaceId",
-                ID,
-                "catalogId",
-                TestCatalog.ID,
-                "dataModel",
-                data,
-                "components",
-                List.of(components))));
+    Map<String, Object> createSurface =
+        object("surfaceId", ID, "catalogId", TestCatalog.ID, "dataModel", data);
+    if (components.length > 0) {
+      createSurface.put("components", List.of(components));
+    }
+    processor.processMessages(Map.of("version", "1.0", "createSurface", createSurface));
     model().onError().subscribe(errors::add);
     model().onAction().subscribe(actions::add);
     return this;
