@@ -19,7 +19,11 @@ package com.google.a2ui.swing.catalog.basic;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JComponent;
 import javax.swing.UIManager;
 
@@ -191,6 +195,26 @@ final class BasicStyle {
         "Button.disabledText",
         "Label.disabledForeground",
         "textInactiveText");
+  }
+
+  /**
+   * Prepares a graphics object to draw text as the desktop of the user draws it.
+   *
+   * @param graphics the graphics object of a paint
+   */
+  static void textHints(Graphics2D graphics) {
+    Object hints = null;
+    try {
+      hints = Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints");
+    } catch (RuntimeException e) {
+      // A computer with no display has no desktop properties.
+    }
+    if (hints instanceof Map<?, ?> map) {
+      graphics.addRenderingHints(map);
+    } else {
+      graphics.setRenderingHint(
+          RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    }
   }
 
   /**

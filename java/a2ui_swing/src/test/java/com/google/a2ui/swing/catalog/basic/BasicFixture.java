@@ -67,6 +67,8 @@ final class BasicFixture {
           TextView::new,
           "Button",
           ButtonView::new,
+          "TextField",
+          TextFieldView::new,
           "Row",
           context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL),
           "Column",

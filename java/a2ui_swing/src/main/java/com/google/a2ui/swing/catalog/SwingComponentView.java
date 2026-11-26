@@ -75,7 +75,11 @@ public interface SwingComponentView {
    * <p>The default implementation returns {@link #component()}. A view whose control is in a panel
    * returns the control, because the element that gets the focus must have the attributes.
    *
-   * @return the component. It is the same object for the life of the view.
+   * <p>The result is usually the same object for the life of the view. A view can return a
+   * different component after an update, for example if a property selects a different control.
+   * Then the adapter gives the attributes to the new component.
+   *
+   * @return the component
    */
   default JComponent accessibleComponent() {
     return component();
