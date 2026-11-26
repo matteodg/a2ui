@@ -73,18 +73,11 @@ final class SuiteRegistry {
   /** The protocol versions that this SDK implements. */
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
-  private static final String NEEDS_RESOLUTION =
-      "Expects resolved property values, and java-core does not resolve nodes yet";
-
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
 
   /** The cases that the harness skips, by name. Each case has its reason. */
   static final Map<String, String> SKIP_TEST_NAMES =
       Map.of(
-          "test_escaped_doubled_at_unescaping",
-          NEEDS_RESOLUTION,
-          "test_escaped_doubled_at_metadata_unescaping",
-          NEEDS_RESOLUTION,
           "test_v10_get_renderer_data_model_filters_by_surface_protocol_version",
           "Creates a v0.9 surface; " + V1_ONLY);
 
@@ -287,7 +280,7 @@ final class SuiteRegistry {
                 new EvaluateFunctionHandler(),
                 VALIDATE,
                 new ProcessMessagesHandler(true)),
-            reasons("validate.expect", NEEDS_RESOLUTION),
+            reasons(),
             Set.of()));
     suites.put("core/index_function.yaml", new Unsupported(NOT_YET));
     suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
@@ -306,7 +299,7 @@ final class SuiteRegistry {
         new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));
     suites.put("core/reserved_keys.yaml", processorSuite(List.of(PROCESS, VALIDATE)));
     suites.put("core/rpc_functions.yaml", new Unsupported(NOT_YET));
-    suites.put("core/validation_result.yaml", new Unsupported(NOT_YET));
+    suites.put("core/validation_result.yaml", processorSuite(List.of(VALIDATE)));
     suites.put("core/validator_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/validator_v0_9.yaml", new Unsupported(V1_ONLY));
     suites.put("core/validator_v1_0.yaml", processorSuite(List.of(VALIDATE)));

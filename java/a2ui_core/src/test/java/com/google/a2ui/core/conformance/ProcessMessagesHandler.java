@@ -26,12 +26,18 @@ import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionApi;
+import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.conformance.SuiteRegistry.CaseHandler;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.processing.MessageProcessor;
+import com.google.a2ui.core.resolution.ComponentNode;
+import com.google.a2ui.core.resolution.NodeProps;
+import com.google.a2ui.core.resolution.NodeResolver;
+import com.google.a2ui.core.resolution.ResolvedBinding;
+import com.google.a2ui.core.resolution.ValidationResult;
 import com.google.a2ui.core.state.ComponentModel;
 import com.google.a2ui.core.state.SurfaceModel;
 import com.google.a2ui.core.validation.ValidationConfig;
@@ -39,6 +45,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -49,8 +56,11 @@ import java.util.function.Supplier;
  * messages of a case. Then the handler examines the surfaces, or the error.
  *
  * <p>A {@code validate} case and a case with {@code strictMode: true} use the strict validation.
- * Each other case uses the relaxed validation. The handler compares the properties of a component
- * as the messages write them, because this SDK does not yet resolve bindings.
+ * Each other case uses the relaxed validation.
+ *
+ * <p>A property of a component is correct if it is equal to the expected value as the message
+ * writes it, or as the node tree of the surface resolves it. The handler reads the results of the
+ * checks of a component from the node tree.
  */
 final class ProcessMessagesHandler implements CaseHandler {
   private static final Set<String> CASE_KEYS =
@@ -80,8 +90,24 @@ final class ProcessMessagesHandler implements CaseHandler {
 
   private static final Set<String> EXPECT_KEYS = Set.of("surfaces");
 
+  /** The expectations about the checks of the components, by component ID. */
+  private static final List<String> VALIDATION_FIELDS =
+      List.of("isValid", "validationErrors", "validationResults", "validationResult");
+
   private static final Set<String> SURFACE_KEYS =
-      Set.of("components", "dataModel", "exists", "metadata", "sendDataModel");
+      Set.of(
+          "components",
+          "dataModel",
+          "exists",
+          "metadata",
+          "sendDataModel",
+          "isValid",
+          "validationErrors",
+          "validationResults",
+          "validationResult");
+
+  /** The keys of an expected component that are not properties of the component. */
+  private static final Set<String> IDENTITY_KEYS = Set.of("id", "component", "@metadata");
 
   private static final Set<String> CONFIG_KEYS =
       Set.of(
@@ -290,8 +316,111 @@ final class ProcessMessagesHandler implements CaseHandler {
                 message -> message instanceof Map<?, ?> map && map.containsKey("createSurface"));
   }
 
+  /**
+   * Makes the basic catalog with a different ID. Its functions have their code. Thus the node tree
+   * of a surface can resolve the calls.
+   */
   private static Catalog<ComponentApi, FunctionApi> basicAs(String id) {
-    return Catalog.fromJson(BasicCatalog.api().toJson(), id, null);
+    return Catalog.fromJson(BasicCatalog.api().toJson(), id, null)
+        .<FunctionApi>withFunctions(
+            BasicCatalog.withFunctions(Locale.US, uri -> {}).functions().values());
+  }
+
+  /**
+   * Resolves the node tree of a surface and gets its nodes by component ID. A node that a template
+   * made has the key {@code <id>_<index>}.
+   */
+  private static Map<String, ComponentNode<ComponentApi>> resolvedNodes(
+      SurfaceModel<ComponentApi> surface) {
+    Map<String, ComponentNode<ComponentApi>> nodes = new LinkedHashMap<>();
+    // The handler reads the tree and then disposes it. The last properties stay available.
+    NodeResolver<ComponentApi> resolver = new NodeResolver<>(surface);
+    resolver.rootNode().get().ifPresent(root -> collectNodes(root, nodes));
+    resolver.dispose();
+    return nodes;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void collectNodes(Object value, Map<String, ComponentNode<ComponentApi>> nodes) {
+    switch (value) {
+      case ComponentNode<?> found -> {
+        ComponentNode<ComponentApi> node = (ComponentNode<ComponentApi>) found;
+        String key =
+            node.index().isPresent()
+                ? node.componentId() + "_" + node.index().getAsInt()
+                : node.componentId();
+        if (nodes.putIfAbsent(key, node) == null) {
+          collectNodes(node.props().get().asMap(), nodes);
+        }
+      }
+      case Map<?, ?> map -> map.values().forEach(member -> collectNodes(member, nodes));
+      case List<?> list -> list.forEach(item -> collectNodes(item, nodes));
+      case null, default -> {}
+    }
+  }
+
+  /** Writes a resolved property in the form that a case uses. */
+  private static Object plain(Object value) {
+    return switch (value) {
+      case ResolvedBinding binding -> plain(binding.value());
+      case ComponentNode<?> node -> node.componentId();
+      case ValidationResult result -> result.toJson();
+      case Map<?, ?> map -> {
+        Map<Object, Object> json = new LinkedHashMap<>();
+        map.forEach((key, member) -> json.put(key, plain(member)));
+        yield json;
+      }
+      case List<?> list -> list.stream().map(ProcessMessagesHandler::plain).toList();
+      case null, default -> value;
+    };
+  }
+
+  /**
+   * Tells if a resolved value is the expected value. A case can write a number as the text that a
+   * view shows.
+   */
+  private static boolean matches(Object expected, Object actual) {
+    return JsonValues.jsonEquals(expected, actual)
+        || (expected instanceof String text
+            && actual instanceof Number
+            && Coercion.toText(actual).equals(text));
+  }
+
+  /** Examines the results of the checks of the components that a surface expectation names. */
+  private static void checkValidation(
+      Map<String, Object> expect,
+      Supplier<Map<String, ComponentNode<ComponentApi>>> nodes,
+      String where) {
+    for (String field : VALIDATION_FIELDS) {
+      if (expect.get(field) == null) {
+        continue;
+      }
+      asObject(expect.get(field), field + " in " + where)
+          .forEach((id, expected) -> {
+            ComponentNode<ComponentApi> node = nodes.get().get(id);
+            if (node == null) {
+              throw new AssertionError(where + ": no node '" + id + "'");
+            }
+            NodeProps<ComponentApi> props = node.props().get();
+            List<Object> failed =
+                props.validationResults().stream().map(result -> (Object) result.toJson()).toList();
+            String at = where + ", " + field + " of '" + id + "'";
+            switch (field) {
+              case "isValid" -> assertJsonEquals(expected, props.isValid(), at);
+              case "validationErrors" -> assertJsonEquals(expected, props.validationErrors(), at);
+              case "validationResults" -> assertJsonEquals(expected, failed, at);
+              default -> {
+                // The first failed result. A case names the members that it examines.
+                if (failed.isEmpty()) {
+                  throw new AssertionError(at + ": no check failed");
+                }
+                Map<String, Object> first = asObject(failed.getFirst(), at);
+                asObject(expected, at)
+                    .forEach((key, value) -> assertJsonEquals(value, first.get(key), at));
+              }
+            }
+          });
+    }
   }
 
   /** Gets the catalog IDs that the {@code createSurface} messages of a case name, in all steps. */
@@ -371,6 +500,16 @@ final class ProcessMessagesHandler implements CaseHandler {
 
   private static void checkSurface(
       SurfaceModel<ComponentApi> surface, Map<String, Object> expect, String where) {
+    // The handler resolves the tree only for a case that needs it, and one time.
+    List<Map<String, ComponentNode<ComponentApi>>> resolved = new ArrayList<>();
+    Supplier<Map<String, ComponentNode<ComponentApi>>> nodes =
+        () -> {
+          if (resolved.isEmpty()) {
+            resolved.add(resolvedNodes(surface));
+          }
+          return resolved.getFirst();
+        };
+    checkValidation(expect, nodes, where);
     if (expect.containsKey("sendDataModel")) {
       assertJsonEquals(
           expect.get("sendDataModel"), surface.sendDataModel(), where + " sendDataModel");
@@ -416,7 +555,20 @@ final class ProcessMessagesHandler implements CaseHandler {
               case "@metadata" -> metadataJson(component.metadata());
               default -> component.properties().get(key);
             };
-        assertJsonEquals(value, found, where + ", component '" + id + "', '" + key + "'");
+        String at = where + ", component '" + id + "', '" + key + "'";
+        if (IDENTITY_KEYS.contains(key)) {
+          assertJsonEquals(value, found, at);
+          return;
+        }
+        if (JsonValues.jsonEquals(value, found)) {
+          return;
+        }
+        ComponentNode<ComponentApi> node = nodes.get().get(id);
+        Object plain = node == null ? null : plain(node.props().get().get(key));
+        if (!matches(value, plain)) {
+          throw new AssertionError(
+              at + ": expected <" + value + "> but was <" + found + ">, resolved <" + plain + ">");
+        }
       });
     });
   }
