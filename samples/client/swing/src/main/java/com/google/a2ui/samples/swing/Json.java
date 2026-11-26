@@ -17,11 +17,24 @@
 package com.google.a2ui.samples.swing;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.util.DefaultIndenter;
+import tools.jackson.core.util.DefaultPrettyPrinter;
+import tools.jackson.core.util.Separators;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Reads JSON text as plain Java values, and writes plain Java values as JSON text. */
 final class Json {
   private static final JsonMapper MAPPER = JsonMapper.builder().build();
+
+  /** Two spaces for each level, one element in each line, and no space before a colon. */
+  private static final DefaultPrettyPrinter PRINTER =
+      new DefaultPrettyPrinter(
+              Separators.createDefaultInstance()
+                  .withObjectNameValueSpacing(Separators.Spacing.AFTER)
+                  .withObjectEmptySeparator("")
+                  .withArrayEmptySeparator(""))
+          .withObjectIndenter(new DefaultIndenter("  ", "\n"))
+          .withArrayIndenter(new DefaultIndenter("  ", "\n"));
 
   private Json() {}
 
@@ -49,10 +62,7 @@ final class Json {
    */
   static String pretty(Object value) {
     try {
-      return MAPPER
-          .writerWithDefaultPrettyPrinter()
-          .writeValueAsString(value)
-          .replace("\r\n", "\n");
+      return MAPPER.writer().with(PRINTER).writeValueAsString(value);
     } catch (JacksonException e) {
       return String.valueOf(value);
     }
