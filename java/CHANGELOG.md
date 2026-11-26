@@ -123,5 +123,7 @@
   an absolute URI with a scheme, as in the Python SDK and the Dart SDK.
 - A component of a `FlexLayout` that has a weight is now not smaller than its minimum size. Thus a
   weighted column of a `Row` does not cut a word.
-- The keyboard focus does not go into a part of a surface that the `@accessibility` attribute
-  `hidden` hides.
+- The user cannot operate a part of a surface that the `@accessibility` attribute `hidden` hides.
+  The keyboard focus does not go into it, and the mouse events at its position reach no view. For
+  the mouse rule the adapter adds a component that paints nothing to the layered pane of the root
+  pane of the window.

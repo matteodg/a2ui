@@ -517,11 +517,26 @@ view, after each update. A view does not do this work.
   for a live component there, and marks each of these components.
   `A2uiAccessibility.isHidden(component)` reads the mark. A Swing component that a view makes for
   its own use, for example the label of a field, keeps its name.
-- The keyboard focus does not go into a hidden part, as the rule `aria-hidden-focus` of the
-  accessibility suite requires. The root component of each view there gives a focus traversal
-  policy that has no components, thus the Tab key goes past the view. The control of the view is
-  not focusable. If a component of the view has the focus when the view becomes hidden, the focus
-  goes to the subsequent component. A click on a hidden button still does its action.
+- The user cannot operate a hidden part, as with the attribute `inert` that the web renderers set.
+  - The keyboard focus does not go into a hidden part, as the rule `aria-hidden-focus` of the
+    accessibility suite requires. The root component of each view there gives a focus traversal
+    policy that has no components, thus the Tab key goes past the view. The control of the view is
+    not focusable. If a component of the view has the focus when the view becomes hidden, the
+    focus goes to the subsequent component.
+  - The mouse does not reach a hidden part. For each view there, the adapter puts a component that
+    paints nothing in the layered pane of the root pane of the window. That component takes each
+    press, click, move and turn of the wheel at a point of the view. Thus no action runs, no
+    control takes the focus by a click, and no key event goes to a control there. This applies to
+    each view, also to the options of a `ChoicePicker`, to the tabs of `Tabs`, to the trigger of a
+    `Modal` and to the view of a custom component. A turn of the wheel on a hidden item still
+    scrolls a list that is not hidden.
+  - The view, its Swing component and its layout do not change. The adapter puts each value back
+    when the part is not hidden and when the surface disposes the view.
+  - Limits: the mouse rule needs a `JRootPane` above the surface, as each Swing window, dialog and
+    internal frame has. The adapter adds its component to the layered pane in the event after the
+    event that hides the part. Code that sends an event to a hidden control directly, for example
+    with `doClick`, and code that gives it the focus with `requestFocusInWindow`, still operates
+    the control.
 - A view whose control is in a panel overrides `accessibleComponent()` and returns the control.
 
 ## The shapes of the icons
