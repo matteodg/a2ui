@@ -83,6 +83,21 @@ class BasicFunctionsTest {
         .resolveDynamicValue(call(name, namesAndValues));
   }
 
+  /**
+   * Makes sure that the context refuses a call that gives no argument, and that the message names
+   * each required argument.
+   */
+  private static void assertRefused(String name, String... required) {
+    A2uiExpressionError error = assertThrows(A2uiExpressionError.class, () -> evaluate(name));
+    StringBuilder missing = new StringBuilder();
+    for (String argument : required) {
+      missing.append(missing.isEmpty() ? "'" : ", '").append(argument).append("'");
+    }
+    assertEquals(
+        "Validation failed for function '" + name + "': missing " + missing + ".",
+        error.getMessage());
+  }
+
   private static Map<String, Object> invalid(String message) {
     return Map.of("valid", false, "message", message);
   }
@@ -107,7 +122,7 @@ class BasicFunctionsTest {
     assertEquals(invalid("This field is required."), evaluate("required", "value", ""));
     assertEquals(invalid("This field is required."), evaluate("required", "value", null));
     assertEquals(invalid("This field is required."), evaluate("required", "value", List.of()));
-    assertEquals(invalid("This field is required."), evaluate("required"));
+    assertRefused("required", "value");
   }
 
   @Test
@@ -183,8 +198,10 @@ class BasicFunctionsTest {
     for (String name : List.of("and", "or")) {
       assertThrows(A2uiExpressionError.class, () -> evaluate(name, "values", List.of(true)));
       assertThrows(A2uiExpressionError.class, () -> evaluate(name, "values", true));
-      A2uiExpressionError error = assertThrows(A2uiExpressionError.class, () -> evaluate(name));
+      A2uiExpressionError error =
+          assertThrows(A2uiExpressionError.class, () -> evaluate(name, "values", null));
       assertEquals("The '" + name + "' function requires at least 2 values.", error.getMessage());
+      assertRefused(name, "values");
     }
   }
 
@@ -342,7 +359,11 @@ class BasicFunctionsTest {
   void formatDateUsesTheDefaultPatternAndAcceptsMilliseconds() {
     assertEquals("1970-01-02", formatDate(86_400_000, null));
     assertEquals("2026-09-04", formatDate(" 2026-09-04T21:05:09Z ", ""));
-    assertEquals("2026-09-04", evaluate("formatDate", "value", "2026-09-04"));
+    A2uiExpressionError error =
+        assertThrows(
+            A2uiExpressionError.class, () -> evaluate("formatDate", "value", "2026-09-04"));
+    assertEquals(
+        "Validation failed for function 'formatDate': missing 'format'.", error.getMessage());
   }
 
   @Test
@@ -393,8 +414,8 @@ class BasicFunctionsTest {
     assertEquals("apples", evaluate("pluralize", "value", 1, "one", null, "other", "apples"));
     assertEquals(
         "apples", evaluate("pluralize", "value", "many", "one", "apple", "other", "apples"));
-    assertEquals("apples", evaluate("pluralize", "one", "apple", "other", "apples"));
-    assertEquals("", evaluate("pluralize", "value", 5, "one", "apple"));
+    assertEquals("apples", evaluate("pluralize", "value", null, "one", "apple", "other", "apples"));
+    assertEquals("", evaluate("pluralize", "value", 5, "one", "apple", "other", null));
     assertEquals("7", evaluate("pluralize", "value", 5, "other", 7));
   }
 
@@ -491,9 +512,9 @@ class BasicFunctionsTest {
     assertEquals(VALID, evaluate("regex", "value", 2.5, "pattern", "^2\\.5$"));
     assertEquals(VALID, evaluate("regex", "value", true, "pattern", "^true$"));
     assertEquals(VALID, evaluate("regex", "value", null, "pattern", "^$"));
-    assertEquals(VALID, evaluate("regex", "pattern", "^$"));
     assertEquals(VALID, evaluate("regex", "value", "7", "pattern", 7));
-    assertEquals(VALID, evaluate("regex", "value", "anything"));
+    assertEquals(VALID, evaluate("regex", "value", "anything", "pattern", null));
+    assertRefused("regex", "value", "pattern");
   }
 
   @Test

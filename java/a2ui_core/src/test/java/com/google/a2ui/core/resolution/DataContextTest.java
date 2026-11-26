@@ -17,6 +17,7 @@
 package com.google.a2ui.core.resolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -34,6 +35,7 @@ import com.google.a2ui.core.exceptions.A2uiDataError;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.expressions.Expression;
 import com.google.a2ui.core.expressions.ExpressionParser;
+import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.state.SurfaceModel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -89,6 +91,7 @@ class DataContextTest {
                 }),
             function("echo", echoSchema(), (args, context) -> args),
             function("check", Map.of(), (args, context) -> Map.of("valid", false)),
+            function("strict", strictSchema(), (args, context) -> args.get("value")),
             function("secret", Map.of("allowedCallers", "agentOnly"), (args, context) -> "secret"),
             function("beep", Map.of("requiresUserActivation", true), (args, context) -> null),
             new FunctionApi("described", Map.of("returnType", "string")));
@@ -115,6 +118,13 @@ class DataContextTest {
             "options", Map.of("type", "object", "properties", Map.of("strict", DYNAMIC_BOOLEAN)),
             "label", Map.of("$ref", "common_types.json#/$defs/DynamicString"));
     return Map.of("properties", Map.of("args", Map.of("type", "object", "properties", properties)));
+  }
+
+  /** The definition of a function that requires the argument {@code value}. */
+  private static Map<String, Object> strictSchema() {
+    Map<String, Object> args =
+        Map.of("type", "object", "properties", Map.of(), "required", List.of("value", "unit"));
+    return Map.of("properties", Map.of("args", args));
   }
 
   /** Makes a surface that can use the two catalogs. */
@@ -250,6 +260,24 @@ class DataContextTest {
     assertEquals(5L, context.resolveDynamicValue(5L));
     assertEquals("text", context.resolveDynamicValue("text"));
     assertNull(context.resolveDynamicValue(null));
+  }
+
+  @Test
+  void aCallThatOmitsARequiredArgumentDoesNotRun() {
+    DataContext context = context();
+
+    A2uiExpressionError error =
+        assertThrows(
+            A2uiExpressionError.class,
+            () -> context.resolveDynamicValue(call("strict", Map.of("unit", "m"))));
+
+    assertEquals("Validation failed for function 'strict': missing 'value'.", error.getMessage());
+    assertFalse(ErrorFields.isRaisedByFunction(error));
+    assertEquals(List.of(), calls);
+    // An argument that resolves to null is given.
+    Map<String, Object> args = Map.of("value", Map.of("@path", "/absent"), "unit", "m");
+    assertNull(context.resolveDynamicValue(call("strict", args)));
+    assertEquals(List.of("strict"), calls);
   }
 
   @Test

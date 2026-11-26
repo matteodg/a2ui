@@ -294,7 +294,9 @@ public final class DataContext {
    * </ul>
    *
    * <p>Before a function runs, the context reads each argument as a boolean if the schema of the
-   * function gives it the type {@code DynamicBoolean}. See {@link Coercion#toBoolean(Object)}.
+   * function gives it the type {@code DynamicBoolean}. See {@link Coercion#toBoolean(Object)}. The
+   * context refuses a call that omits an argument that the schema of the function requires. Then
+   * the function does not run.
    *
    * @param value the value to resolve, or null
    * @return the resolved value. Maps and lists are read-only.
@@ -510,6 +512,7 @@ public final class DataContext {
               + "' has no implementation in this renderer.");
     }
     Map<String, Object> resolved = coerceArguments(function, arguments.get());
+    requireArguments(function, resolved);
     DataContext scope =
         new DataContext(surface, path, index, userActivated, catalog, reads, agentCaller);
     try {
@@ -543,6 +546,33 @@ public final class DataContext {
       throw new A2uiExpressionError("The offset of @index must be a number.");
     }
     return index + (long) offset.getAsDouble();
+  }
+
+  /**
+   * Makes sure that a call gives each argument that the schema of the function requires. An
+   * argument that has the value null is given.
+   *
+   * @throws A2uiExpressionError if the call omits a required argument
+   */
+  private static void requireArguments(FunctionApi function, Map<String, Object> arguments) {
+    Object required = function.argumentSchema().map(schema -> schema.get("required")).orElse(null);
+    if (!(required instanceof List<?> names)) {
+      return;
+    }
+    List<String> missing = new ArrayList<>();
+    for (Object name : names) {
+      if (!arguments.containsKey(name)) {
+        missing.add("'" + name + "'");
+      }
+    }
+    if (!missing.isEmpty()) {
+      throw new A2uiExpressionError(
+          "Validation failed for function '"
+              + function.name()
+              + "': missing "
+              + String.join(", ", missing)
+              + ".");
+    }
   }
 
   /**
