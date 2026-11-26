@@ -389,6 +389,21 @@ public final class Catalog<C extends ComponentApi, F extends FunctionApi> {
   }
 
   /**
+   * Makes a catalog that has other functions and that is equal to this catalog in all other parts.
+   *
+   * <p>An example is a catalog in which each function has its code. The functions of the result are
+   * the given functions only.
+   *
+   * @param <G> the type of the new functions
+   * @param functions the functions of the new catalog, in the sequence of their declaration
+   * @return the new catalog
+   * @throws A2uiCatalogError if two functions have the same name
+   */
+  public <G extends FunctionApi> Catalog<C, G> withFunctions(Collection<? extends G> functions) {
+    return new Catalog<>(id, protocolVersion, components.values(), functions, layout);
+  }
+
+  /**
    * Makes a catalog with a new ID that has all the entries of this catalog. See {@link
    * #derive(String, Collection, Collection, Collection, Collection, String)}.
    *

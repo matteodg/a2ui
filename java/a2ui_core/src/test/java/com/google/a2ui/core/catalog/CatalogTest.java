@@ -124,6 +124,30 @@ class CatalogTest {
   }
 
   @Test
+  void withFunctionsReplacesTheFunctionsAndKeepsAllOtherParts() {
+    Catalog<ComponentApi, FunctionApi> catalog =
+        new Catalog<>("urn:test", List.of(text), List.of(upper), null, ProtocolVersion.V1_0);
+    FunctionImplementation runnable =
+        new FunctionImplementation(upper, (args, context) -> "RESULT");
+
+    Catalog<ComponentApi, FunctionImplementation> result = catalog.withFunctions(List.of(runnable));
+
+    assertEquals("urn:test", result.id());
+    assertEquals(Optional.of(ProtocolVersion.V1_0), result.protocolVersion());
+    assertEquals(catalog.components(), result.components());
+    assertEquals(Map.of("upper", runnable), result.functions());
+    assertEquals(catalog.toJson(), result.toJson());
+    assertEquals(Map.of("upper", upper), catalog.functions());
+  }
+
+  @Test
+  void withFunctionsRejectsTwoFunctionsWithTheSameName() {
+    Catalog<ComponentApi, FunctionApi> catalog = new Catalog<>("urn:test", List.of(text));
+
+    assertThrows(A2uiCatalogError.class, () -> catalog.withFunctions(List.of(upper, upper)));
+  }
+
+  @Test
   void deriveKeepsTheNamedEntriesAndAddsTheNewEntries() {
     Catalog<ComponentApi, FunctionApi> source =
         new Catalog<>("urn:source", List.of(text, row), List.of(upper), null, ProtocolVersion.V1_0);
