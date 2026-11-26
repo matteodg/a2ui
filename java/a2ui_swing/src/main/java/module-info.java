@@ -23,4 +23,6 @@
 module com.google.a2ui.swing {
   requires transitive com.google.a2ui.core;
   requires transitive java.desktop;
+
+  exports com.google.a2ui.swing.surface;
 }
