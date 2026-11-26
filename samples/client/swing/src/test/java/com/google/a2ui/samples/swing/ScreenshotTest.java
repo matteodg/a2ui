@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Dimension;
+import java.awt.geom.AffineTransform;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -39,5 +40,18 @@ class ScreenshotTest {
           assertThrows(IllegalArgumentException.class, () -> Screenshot.parseSize(text), text);
       assertTrue(error.getMessage().contains("900x600"), error.getMessage());
     }
+  }
+
+  @Test
+  void theImageHasTheSizeOfTheWindowInThePixelsOfTheScreen() {
+    Dimension window = new Dimension(1280, 801);
+
+    assertEquals(window, Screenshot.imageSize(window, new AffineTransform()));
+    assertEquals(
+        new Dimension(1920, 1202),
+        Screenshot.imageSize(window, AffineTransform.getScaleInstance(1.5, 1.5)));
+    assertEquals(
+        new Dimension(1, 1),
+        Screenshot.imageSize(new Dimension(0, 0), AffineTransform.getScaleInstance(2, 2)));
   }
 }

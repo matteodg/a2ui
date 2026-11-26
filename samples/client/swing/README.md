@@ -133,5 +133,6 @@ of the window to the file and stops.
 If the event dispatch thread is not idle after 10 seconds, the program stops with a message and
 with the exit code 2. This occurs when a layout requests a new layout without end.
 
-The program paints the window on an image. It does not copy the screen. Thus the spaces between
-words can be some pixels different from the screen.
+The program paints the window on an image. It does not copy the screen. The image has the scale of
+the screen of the window. Thus, on a screen with a scale of 150 %, a window of 1280 x 800 gives an
+image of 1920 x 1200 pixels, and the text has the same widths as on the screen.

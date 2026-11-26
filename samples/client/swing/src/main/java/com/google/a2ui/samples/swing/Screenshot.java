@@ -21,7 +21,9 @@ import java.awt.AWTEvent;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.Graphics2D;
+import java.awt.GraphicsConfiguration;
 import java.awt.Toolkit;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -165,13 +167,29 @@ final class Screenshot {
     }
   }
 
-  /** Paints the content of the window and its menu bar on an image, and writes the image. */
+  /**
+   * Gets the size of the image of a window.
+   *
+   * @param window the size of the content of the window
+   * @param scale the scale of the screen of the window
+   * @return the size in the pixels of the screen. Each side is 1 or more.
+   */
+  static Dimension imageSize(Dimension window, AffineTransform scale) {
+    return new Dimension(
+        Math.max(1, (int) Math.ceil(window.width * scale.getScaleX())),
+        Math.max(1, (int) Math.ceil(window.height * scale.getScaleY())));
+  }
+
+  /**
+   * Paints the content of the window and its menu bar on an image, and writes the image. The image
+   * has the scale of the screen of the window. A component calculates the width of its text for
+   * that scale. With a different scale, a text can be wider than its component.
+   */
   private static void write(JRootPane root, Path file) {
-    BufferedImage image =
-        new BufferedImage(
-            Math.max(1, root.getWidth()),
-            Math.max(1, root.getHeight()),
-            BufferedImage.TYPE_INT_RGB);
+    GraphicsConfiguration screen = root.getGraphicsConfiguration();
+    AffineTransform scale = screen == null ? new AffineTransform() : screen.getDefaultTransform();
+    Dimension size = imageSize(root.getSize(), scale);
+    BufferedImage image = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_RGB);
     Graphics2D graphics = image.createGraphics();
     try {
       // With the text hints of the desktop, the text has the widths that it has on the screen.
@@ -179,6 +197,7 @@ final class Screenshot {
           instanceof Map<?, ?> hints) {
         graphics.addRenderingHints(hints);
       }
+      graphics.scale(scale.getScaleX(), scale.getScaleY());
       root.paint(graphics);
     } finally {
       graphics.dispose();
