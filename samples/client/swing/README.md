@@ -78,8 +78,10 @@ A component that the surface cannot show is visible as a label with a dashed bor
 - The Swing adapter has views for 5 of the 18 components of the basic catalog at this time: `Text`,
   `Row`, `Column`, `Button` and `TextField`. Thus 7 of the 43 examples show completely. These are
   the examples whose name starts with `scaffold-`.
-- The root of each other example is a `Card`. A component with no view does not show its children.
-  Thus such an example shows only one placeholder for its root.
+- A component with no view does not show its children. The root of 33 of the other 36 examples is
+  a `Card`. Thus such an example shows only one placeholder, for its root. The examples
+  `incremental-dashboard`, `live-invitation-builder` and `modal` show placeholders between
+  components that have a view.
 - The gallery shows the first surface of an example.
 - The gallery has the examples of protocol v1.0 only, and it has no example with a custom catalog.
 - The function `openUrl` opens the browser of the system. The tests use a different URL opener.
