@@ -64,3 +64,10 @@
   update, if the validation configuration accepts dangling references and orphans.
 - Add `Catalog.withComponents` in `com.google.a2ui.core.catalog`. It makes a catalog with other
   components, for example the components of a framework adapter that have a view.
+- Add `a2ui-java-swing`, the Swing adapter of the SDK, with its foundations. `A2uiSurface` shows one
+  `SurfaceModel`. `A2uiFallbacks`, `A2uiServices` and `A2uiSwing` are in
+  `com.google.a2ui.swing.surface`. `SwingComponentImplementation`, `SwingComponentView`,
+  `ViewContext` and `ChildViews` in `com.google.a2ui.swing.catalog` are the types for component
+  implementations. `TextBinding` is in `com.google.a2ui.swing.binding`, and `FlexLayout` is in
+  `com.google.a2ui.swing.catalog.basic`. The module does not have the views of the components of the
+  basic catalog in this change.

@@ -2,9 +2,10 @@
 
 This directory contains the Java client SDK for the A2UI protocol v1.0.
 
-| Module                   | Artifact                         | Contents                                                   |
-| :----------------------- | :------------------------------- | :--------------------------------------------------------- |
-| [`a2ui_core`](a2ui_core) | `com.google.a2ui:a2ui-java-core` | The state model and the protocol logic. It has no UI code. |
+| Module                     | Artifact                          | Contents                                                                    |
+| :------------------------- | :-------------------------------- | :-------------------------------------------------------------------------- |
+| [`a2ui_core`](a2ui_core)   | `com.google.a2ui:a2ui-java-core`  | The state model and the protocol logic. It has no UI code.                  |
+| [`a2ui_swing`](a2ui_swing) | `com.google.a2ui:a2ui-java-swing` | The Swing adapter. It shows the surfaces of the core with Swing components. |
 
 The SDK is in development. It is not released.
 
@@ -41,7 +42,7 @@ other work:
 ## Conformance
 
 The tests of each module run the shared suites in [`conformance/`](../conformance). The harness of
-`a2ui_core` has the name `java-core`.
+`a2ui_core` has the name `java-core`. The harness of `a2ui_swing` has the name `swing`.
 
 To write the manifest of the executed cases, set `A2UI_CONFORMANCE_MANIFEST_DIR`:
 
@@ -49,10 +50,17 @@ To write the manifest of the executed cases, set `A2UI_CONFORMANCE_MANIFEST_DIR`
 A2UI_CONFORMANCE_MANIFEST_DIR=/tmp/a2ui-manifest ./mvnw verify
 uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
   --manifest-dir /tmp/a2ui-manifest --harness java-core --corpus core
+uv run --project ../conformance python ../conformance/scripts/check_executed_cases.py \
+  --manifest-dir /tmp/a2ui-manifest --harness swing --corpus adapter
 ```
 
-The harness records the cases of protocol versions before 1.0 and the cases of the two framework
-adapter suites as skipped, each with its reason.
+The harness `java-core` records the cases of protocol versions before 1.0 and the cases of the two
+framework adapter suites as skipped, each with its reason.
+
+The harness `swing` runs the four suites of the `adapter` corpus. It runs a case only if the adapter
+has a view for each basic catalog component that the case uses. It records each other case as
+skipped, with the names of the components that have no view. It also records the cases of protocol
+v0.9 as skipped.
 
 The timing cases of `core/message_processor_scaling.yaml` run only in the `performance` profile. The
 usual build records them as skipped. Give the two builds different manifest directories:
@@ -68,3 +76,5 @@ uv run --project ../conformance python ../conformance/scripts/check_executed_cas
 
 - Protocol: [specification/v1_0/docs/a2ui_protocol.md](../specification/v1_0/docs/a2ui_protocol.md)
 - Core design: [blueprints/modules/a2ui_core.blueprint.md](../blueprints/modules/a2ui_core.blueprint.md)
+- Adapter design:
+  [blueprints/modules/a2ui_framework_adapter.blueprint.md](../blueprints/modules/a2ui_framework_adapter.blueprint.md)
