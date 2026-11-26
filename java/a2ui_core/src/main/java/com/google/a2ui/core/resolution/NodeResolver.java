@@ -66,6 +66,9 @@ public final class NodeResolver<C extends ComponentApi> {
   private static final String ROOT_PATH = "/";
   private static final int MAX_DEPTH = 100;
 
+  /** The location of the check rules of a component, for the key of a reported error. */
+  private static final String CHECKS = "@checks";
+
   /** The characters of an ID or of a path that have a meaning in an instance ID. */
   private static final String ID_ESCAPES = "~#[]>@";
 
@@ -356,6 +359,14 @@ public final class NodeResolver<C extends ComponentApi> {
     model
         .properties()
         .forEach((name, raw) -> props.put(name, resolve(pass, raw, structure.member(name), name)));
+    model
+        .accessibility()
+        .ifPresent(attributes ->
+            props.put(
+                NodeProps.ACCESSIBILITY,
+                resolve(
+                    pass, attributes, PropertyBehaviors.accessibility(), NodeProps.ACCESSIBILITY)));
+    model.checks().ifPresent(rules -> check(pass, rules, props));
 
     Map<ChildKey, ComponentNode<C>> previous = node.children;
     node.children = pass.children;
@@ -504,6 +515,42 @@ public final class NodeResolver<C extends ComponentApi> {
       children.add(child(pass, componentId, prefix + position, position));
     }
     return Collections.unmodifiableList(children);
+  }
+
+  private void check(Pass pass, List<Object> rules, Map<String, Object> props) {
+    List<ValidationResult> failed = new ArrayList<>();
+    for (int position = 0; position < rules.size(); position++) {
+      if (!(rules.get(position) instanceof Map<?, ?> rule)) {
+        continue;
+      }
+      Object condition = rule.get("condition");
+      String message = rule.get("message") instanceof String text ? text : null;
+      ValidationResult result;
+      try {
+        boolean pathBound =
+            condition instanceof Map<?, ?> map && map.get("@path") instanceof String;
+        result =
+            ValidationResult.of(pass.context.resolveDynamicValue(condition), message, pathBound);
+      } catch (A2uiError error) {
+        // The resolver reports the failure, and the check fails.
+        report(pass, CHECKS + "/" + position + "/condition", error);
+        result = ValidationResult.failed(message, error);
+      }
+      if (!result.valid()) {
+        failed.add(result);
+      }
+    }
+    List<String> errors = new ArrayList<>();
+    for (ValidationResult result : failed) {
+      if (result.severity() == ValidationSeverity.ERROR) {
+        result.message().ifPresent(errors::add);
+      }
+    }
+    props.put(
+        NodeProps.IS_VALID,
+        failed.stream().noneMatch(result -> result.severity() == ValidationSeverity.ERROR));
+    props.put(NodeProps.VALIDATION_ERRORS, Collections.unmodifiableList(errors));
+    props.put(NodeProps.VALIDATION_RESULTS, Collections.unmodifiableList(failed));
   }
 
   // Actions.
