@@ -35,8 +35,9 @@ public interface MediaView {
   /**
    * Sets the media to play. The view does not start to play until the user starts it.
    *
-   * @param url the absolute URL of the media, or an empty value to show no media. The component
-   *     examines each URL before it calls the view.
+   * @param url the URL of the media, or an empty value to show no media. The component examines
+   *     each URL with {@link MediaUrls} before it calls the view. The URL is relative if the agent
+   *     sent a relative path.
    */
   void setSource(Optional<URI> url);
 
@@ -44,7 +45,8 @@ public interface MediaView {
    * Sets the image that a video view shows before the video plays. The default implementation does
    * nothing.
    *
-   * @param url the absolute URL of the image, or an empty value to show none
+   * @param url the URL of the image, or an empty value to show none. See {@link
+   *     #setSource(Optional)}.
    */
   default void setPoster(Optional<URI> url) {}
 

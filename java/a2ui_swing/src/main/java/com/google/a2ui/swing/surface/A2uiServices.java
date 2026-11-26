@@ -32,7 +32,9 @@ import java.util.Objects;
  *       width of the component.
  *   <li>{@code imageLoader}: reads {@code http}, {@code https} and {@code data} URLs with {@code
  *       ImageIO}, on a thread that is not the event dispatch thread. It reads the formats that
- *       {@code ImageIO} reads, for example PNG, JPEG, GIF and BMP. It has no cache.
+ *       {@code ImageIO} reads, for example PNG, JPEG, GIF and BMP. It has no cache. It has timeouts
+ *       and limits for the bytes and the pixels of an image, and it follows a redirection only to
+ *       an {@code http} or {@code https} URL.
  *   <li>{@code mediaPlayer}: {@link MediaPlayer#NONE}, because Swing cannot play media.
  *   <li>{@code modalPresenter}: shows a modal {@code JDialog} above the window of the surface. It
  *       needs a display.

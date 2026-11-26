@@ -70,17 +70,16 @@ class DefaultImageLoaderTest {
 
   @Test
   void itGivesAnEmptyResultForDataThatIsNotAnImage() throws Exception {
-    assertEquals(Optional.empty(), DefaultImageLoader.read(URI.create("data:text/plain,hello")));
-    assertEquals(Optional.empty(), DefaultImageLoader.read(URI.create("data:image/png;base64")));
-    assertEquals(
-        Optional.empty(), DefaultImageLoader.read(URI.create("data:image/png;base64,!!!")));
+    assertEquals(Optional.empty(), loader.read(URI.create("data:text/plain,hello")));
+    assertEquals(Optional.empty(), loader.read(URI.create("data:image/png;base64")));
+    assertEquals(Optional.empty(), loader.read(URI.create("data:image/png;base64,!!!")));
   }
 
   @Test
   void itGivesAnEmptyResultForASchemeThatItDoesNotRead() {
-    assertEquals(Optional.empty(), DefaultImageLoader.read(URI.create("file:///etc/passwd")));
-    assertEquals(Optional.empty(), DefaultImageLoader.read(URI.create("ftp://example.com/a.png")));
-    assertEquals(Optional.empty(), DefaultImageLoader.read(URI.create("relative/a.png")));
+    assertEquals(Optional.empty(), loader.read(URI.create("file:///etc/passwd")));
+    assertEquals(Optional.empty(), loader.read(URI.create("ftp://example.com/a.png")));
+    assertEquals(Optional.empty(), loader.read(URI.create("relative/a.png")));
   }
 
   @Test
@@ -92,9 +91,40 @@ class DefaultImageLoaderTest {
       encoded.append(String.format("%%%02X", b & 0xFF));
     }
 
-    Optional<Image> image = DefaultImageLoader.read(URI.create(encoded.toString()));
+    Optional<Image> image = loader.read(URI.create(encoded.toString()));
 
     assertEquals(1, image.orElseThrow().getWidth(null));
+  }
+
+  private static URI pngDataUrl(int width, int height) throws IOException {
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB), "png", bytes);
+    return URI.create(
+        "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes.toByteArray()));
+  }
+
+  @Test
+  void itRefusesAnImageWithMorePixelsThanTheLimit() throws Exception {
+    DefaultImageLoader small = new DefaultImageLoader(DefaultImageLoader.MAX_BYTES, 100);
+
+    assertTrue(small.read(pngDataUrl(10, 10)).isPresent());
+    assertEquals(Optional.empty(), small.read(pngDataUrl(101, 1)));
+    assertEquals(Optional.empty(), small.read(pngDataUrl(11, 10)));
+    // The file of a large image with one color is small. The limit is for the pixels.
+    assertEquals(Optional.empty(), small.read(pngDataUrl(3000, 3000)));
+  }
+
+  @Test
+  void itRefusesADataUrlWithMoreBytesThanTheLimit() throws Exception {
+    URI url = pngDataUrl(40, 40);
+    int bytes =
+        Base64.getDecoder()
+            .decode(url.toString().substring(url.toString().indexOf(',') + 1))
+            .length;
+
+    assertTrue(new DefaultImageLoader(bytes, 10_000).read(url).isPresent());
+    assertEquals(Optional.empty(), new DefaultImageLoader(bytes - 1, 10_000).read(url));
+    assertEquals(Optional.empty(), new DefaultImageLoader(10, 10_000).read(url));
   }
 
   @Test
