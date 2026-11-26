@@ -558,10 +558,16 @@ The module has no icon font, no dependency and no network access. Thus it has th
 of the basic catalog: the name and the SVG path data of its shape, in a view box of 24 by 24 units,
 with the non-zero fill rule.
 
-The shapes are original drawings for this module. They are simple shapes for the usual meaning of
-each name. They are not copies of the Material Symbols or of the Material Icons, and they are not
-equal to them. Thus the resource has the license of this repository and no other notice. To show a
-different shape, replace the view of the `Icon` component, or send the shape as `svgPath`.
+The path data is from the [Material Icons](https://github.com/google/material-design-icons) of
+Google, filled style, commit `10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7`, files
+`src/<category>/<name>/materialicons/24px.svg`. Google publishes the Material Icons with the Apache
+License 2.0, which is also the license of this repository. Each line has the path data of the one
+visible path of its file, with no change other than white space. The header of the resource gives
+the source and the four catalog names that are not the Material name in camel case: `favoriteOff`
+(`favorite_border`), `starOff` (`star_border`), `play` (`play_arrow`) and `rewind` (`fast_rewind`).
+
+To show a different shape, replace the view of the `Icon` component, or send the shape as
+`svgPath`.
 
 ## Tests
 
