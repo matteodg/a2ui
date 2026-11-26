@@ -173,11 +173,8 @@ final class HtmlMarkdownView implements MarkdownView {
       setEditable(false);
       setFocusable(false);
       setOpaque(false);
-      setBorder(null);
-      // The caret of a text component makes a scroll pane show the position of the last change.
-      if (getCaret() instanceof DefaultCaret caret) {
-        caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
-      }
+      // The constructor of the superclass applied the look and feel before the kit was there.
+      updateUI();
     }
 
     /** Forgets the sizes of the text, after a change of the document or of the UI. */
@@ -194,6 +191,12 @@ final class HtmlMarkdownView implements MarkdownView {
       // Some look and feels paint the background of a text component that is not opaque. A
       // background color with no opacity makes that paint show nothing.
       setBackground(new Color(0, 0, 0, 0));
+      // Each look and feel installs its own border and a new caret. The caret of a text component
+      // makes a scroll pane show the position of the last change.
+      setBorder(null);
+      if (getCaret() instanceof DefaultCaret caret) {
+        caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
+      }
       contentChanged();
     }
 

@@ -40,6 +40,7 @@ import javax.swing.JEditorPane;
 import javax.swing.JPanel;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
 import javax.swing.text.Document;
 import javax.swing.text.Element;
 import javax.swing.text.StyleConstants;
@@ -94,6 +95,21 @@ class HtmlMarkdownViewTest {
       assertEquals("text/html", pane.getContentType());
       assertSame(pane, view.component());
       assertTrue(pane instanceof HeightForWidth);
+    });
+  }
+
+  @Test
+  void aNewLookAndFeelKeepsTheComponentWithNoBorderAndWithACaretThatDoesNotScroll() {
+    Edt.run(() -> {
+      view.setMarkdown("A paragraph.");
+
+      // A change of the look and feel at run time does this for each component of a window.
+      pane.updateUI();
+
+      assertNull(pane.getBorder());
+      assertEquals(DefaultCaret.NEVER_UPDATE, ((DefaultCaret) pane.getCaret()).getUpdatePolicy());
+      assertFalse(pane.isOpaque());
+      assertEquals(0, pane.getBackground().getAlpha());
     });
   }
 
