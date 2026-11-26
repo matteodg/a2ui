@@ -45,7 +45,17 @@ public final class CatalogSchemaIndex {
    * @param id the ID of the component that the reference names
    * @param field the property that contains the reference, for example {@code children[1]}
    */
-  public record ChildReference(String id, String field) {}
+  public record ChildReference(String id, String field) {
+    /**
+     * Gets the field as a JSON Pointer. For example, {@code tabs[0].child} is {@code
+     * /tabs/0/child}.
+     *
+     * @return the JSON Pointer of the reference in its component
+     */
+    public String pointer() {
+      return "/" + field.replace("[", "/").replace("]", "").replace(".", "/");
+    }
+  }
 
   private final Catalog<?, ?> catalog;
   private final Map<String, List<Map<String, Object>>> blocks = new HashMap<>();

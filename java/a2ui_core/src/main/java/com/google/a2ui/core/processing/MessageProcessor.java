@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
@@ -610,18 +611,39 @@ public final class MessageProcessor<C extends ComponentApi> {
     for (ComponentModel existing : surface.componentsModel().all().values()) {
       nodes.put(
           existing.id(),
-          node(existing.id(), existing.type(), existing.catalog(), existing.properties()));
+          node(
+              existing.id(),
+              existing.type(),
+              existing.catalog(),
+              existing.properties(),
+              OptionalInt.empty()));
     }
-    for (Planned entry : planned) {
-      nodes.put(entry.id(), node(entry.id(), entry.type(), entry.catalog(), entry.normalized()));
+    for (int position = 0; position < planned.size(); position++) {
+      Planned entry = planned.get(position);
+      nodes.put(
+          entry.id(),
+          node(
+              entry.id(),
+              entry.type(),
+              entry.catalog(),
+              entry.normalized(),
+              OptionalInt.of(position)));
     }
     return nodes;
   }
 
   private ComponentGraph.Node node(
-      String id, String type, Catalog<?, ?> catalog, Map<String, Object> values) {
+      String id,
+      String type,
+      Catalog<?, ?> catalog,
+      Map<String, Object> values,
+      OptionalInt position) {
     return new ComponentGraph.Node(
-        id, type, catalog.components().get(type), indexFor(catalog).children(type, values));
+        id,
+        type,
+        catalog.components().get(type),
+        indexFor(catalog).children(type, values),
+        position);
   }
 
   private void apply(SurfaceModel<C> surface, List<Planned> planned) {

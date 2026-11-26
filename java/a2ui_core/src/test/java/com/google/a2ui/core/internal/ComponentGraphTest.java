@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.exceptions.A2uiErrorDetail;
 import com.google.a2ui.core.exceptions.A2uiIntegrityError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
@@ -31,6 +32,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 
 class ComponentGraphTest {
@@ -106,6 +109,8 @@ class ComponentGraphTest {
             () -> ComponentGraph.validate(cycle, "root", ValidationConfig.RELAXED));
 
     assertEquals("Self-reference detected: component 'root' references itself.", self.getMessage());
+    assertEquals(Optional.of("RECURSION_LIMIT_EXCEEDED"), self.errorCode());
+    assertEquals(Optional.of("RECURSION_LIMIT_EXCEEDED"), circular.errorCode());
     assertEquals(
         "Circular component reference. Circular reference detected: a -> b -> a",
         circular.getMessage());
@@ -127,6 +132,7 @@ class ComponentGraphTest {
     assertEquals(
         "Global recursion limit exceeded: component 'c51' is deeper than 50 levels.",
         error.getMessage());
+    assertEquals(Optional.empty(), error.errorCode());
   }
 
   @Test
@@ -145,12 +151,14 @@ class ComponentGraphTest {
             A2uiValidationError.class, () -> ComponentGraph.validate(atTheRoot, "root", STRICT));
 
     assertEquals(
-        "Component 'i' (Item) cannot be a child of 'root' (Box): its allowedParents are [Menu].",
+        "Component 'i' (Item) cannot be placed under parent 'root' (Box). Allowed parents:"
+            + " ['Menu'].",
         box.getMessage());
     assertEquals(
-        "Component 'root' (Item) cannot be a child of the surface (Surface): its allowedParents"
-            + " are [Menu].",
+        "Component 'root' (Item) cannot be placed under parent 'Surface' (Surface). Allowed"
+            + " parents: ['Menu'].",
         root.getMessage());
+    assertEquals(Optional.of("UNALLOWED_PARENT"), box.errorCode());
   }
 
   @Test
@@ -164,8 +172,55 @@ class ComponentGraphTest {
             () -> ComponentGraph.validate(nodes, "root", ValidationConfig.RELAXED));
 
     assertEquals(
-        "Component 'root' (Menu) cannot hold 't' (Text): its allowedChildren are [Item].",
+        "Container 'root' (Menu) cannot contain child 't' (Text). Allowed children: ['Item'].",
         error.getMessage());
+    assertEquals(Optional.of("UNALLOWED_CHILD"), error.errorCode());
+  }
+
+  @Test
+  void aCompositionErrorHasThePathOfTheComponentInTheUpdate() {
+    ComponentApi item = new ComponentApi("Item", Map.of("allowedParents", List.of("Menu")));
+    ComponentApi menu = new ComponentApi("Menu", Map.of("allowedChildren", List.of("Item")));
+    List<ChildReference> tab = List.of(new ChildReference("i", "tabs[0].child"));
+    Map<String, Node> parent =
+        graph(
+            new Node("root", "Box", null, tab, OptionalInt.of(0)),
+            new Node("i", "Item", item, List.of(), OptionalInt.of(1)));
+    Map<String, Node> child =
+        graph(
+            new Node("root", "Menu", menu, tab, OptionalInt.of(0)),
+            new Node("i", "Text", null, List.of(), OptionalInt.of(1)));
+
+    A2uiValidationError unallowedParent =
+        assertThrows(
+            A2uiValidationError.class, () -> ComponentGraph.validate(parent, "root", STRICT));
+    A2uiValidationError unallowedChild =
+        assertThrows(
+            A2uiValidationError.class, () -> ComponentGraph.validate(child, "root", STRICT));
+
+    assertEquals(Optional.of("/components/1"), unallowedParent.path());
+    assertEquals(
+        List.of(
+            new A2uiErrorDetail("/components/1", "UNALLOWED_PARENT", unallowedParent.getMessage())),
+        unallowedParent.details());
+    assertEquals(Optional.of("/components/0/tabs/0/child"), unallowedChild.path());
+    assertEquals(
+        List.of(
+            new A2uiErrorDetail(
+                "/components/0/tabs/0/child", "UNALLOWED_CHILD", unallowedChild.getMessage())),
+        unallowedChild.details());
+  }
+
+  @Test
+  void aCompositionErrorOfAComponentThatIsNotInTheUpdateHasThePathOfTheMessage() {
+    ComponentApi item = new ComponentApi("Item", Map.of("allowedParents", List.of("Menu")));
+    Map<String, Node> nodes = graph(typed("root", "Box", null, "i"), typed("i", "Item", item));
+
+    A2uiValidationError error =
+        assertThrows(
+            A2uiValidationError.class, () -> ComponentGraph.validate(nodes, "root", STRICT));
+
+    assertEquals(Optional.of("/"), error.path());
   }
 
   /** Makes a chain of components. The last component is at the given depth below the root. */

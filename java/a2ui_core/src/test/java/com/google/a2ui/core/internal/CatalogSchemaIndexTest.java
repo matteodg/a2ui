@@ -42,6 +42,13 @@ class CatalogSchemaIndexTest {
   }
 
   @Test
+  void theFieldOfAReferenceIsAlsoAJsonPointer() {
+    assertEquals("/child", new ChildReference("a", "child").pointer());
+    assertEquals("/children/2", new ChildReference("a", "children[2]").pointer());
+    assertEquals("/tabs/0/child", new ChildReference("a", "tabs[0].child").pointer());
+  }
+
+  @Test
   void childrenFindsTheIdsOfAStaticChildList() {
     Map<String, Object> column =
         Map.of("id", "root", "component", "Column", "children", List.of("a", "b", "a"));
