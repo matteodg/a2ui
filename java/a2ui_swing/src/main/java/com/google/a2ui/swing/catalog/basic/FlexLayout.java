@@ -16,6 +16,7 @@
 
 package com.google.a2ui.swing.catalog.basic;
 
+import com.google.a2ui.swing.catalog.HeightForWidth;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -49,6 +50,11 @@ import java.util.function.Function;
  *   <li>If the container is too small, the layout makes the components without a weight smaller,
  *       down to their minimum size. Then the components that have a weight get no space.
  * </ul>
+ *
+ * <p>The layout gives its width to a component that implements {@link HeightForWidth}, and gets the
+ * height for that width. Thus text that wraps gets the correct height in one layout pass. A
+ * container that uses this layout passes the question on with {@link #preferredHeight(Container,
+ * int)}, as {@link FlexPanel} does.
  *
  * <p>The layout ignores a component that is not visible: the component gets no space and no gap. A
  * horizontal layout starts at the right side in a container whose component orientation is right to
@@ -362,6 +368,40 @@ public final class FlexLayout implements LayoutManager2 {
     // The layout keeps no sizes.
   }
 
+  /**
+   * Gets the preferred height of the content of a container at a width. The result is the height
+   * that {@link #layoutContainer(Container)} needs to give each component its preferred size on the
+   * vertical axis.
+   *
+   * <p>A container that uses this layout implements {@link HeightForWidth} with this method. Then
+   * the text below the container wraps correctly.
+   *
+   * @param parent the container that has this layout
+   * @param width the width of the container in pixels, with its insets
+   * @return the height in pixels, with the insets of the container
+   */
+  public int preferredHeight(Container parent, int width) {
+    synchronized (parent.getTreeLock()) {
+      List<Component> items = visibleComponents(parent);
+      Insets insets = parent.getInsets();
+      int innerWidth = Math.max(0, width - insets.left - insets.right);
+      int height = 0;
+      if (axis == Axis.VERTICAL) {
+        height = gap * Math.max(0, items.size() - 1);
+        for (Component item : items) {
+          height += heightAt(item, crossSizeOfWidth(item, innerWidth));
+        }
+      } else if (!items.isEmpty()) {
+        int[] sizes = new int[items.size()];
+        mainSizes(items, innerWidth, innerWidth, sizes);
+        for (int i = 0; i < sizes.length; i++) {
+          height = Math.max(height, heightAt(items.get(i), sizes[i]));
+        }
+      }
+      return height + insets.top + insets.bottom;
+    }
+  }
+
   @Override
   public void layoutContainer(Container parent) {
     synchronized (parent.getTreeLock()) {
@@ -378,7 +418,7 @@ public final class FlexLayout implements LayoutManager2 {
       int crossSpace = horizontal ? innerHeight : innerWidth;
 
       int[] sizes = new int[count];
-      int free = mainSizes(items, mainSpace, sizes);
+      int free = mainSizes(items, mainSpace, innerWidth, sizes);
 
       double lead = 0;
       double between = gap;
@@ -406,10 +446,15 @@ public final class FlexLayout implements LayoutManager2 {
       for (int i = 0; i < count; i++) {
         Component item = items.get(i);
         int position = (int) Math.round(offset);
-        int crossSize =
-            align == Align.STRETCH
-                ? crossSpace
-                : Math.min(cross(item.getPreferredSize()), crossSpace);
+        int crossSize;
+        if (align == Align.STRETCH) {
+          crossSize = crossSpace;
+        } else if (horizontal) {
+          // The height of a component can depend on the width that it got on the main axis.
+          crossSize = Math.min(heightAt(item, sizes[i]), crossSpace);
+        } else {
+          crossSize = crossSizeOfWidth(item, crossSpace);
+        }
         int crossPosition =
             switch (align) {
               case START, STRETCH -> 0;
@@ -435,10 +480,12 @@ public final class FlexLayout implements LayoutManager2 {
    *
    * @param items the visible components
    * @param mainSpace the space of the container on the main axis, without the insets
+   * @param innerWidth the width of the container without the insets. A vertical layout uses it to
+   *     get the height of each component.
    * @param sizes receives the size of each component
    * @return the space that stays free. It is not less than zero.
    */
-  private int mainSizes(List<Component> items, int mainSpace, int[] sizes) {
+  private int mainSizes(List<Component> items, int mainSpace, int innerWidth, int[] sizes) {
     int count = items.size();
     double[] itemWeights = new double[count];
     int[] minimums = new int[count];
@@ -450,7 +497,10 @@ public final class FlexLayout implements LayoutManager2 {
       itemWeights[i] = weightOf(item);
       totalWeight += itemWeights[i];
       if (itemWeights[i] == 0) {
-        sizes[i] = main(item.getPreferredSize());
+        sizes[i] =
+            axis == Axis.HORIZONTAL
+                ? item.getPreferredSize().width
+                : heightAt(item, crossSizeOfWidth(item, innerWidth));
         minimums[i] = Math.min(main(item.getMinimumSize()), sizes[i]);
         used += sizes[i];
         shrinkable += sizes[i] - minimums[i];
@@ -481,6 +531,25 @@ public final class FlexLayout implements LayoutManager2 {
       return 0;
     }
     return free;
+  }
+
+  /**
+   * Gets the width of a component of a vertical layout.
+   *
+   * @param item the component
+   * @param innerWidth the width of the container without the insets
+   */
+  private int crossSizeOfWidth(Component item, int innerWidth) {
+    return align == Align.STRETCH
+        ? innerWidth
+        : Math.min(item.getPreferredSize().width, innerWidth);
+  }
+
+  /** Gets the preferred height of a component at a width. */
+  private static int heightAt(Component item, int width) {
+    return item instanceof HeightForWidth wrapping
+        ? wrapping.preferredHeightFor(width)
+        : item.getPreferredSize().height;
   }
 
   /**
