@@ -290,12 +290,38 @@ public final class NodeHost {
     if (view == null) {
       return;
     }
+    boolean hiddenBefore = accessibility.hidden();
     try {
-      accessibility.apply(view, node.props().get(), updated);
+      accessibility.apply(
+          view, node.props().get(), updated, parent != null && parent.hidesContent());
     } catch (RuntimeException e) {
       SurfaceScope.log(
           "The accessibility attributes failed for the component '" + node.componentId() + "'.", e);
     }
+    if (accessibility.hidden() != hiddenBefore) {
+      // The attribute hidden applies to all the content below the node.
+      for (NodeHost child : childHosts()) {
+        child.applyAccessibility(false);
+      }
+    }
+  }
+
+  /**
+   * Tells if assistive tools must ignore the content below this host: the node of this host, or a
+   * node above it, has the attribute {@code hidden}.
+   *
+   * <p>The method reads the attribute from the properties of the nodes, and not from the state of
+   * the hosts. A host shows its children during its first update, before it gets its own
+   * attributes. Thus the state of a host above can be old at that time.
+   */
+  private boolean hidesContent() {
+    for (NodeHost host = this; host != null; host = host.parent) {
+      if (host.view != null
+          && Boolean.TRUE.equals(host.node.props().get().accessibility().value("hidden"))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void showFallback(ComponentNode<?> placeholder) {

@@ -42,14 +42,29 @@ final class Accessibility {
   /** True after the first call. A component is not live for its first content. */
   private boolean applied;
 
+  /** True if the node, or a node above it, has the attribute {@code hidden}. */
+  private boolean hidden;
+
+  /**
+   * Tells if assistive tools must ignore the component of the node and the components below it.
+   *
+   * @return true if the last call of {@code apply} found the attribute {@code hidden} on the node
+   *     or got it from a node above
+   */
+  boolean hidden() {
+    return hidden;
+  }
+
   /**
    * Applies the attributes after an update of a view.
    *
    * @param view the view of the node
    * @param props the current properties of the node
    * @param updated true if the view got new properties, false if only a view below it changed
+   * @param hiddenAbove true if a node above this node has the attribute {@code hidden}. The
+   *     attribute hides all the content below its node.
    */
-  void apply(SwingComponentView view, NodeProps<?> props, boolean updated) {
+  void apply(SwingComponentView view, NodeProps<?> props, boolean updated, boolean hiddenAbove) {
     JComponent component = view.accessibleComponent();
     NodeProps<?> written = props.accessibility();
     A2uiAccessibility attributes =
@@ -64,9 +79,10 @@ final class Accessibility {
 
     // An explicit label is before the name that the view infers from its visible text. A hidden
     // component has an empty name, because Swing cannot remove it from the accessible tree.
-    String name =
-        attributes.hidden() ? "" : attributes.label().or(view::inferredAccessibleName).orElse(null);
-    String description = attributes.hidden() ? "" : attributes.description().orElse(null);
+    hidden = attributes.hidden() || hiddenAbove;
+    component.putClientProperty(A2uiAccessibility.HIDDEN_PROPERTY, hidden ? Boolean.TRUE : null);
+    String name = hidden ? "" : attributes.label().or(view::inferredAccessibleName).orElse(null);
+    String description = hidden ? "" : attributes.description().orElse(null);
     boolean live = attributes.live().filter(value -> !value.equals(OFF)).isPresent();
     if (name == null
         && description == null
@@ -89,7 +105,7 @@ final class Accessibility {
             context.getAccessibleDescription(),
             context::setAccessibleDescription);
 
-    if (live && applied && updated && !attributes.hidden()) {
+    if (live && applied && updated && !hidden) {
       // Swing has no live regions. This event tells a listener that the content changed.
       context.firePropertyChange(
           AccessibleContext.ACCESSIBLE_VISIBLE_DATA_PROPERTY, Boolean.FALSE, Boolean.TRUE);

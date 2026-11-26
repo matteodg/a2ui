@@ -29,6 +29,13 @@ import javax.swing.JComponent;
  * the key {@link #CLIENT_PROPERTY}. An assistive tool or a test reads them with {@link
  * #of(JComponent)}.
  *
+ * <p>The attribute {@code hidden} applies to a component and to all the components below it in the
+ * surface. Swing cannot remove a component from the accessible tree. Thus the adapter gives an
+ * empty accessible name and an empty accessible description to the component of each view in the
+ * hidden part, and it sends no change event for a live component there. It also marks each of these
+ * components. Read the mark with {@link #isHidden(JComponent)}. The record of a component below a
+ * hidden component has only the attributes of that component itself.
+ *
  * @param label the name of the component for assistive tools, if the agent gave one
  * @param description the description of the component for assistive tools, if the agent gave one
  * @param hidden true if assistive tools must ignore the component
@@ -39,6 +46,12 @@ public record A2uiAccessibility(
     Optional<String> label, Optional<String> description, boolean hidden, Optional<String> live) {
   /** The key of the client property of a Swing component that has the attributes. */
   public static final String CLIENT_PROPERTY = "a2ui.accessibility";
+
+  /**
+   * The key of the client property that marks a Swing component in a hidden part of a surface. The
+   * value is {@code Boolean.TRUE}, or the property is absent.
+   */
+  public static final String HIDDEN_PROPERTY = "a2ui.accessibility.hidden";
 
   /** The attributes of a component that has none. */
   public static final A2uiAccessibility NONE =
@@ -62,5 +75,17 @@ public record A2uiAccessibility(
     return component.getClientProperty(CLIENT_PROPERTY) instanceof A2uiAccessibility attributes
         ? attributes
         : NONE;
+  }
+
+  /**
+   * Tells if assistive tools must ignore a Swing component: the component has the attribute {@code
+   * hidden}, or a component above it in the surface has it.
+   *
+   * @param component the Swing component of a view. See {@code
+   *     SwingComponentView.accessibleComponent()}.
+   * @return true if the component is in a hidden part of a surface
+   */
+  public static boolean isHidden(JComponent component) {
+    return Boolean.TRUE.equals(component.getClientProperty(HIDDEN_PROPERTY));
   }
 }

@@ -20,6 +20,7 @@ import static com.google.a2ui.swing.testing.TestSurface.component;
 import static com.google.a2ui.swing.testing.TestSurface.event;
 import static com.google.a2ui.swing.testing.TestSurface.path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -202,6 +203,119 @@ class AccessibilityTest {
     });
   }
 
+  /** Makes a box with a button and a live label in an inner box. The outer box can be hidden. */
+  private void mountNested(boolean hidden) {
+    mount(
+        Map.of("caption", "Save", "status", "Ready", "secret", hidden),
+        component(
+            "root",
+            "Box",
+            "children",
+            List.of("inner"),
+            "@accessibility",
+            Map.of("hidden", path("/secret"))),
+        component("inner", "Box", "children", List.of("save", "status")),
+        saveButton("@accessibility", Map.of("description", "Stores the form")),
+        component("save_text", "Label", "text", path("/caption")),
+        component(
+            "status",
+            "Label",
+            "text",
+            path("/status"),
+            "@accessibility",
+            Map.of("label", "Status", "live", "polite")));
+  }
+
+  @Test
+  void aHiddenComponentHidesAllTheComponentsBelowIt() {
+    Edt.run(() -> {
+      mountNested(true);
+
+      for (String id : List.of("root", "inner", "save", "save_text", "status")) {
+        assertTrue(A2uiAccessibility.isHidden(componentOf(id)), id);
+        assertEquals("", contextOf(id).getAccessibleName(), id);
+        assertEquals("", contextOf(id).getAccessibleDescription(), id);
+      }
+      // The record of a component has only its own attributes.
+      assertTrue(A2uiAccessibility.of(componentOf("root")).hidden());
+      assertFalse(A2uiAccessibility.of(componentOf("status")).hidden());
+      assertEquals(Optional.of("Status"), A2uiAccessibility.of(componentOf("status")).label());
+    });
+  }
+
+  @Test
+  void theComponentsBelowGetTheirNamesBackWhenTheComponentIsNotHiddenAgain() {
+    Edt.run(() -> {
+      mountNested(true);
+
+      surface.setData("/secret", false);
+
+      for (String id : List.of("root", "inner", "save", "save_text", "status")) {
+        assertFalse(A2uiAccessibility.isHidden(componentOf(id)), id);
+      }
+      assertEquals("Save", contextOf("save").getAccessibleName());
+      assertEquals("Stores the form", contextOf("save").getAccessibleDescription());
+      assertEquals("Status", contextOf("status").getAccessibleName());
+      assertEquals("Save", contextOf("save_text").getAccessibleName());
+
+      surface.setData("/secret", true);
+
+      assertTrue(A2uiAccessibility.isHidden(componentOf("status")));
+      assertEquals("", contextOf("save").getAccessibleName());
+      assertEquals("", contextOf("status").getAccessibleName());
+    });
+  }
+
+  @Test
+  void aComponentThatArrivesBelowAHiddenComponentIsHidden() {
+    Edt.run(() -> {
+      mountNested(true);
+
+      surface.update(
+          component("inner", "Box", "children", List.of("save", "status", "late")),
+          component("late", "Label", "text", "Late"));
+      surface.setData("/caption", "Store");
+
+      assertTrue(A2uiAccessibility.isHidden(componentOf("late")));
+      assertEquals("", contextOf("late").getAccessibleName());
+      // An update of a component in the hidden part does not give a name back.
+      assertEquals("", contextOf("save").getAccessibleName());
+      assertEquals("", contextOf("save_text").getAccessibleName());
+    });
+  }
+
+  @Test
+  void aLiveComponentInAHiddenPartSendsNoChangeEvent() {
+    Edt.run(() -> {
+      mountNested(true);
+      List<String> events = new ArrayList<>();
+      contextOf("status")
+          .addPropertyChangeListener(event -> {
+            if (AccessibleContext.ACCESSIBLE_VISIBLE_DATA_PROPERTY.equals(
+                event.getPropertyName())) {
+              events.add(event.getPropertyName());
+            }
+          });
+
+      surface.setData("/status", "Saved");
+      assertEquals(List.of(), events);
+
+      surface.setData("/secret", false);
+      surface.setData("/status", "Ready");
+      assertEquals(List.of(AccessibleContext.ACCESSIBLE_VISIBLE_DATA_PROPERTY), events);
+    });
+  }
+
+  @Test
+  void aComponentWithNoHiddenComponentAboveItIsNotMarked() {
+    Edt.run(() -> {
+      mountNested(false);
+
+      assertFalse(A2uiAccessibility.isHidden(componentOf("status")));
+      assertNull(componentOf("status").getClientProperty(A2uiAccessibility.HIDDEN_PROPERTY));
+    });
+  }
+
   @Test
   void aLiveComponentKeepsItsValueAndTellsItsListenersAboutAnUpdate() {
     Edt.run(() -> {
@@ -267,7 +381,7 @@ class AccessibilityTest {
             public void update(ComponentNode<?> updated, NodeProps<?> props) {}
           };
 
-      new Accessibility().apply(composite, node.props().get(), true);
+      new Accessibility().apply(composite, node.props().get(), true, false);
 
       assertEquals("Name", control.getAccessibleContext().getAccessibleName());
       assertNull(panel.getAccessibleContext().getAccessibleName());
