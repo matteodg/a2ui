@@ -181,7 +181,10 @@ These rules apply to the views:
   play mark, and `AudioPlayer` shows a button with a play mark and the description. The area and
   the button open the URL in an external application with the `urlOpener` service. This occurs only
   when the user operates them, and only for an absolute `http` or `https` URL. The accessible name
-  tells what the control does.
+  tells what the control does. The area of `Video` shows the keyboard focus as a ring of two lines:
+  the focus color of the look and feel, and black or white. Thus the ring shows on a dark poster
+  image and on a light poster image. The button of `AudioPlayer` shows the focus as each button of
+  the look and feel does.
 - **Media URLs.** The URLs of `Image`, `Video` and `AudioPlayer` come from the agent. Each view
   examines them with `MediaUrls.safe`, which applies the rules of the implementation guide: only
   `http`, `https` and `data` URLs and relative paths, a host after the scheme, and no path that
