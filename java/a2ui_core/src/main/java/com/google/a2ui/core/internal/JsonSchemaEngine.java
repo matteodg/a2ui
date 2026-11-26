@@ -46,7 +46,16 @@ import tools.jackson.databind.node.ObjectNode;
  * DateTimeInput} component has, agrees with no string. Thus the engine asserts the formats {@code
  * date}, {@code time} and {@code date-time}: it adds a {@code pattern} for ISO 8601 text to each
  * schema that has one of them. The offset from UTC is optional, because a date and a time of the
- * user frequently have none. The engine does not assert other formats.
+ * user frequently have none.
+ *
+ * <p>The engine does not assert other formats. The decision for the format {@code uri} is as
+ * follows. The schemas of protocol v1.0 and the basic catalog use it one time, for a literal {@code
+ * url} argument of the function {@code openUrl}. The other branches of that {@code oneOf} are
+ * objects, thus a string agrees with one branch only, and the schema is not ambiguous without the
+ * assertion. No conformance case and no rule of the specification requires the assertion. The
+ * function {@code openUrl} examines the URL when it runs, and it rejects a URL that is not
+ * permitted. The Python SDK and the Dart SDK assert the format when they validate a message. Thus
+ * they reject a literal URL with no scheme earlier than this SDK does.
  *
  * <p>Only this class and {@link UnicodeRegularExpressions} use the JSON Schema library. Thus the
  * library is not visible in the public API.
