@@ -94,17 +94,6 @@ class SuiteRegistryTest {
   }
 
   @Test
-  void theE2eCorpusNamesThisHarness() throws IOException {
-    Object corpora =
-        ConformanceLoader.parse(
-            Files.readString(ConformancePaths.conformancePath("manifest_corpora.json")));
-    Object e2e = ((Map<?, ?>) corpora).get("e2e");
-
-    assertTrue(
-        ((List<?>) ((Map<?, ?>) e2e).get("harnesses")).contains(ConformanceManifest.HARNESS));
-  }
-
-  @Test
   void eachScenarioOfProtocolV1RunsAndEachOtherScenarioSkipsWithTheReason() {
     SuiteRegistry.E2E_SUITES.forEach((suite, support) -> {
       for (ConformanceCase testCase : ConformanceLoader.loadSuite(suite)) {

@@ -395,8 +395,8 @@ The renderer half tests UI tree construction, interaction, and outbound messagin
 - A scenario is recorded as `failed` if any declared format, turn, assertion, or operation fails.
 - Active harness names:
   - Agent harnesses: `python-agent`, `ts-agent`, `dart-agent`.
-  - Renderer harnesses: `lit`, `react`, `angular`, `flutter`, `swiftui`, `swing`.
-- The `swing` harness implements protocol v1.0 only. It records the `e2e/v0_9_1/` scenarios, and the cases of `adapter/adapter_conformance_v0_9.yaml` in the `adapter` corpus, as `skipped` with a reason.
+  - Renderer harnesses: `lit`, `react`, `angular`, `flutter`, `swiftui`.
+- The `swing` harness also runs the renderer half, but the `harnesses` list of the `e2e` corpus in `manifest_corpora.json` does not name it. It implements protocol v1.0 only. It records the `e2e/v0_9_1/` scenarios, and the cases of `adapter/adapter_conformance_v0_9.yaml` in the `adapter` corpus, as `skipped` with a reason.
 
 ### Renderer-visible outcome definition
 
