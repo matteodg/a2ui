@@ -49,9 +49,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.JComponent;
+import javax.swing.JTextField;
 import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -89,6 +92,18 @@ class BasicCatalogSnapshotTest {
           "email-compose",
           "countdown-timer",
           "weather-current");
+
+  /** The width of the narrow surfaces. */
+  private static final int NARROW = 200;
+
+  /** The examples that show the input components. Some of them use components with no view. */
+  private static final List<String> INPUT_EXAMPLES =
+      List.of(
+          "advanced-form-validator",
+          "software-purchase",
+          "live-invitation-builder",
+          "task-card",
+          "music-player");
 
   private static final String LONG_TEXT =
       "This text is long. It does not fit in one line of the surface, and thus it breaks at the"
@@ -402,6 +417,399 @@ class BasicCatalogSnapshotTest {
         text("link_content", "The information"));
   }
 
+  private static Map<String, Object> warning(String message) {
+    return Map.of("valid", false, "message", message, "severity", "warning");
+  }
+
+  private static List<Object> options(String... labels) {
+    List<Object> options = new ArrayList<>();
+    for (String label : labels) {
+      options.add(object("label", label, "value", label.toLowerCase(Locale.ROOT)));
+    }
+    return options;
+  }
+
+  private static List<Object> checkBoxes() {
+    return List.of(
+        component("root", "Column", "children", List.of("agree", "news", "long", "must", "warn")),
+        component("agree", "CheckBox", "label", "I agree to the terms", "value", path("/agree")),
+        component("news", "CheckBox", "label", "Send me the newsletter", "value", path("/news")),
+        component(
+            "long",
+            "CheckBox",
+            "label",
+            "Share my data with the partners of the service, as the policy of the data describes"
+                + " it",
+            "value",
+            path("/news")),
+        component(
+            "must",
+            "CheckBox",
+            "label",
+            "I am at least 18 years old",
+            "value",
+            path("/adult"),
+            "checks",
+            List.of(check(path("/adult"), "You must be 18 or older."))),
+        component(
+            "warn",
+            "CheckBox",
+            "label",
+            "Remember me on this computer",
+            "value",
+            path("/remember"),
+            "checks",
+            List.of(check(path("/shared"), "unused"))));
+  }
+
+  private static Map<String, Object> checkBoxData() {
+    return object(
+        "agree", true,
+        "news", false,
+        "adult", false,
+        "remember", true,
+        "shared", warning("Do not use this on a shared computer."));
+  }
+
+  private static List<Object> choices() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of("size", "toppings", "color", "tags", "fruit", "required", "hinted")),
+        component(
+            "size",
+            "ChoicePicker",
+            "label",
+            "Size",
+            "options",
+            options("Small", "Medium", "Large"),
+            "value",
+            path("/size")),
+        component(
+            "toppings",
+            "ChoicePicker",
+            "label",
+            "Toppings",
+            "variant",
+            "multipleSelection",
+            "options",
+            options("Cheese", "Olives", "Peppers", "Mushrooms with a long name of the option"),
+            "value",
+            path("/toppings")),
+        component(
+            "color",
+            "ChoicePicker",
+            "label",
+            "Color",
+            "displayStyle",
+            "chips",
+            "options",
+            options("Red", "Green", "Blue"),
+            "value",
+            path("/color")),
+        component(
+            "tags",
+            "ChoicePicker",
+            "label",
+            "Tags",
+            "variant",
+            "multipleSelection",
+            "displayStyle",
+            "chips",
+            "options",
+            options(
+                "Work", "Home", "Urgent", "Later", "Family", "Travel", "Finance", "Health",
+                "Reading"),
+            "value",
+            path("/tags")),
+        component(
+            "fruit",
+            "ChoicePicker",
+            "label",
+            "Fruit (filter: an)",
+            "filterable",
+            true,
+            "options",
+            options("Apple", "Banana", "Cherry", "Mango", "Orange", "Pineapple"),
+            "value",
+            path("/fruit")),
+        component(
+            "required",
+            "ChoicePicker",
+            "label",
+            "Delivery",
+            "options",
+            options("Standard", "Express"),
+            "value",
+            path("/delivery"),
+            "checks",
+            List.of(check(path("/never"), "Select a delivery option."))),
+        component(
+            "hinted",
+            "ChoicePicker",
+            "label",
+            "Newsletter",
+            "displayStyle",
+            "chips",
+            "options",
+            options("Daily", "Weekly"),
+            "value",
+            path("/newsletter"),
+            "checks",
+            List.of(check(path("/often"), "unused"))));
+  }
+
+  private static Map<String, Object> choiceData() {
+    return object(
+        "size", List.of("medium"),
+        "toppings", List.of("cheese", "mushrooms with a long name of the option"),
+        "color", List.of("green"),
+        "tags", List.of("urgent", "travel"),
+        "fruit", List.of("apple"),
+        "delivery", List.of(),
+        "never", false,
+        "newsletter", List.of("daily"),
+        "often", warning("Daily mail can be a lot of mail."));
+  }
+
+  private static List<Object> manyChoices() {
+    List<String> labels = new ArrayList<>();
+    for (int i = 1; i <= 30; i++) {
+      labels.add("Option " + i);
+    }
+    return List.of(
+        component("root", "Column", "children", List.of("many", "after")),
+        component(
+            "many",
+            "ChoicePicker",
+            "label",
+            "Thirty options",
+            "variant",
+            "multipleSelection",
+            "options",
+            options(labels.toArray(String[]::new)),
+            "value",
+            path("/many")),
+        text("after", "Text after the options"));
+  }
+
+  private static List<Object> sliders() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of("volume", "rating", "opacity", "temperature", "low", "loud")),
+        component("volume", "Slider", "label", "Volume", "max", 100, "value", path("/volume")),
+        component(
+            "rating",
+            "Slider",
+            "label",
+            "Rating (5 steps)",
+            "max",
+            5,
+            "steps",
+            5,
+            "value",
+            path("/rating")),
+        component(
+            "opacity", "Slider", "label", "Opacity", "min", 0, "max", 1, "value", path("/opacity")),
+        component(
+            "temperature",
+            "Slider",
+            "label",
+            "Temperature (10 steps)",
+            "min",
+            -10,
+            "max",
+            40,
+            "steps",
+            10,
+            "value",
+            path("/temperature")),
+        component(
+            "low",
+            "Slider",
+            "label",
+            "Budget",
+            "max",
+            1000,
+            "value",
+            path("/budget"),
+            "checks",
+            List.of(check(path("/never"), "Select a budget of 100 or more."))),
+        component(
+            "loud",
+            "Slider",
+            "label",
+            "Bass",
+            "max",
+            10,
+            "value",
+            path("/bass"),
+            "checks",
+            List.of(check(path("/strong"), "unused"))));
+  }
+
+  private static Map<String, Object> sliderData() {
+    return object(
+        "volume", 25,
+        "rating", 3,
+        "opacity", 0.42,
+        "temperature", 15,
+        "budget", 40,
+        "never", false,
+        "bass", 9,
+        "strong", warning("A high bass can hurt small speakers."));
+  }
+
+  private static List<Object> dates() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of(
+                "date", "time", "both", "none", "empty", "zone", "wrong", "required", "hinted")),
+        component(
+            "date", "DateTimeInput", "label", "Date", "enableDate", true, "value", path("/date")),
+        component(
+            "time", "DateTimeInput", "label", "Time", "enableTime", true, "value", path("/time")),
+        component(
+            "both",
+            "DateTimeInput",
+            "label",
+            "Date and time",
+            "enableDate",
+            true,
+            "enableTime",
+            true,
+            "value",
+            path("/both")),
+        component("none", "DateTimeInput", "label", "No flag (a date)", "value", path("/date")),
+        component(
+            "empty",
+            "DateTimeInput",
+            "label",
+            "Empty date and time",
+            "enableDate",
+            true,
+            "enableTime",
+            true,
+            "value",
+            path("/empty")),
+        component(
+            "zone",
+            "DateTimeInput",
+            "label",
+            "A time in UTC",
+            "enableDate",
+            true,
+            "enableTime",
+            true,
+            "value",
+            path("/zone")),
+        component(
+            "wrong",
+            "DateTimeInput",
+            "label",
+            "Not ISO 8601",
+            "enableDate",
+            true,
+            "value",
+            path("/wrong")),
+        component(
+            "required",
+            "DateTimeInput",
+            "label",
+            "Start",
+            "enableDate",
+            true,
+            "value",
+            path("/empty"),
+            "checks",
+            List.of(check(path("/never"), "Select a start date."))),
+        component(
+            "hinted",
+            "DateTimeInput",
+            "label",
+            "Reminder",
+            "enableTime",
+            true,
+            "value",
+            path("/time"),
+            "checks",
+            List.of(check(path("/late"), "unused"))));
+  }
+
+  private static Map<String, Object> dateData() {
+    return object(
+        "date", "2025-06-15",
+        "time", "09:30",
+        "both", "2025-01-01T08:00:00",
+        "empty", "",
+        "zone", "2025-01-01T08:00Z",
+        "wrong", "next Monday",
+        "never", false,
+        "late", warning("The office closes at 18:00."));
+  }
+
+  private static List<Object> modalInputs() {
+    return List.of(
+        component("root", "Column", "children", List.of("modal")),
+        component("modal", "Modal", "trigger", "open", "content", "form"),
+        button("open", "open_text"),
+        text("open_text", "Open the form"),
+        component("form", "Card", "child", "form_column"),
+        component(
+            "form_column",
+            "Column",
+            "children",
+            List.of("form_title", "form_box", "form_size", "form_volume", "form_date")),
+        text("form_title", "### Preferences"),
+        component("form_box", "CheckBox", "label", "I agree to the terms", "value", path("/agree")),
+        component(
+            "form_size",
+            "ChoicePicker",
+            "label",
+            "Size",
+            "displayStyle",
+            "chips",
+            "options",
+            options("Small", "Medium", "Large"),
+            "value",
+            path("/size")),
+        component("form_volume", "Slider", "label", "Volume", "max", 100, "value", path("/volume")),
+        component(
+            "form_date",
+            "DateTimeInput",
+            "label",
+            "Date",
+            "enableDate",
+            true,
+            "value",
+            path("/date")));
+  }
+
+  private static Map<String, Object> modalInputData() {
+    return object("agree", true, "size", List.of("medium"), "volume", 60, "date", "2025-06-15");
+  }
+
+  /** Types a text in the filter field of a choice picker of a mounted surface. */
+  private static void filter(A2uiSurface view, String componentId, String text) {
+    JComponent group =
+        view.viewTree()
+            .orElseThrow()
+            .find(componentId)
+            .orElseThrow()
+            .view()
+            .orElseThrow()
+            .accessibleComponent();
+    ((JTextField) group.getParent().getComponent(0)).setText(text);
+  }
+
   private static Map<String, Object> validationData() {
     return object(
         "email", "not-an-email",
@@ -419,7 +827,7 @@ class BasicCatalogSnapshotTest {
    * accepts a reference to a component that arrives in a later message, as an example can have.
    */
   private static A2uiSurface mount(
-      List<Object> messages, List<A2uiError> errors, A2uiServices services) {
+      List<Object> messages, List<A2uiError> errors, A2uiServices services, int width) {
     MessageProcessor<SwingComponentImplementation> processor =
         new MessageProcessor<>(List.of(SwingBasicCatalog.create()), ValidationConfig.RELAXED);
     processor
@@ -432,15 +840,20 @@ class BasicCatalogSnapshotTest {
     SurfaceModel<SwingComponentImplementation> surface =
         processor.model().getSurface(surfaceId[0]).orElseThrow();
     A2uiSurface view =
-        Headless.mount(new A2uiSurface(surface, A2uiFallbacks.NONE, services), WIDTH, 2000);
+        Headless.mount(new A2uiSurface(surface, A2uiFallbacks.NONE, services), width, 2000);
+    fit(view, width);
+    return view;
+  }
+
+  /** Gives a mounted surface the height of its content at a width. */
+  private static void fit(A2uiSurface view, int width) {
     JComponent root = view.viewTree().orElseThrow().component().orElseThrow();
     int height =
         root instanceof HeightForWidth wrapping
-            ? wrapping.preferredHeightFor(WIDTH)
+            ? wrapping.preferredHeightFor(width)
             : root.getPreferredSize().height;
-    view.setSize(WIDTH, height);
+    view.setSize(width, height);
     view.validate();
-    return view;
   }
 
   private static List<Object> surfaceOf(Map<String, Object> data, List<Object> components) {
@@ -525,9 +938,21 @@ class BasicCatalogSnapshotTest {
    * Thus a test presenter keeps the content, and the image of the content is a different file.
    */
   private static void snapshot(String name, List<Object> messages) {
+    snapshot(name, messages, WIDTH, view -> {});
+  }
+
+  /**
+   * Mounts a surface at a width, operates it, and then does the work of {@link #snapshot(String,
+   * List)}.
+   */
+  private static void snapshot(
+      String name, List<Object> messages, int width, Consumer<A2uiSurface> operate) {
     TestModalPresenter presenter = new TestModalPresenter();
     List<A2uiError> errors = new ArrayList<>();
-    A2uiSurface view = mount(messages, errors, A2uiServices.DEFAULT.withModalPresenter(presenter));
+    A2uiSurface view =
+        mount(messages, errors, A2uiServices.DEFAULT.withModalPresenter(presenter), width);
+    operate.accept(view);
+    fit(view, width);
     assertEquals(List.of(), errors, name);
     assertTrue(view.getHeight() > 20, name + " has the height " + view.getHeight());
     assertLayout(view, view.viewTree().orElseThrow(), name);
@@ -589,9 +1014,40 @@ class BasicCatalogSnapshotTest {
     snapshot(lookAndFeel + "-tabs", surfaceOf(Map.of("second", "Details"), tabs()));
     snapshot(lookAndFeel + "-modal", surfaceOf(Map.of(), modal()));
     snapshot(lookAndFeel + "-example-modal", example("modal"));
+    inputSnapshots(lookAndFeel, WIDTH, "");
+    inputSnapshots(lookAndFeel, NARROW, "-narrow");
+    snapshot(
+        lookAndFeel + "-choices-many",
+        surfaceOf(object("many", List.of("option 3")), manyChoices()));
+    snapshot(
+        lookAndFeel + "-choices-many-narrow",
+        surfaceOf(object("many", List.of("option 3")), manyChoices()),
+        NARROW,
+        view -> {});
+    snapshot(lookAndFeel + "-inputs-modal", surfaceOf(modalInputData(), modalInputs()));
+    for (String example : INPUT_EXAMPLES) {
+      snapshot(lookAndFeel + "-example-" + example, example(example));
+    }
     for (String example : EXAMPLES) {
       snapshot(lookAndFeel + "-example-" + example, example(example));
     }
+  }
+
+  /** Writes the images of the surfaces of the input components at a width. */
+  private static void inputSnapshots(String lookAndFeel, int width, String suffix) {
+    snapshot(
+        lookAndFeel + "-checkboxes" + suffix,
+        surfaceOf(checkBoxData(), checkBoxes()),
+        width,
+        view -> {});
+    snapshot(
+        lookAndFeel + "-choices" + suffix,
+        surfaceOf(choiceData(), choices()),
+        width,
+        view -> filter(view, "fruit", "an"));
+    snapshot(
+        lookAndFeel + "-sliders" + suffix, surfaceOf(sliderData(), sliders()), width, view -> {});
+    snapshot(lookAndFeel + "-dates" + suffix, surfaceOf(dateData(), dates()), width, view -> {});
   }
 
   @Test
