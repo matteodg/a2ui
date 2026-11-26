@@ -38,6 +38,10 @@ import java.util.Optional;
  *   <li>{@code gallery.example}: the ID of the example to show first
  *   <li>{@code gallery.laf}: the look and feel: {@code System}, {@code Metal} or {@code Nimbus}
  *   <li>{@code gallery.tab}: the tab of the inspector to show first
+ *   <li>{@code gallery.screenshot}: a PNG file. The program shows the example, writes an image of
+ *       the window to the file and stops. See {@link Screenshot}.
+ *   <li>{@code gallery.size}: only in the screenshot mode, a size such as {@code 900x600}. The
+ *       program gives this size to the window after the example shows.
  * </ul>
  */
 public final class GalleryApp {
@@ -49,6 +53,12 @@ public final class GalleryApp {
 
   /** The system property that gives the tab of the inspector to show first. */
   static final String TAB_PROPERTY = "gallery.tab";
+
+  /** The system property that starts the screenshot mode and gives its file. */
+  static final String SCREENSHOT_PROPERTY = "gallery.screenshot";
+
+  /** The system property that gives a new size to the window in the screenshot mode. */
+  static final String SIZE_PROPERTY = "gallery.size";
 
   private GalleryApp() {}
 
@@ -67,6 +77,23 @@ public final class GalleryApp {
     } catch (IllegalArgumentException | UncheckedIOException e) {
       System.err.println(e.getMessage());
       System.exit(1);
+      return;
+    }
+    Optional<String> screenshot = property(SCREENSHOT_PROPERTY);
+    if (screenshot.isPresent()) {
+      try {
+        Screenshot.run(
+            examples,
+            new Screenshot.Options(
+                Path.of(screenshot.get()),
+                property(EXAMPLE_PROPERTY),
+                property(LOOK_AND_FEEL_PROPERTY),
+                property(TAB_PROPERTY),
+                property(SIZE_PROPERTY).map(Screenshot::parseSize)));
+      } catch (RuntimeException e) {
+        System.err.println("The screenshot failed. " + e.getMessage());
+        System.exit(2);
+      }
       return;
     }
     EventQueue.invokeLater(() -> open(examples));
