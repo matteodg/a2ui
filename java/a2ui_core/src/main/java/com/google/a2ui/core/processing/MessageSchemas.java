@@ -18,6 +18,7 @@ package com.google.a2ui.core.processing;
 
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.JsonSchemaEngine;
+import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.internal.SchemaReferences;
 import com.google.a2ui.core.schema.v1_0.SchemaDocuments;
 import java.util.Collections;
@@ -51,10 +52,11 @@ final class MessageSchemas {
    *
    * @param action the action key of the message. It is a key of {@link #ACTIONS}.
    * @param message the message, as {@code Json.freeze} makes it
-   * @return one text for each problem. The list is empty if the envelope is correct.
+   * @return the problems, each with its JSON Pointer in the message. The list is empty if the
+   *     envelope is correct.
    */
-  static List<String> errors(String action, Map<String, Object> message) {
-    return Engine.INSTANCE.errors("/$defs/" + ACTIONS.get(action), message);
+  static List<Problem> problems(String action, Map<String, Object> message) {
+    return Engine.INSTANCE.problems("/$defs/" + ACTIONS.get(action), message);
   }
 
   private static Map<String, String> actions() {

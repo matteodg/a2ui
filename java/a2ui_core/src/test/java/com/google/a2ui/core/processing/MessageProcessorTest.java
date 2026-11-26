@@ -378,9 +378,11 @@ class MessageProcessorTest {
 
     String message = error.getMessage();
     assertTrue(
-        message.startsWith("Invalid components for surface 's': component 'root': "), message);
+        message.startsWith("Invalid components for surface 's': component 'root' (Text): "),
+        message);
     assertTrue(
-        message.contains("; component 'x': /component: Unrecognized component type 'Mystery'"),
+        message.contains(
+            "; component 'x' (Mystery): /component: Unrecognized component type 'Mystery'"),
         message);
     assertThrows(
         A2uiIntegrityError.class,
@@ -415,11 +417,13 @@ class MessageProcessorTest {
                     ValidationConfig.STRICT.withAllowOrphanComponents(true)));
 
     assertTrue(
-        inCustom.getMessage().contains("/components/0/text/args/extra: "), inCustom.getMessage());
+        inCustom.getMessage().contains("component 'root' (Text): /text/args/extra: "),
+        inCustom.getMessage());
     assertTrue(
         inBasic
             .getMessage()
-            .contains("/components/0/label: Unrecognized function 'notInBasic' in catalog '"),
+            .contains(
+                "component 'g' (Gauge): /label: Unrecognized function 'notInBasic' in catalog '"),
         inBasic.getMessage());
     assertSame(
         custom,

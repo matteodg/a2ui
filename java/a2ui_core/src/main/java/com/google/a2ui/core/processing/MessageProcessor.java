@@ -23,6 +23,8 @@ import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.common.Reactive;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiErrorDetail;
 import com.google.a2ui.core.exceptions.A2uiIntegrityError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
 import com.google.a2ui.core.exceptions.A2uiStateError;
@@ -30,6 +32,7 @@ import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.CatalogChecks;
 import com.google.a2ui.core.internal.CatalogSchemaIndex;
 import com.google.a2ui.core.internal.ComponentGraph;
+import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.state.ComponentModel;
@@ -49,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Reads the v1.0 messages of the agent, examines them and applies them to the surfaces of {@link
@@ -73,6 +77,10 @@ public final class MessageProcessor<C extends ComponentApi> {
   /** The envelope keys that v1.0 accepts without their {@code @}, apart from {@code catalogId}. */
   private static final List<String> LEGACY_ENVELOPE_KEYS =
       List.of("metadata", "accessibility", "checks");
+
+  /** The actions that are about one surface. */
+  private static final Set<String> SURFACE_ACTIONS =
+      Set.of("createSurface", "updateComponents", "updateDataModel", "deleteSurface");
 
   /** The keys whose text value is a JSON Pointer. */
   private static final List<String> PATH_KEYS = List.of("path", "@path");
@@ -192,8 +200,13 @@ public final class MessageProcessor<C extends ComponentApi> {
   public void processMessages(Object payload, ValidationConfig validationConfig) {
     List<Map<String, Object>> messages = new ArrayList<>();
     unwrap(payload, 0, messages);
-    for (Map<String, Object> message : messages) {
-      process(message, validationConfig);
+    for (int index = 0; index < messages.size(); index++) {
+      Map<String, Object> message = messages.get(index);
+      try {
+        process(index, message, validationConfig);
+      } catch (A2uiError e) {
+        throw withMessageContext(e, message);
+      }
     }
   }
 
@@ -232,6 +245,60 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
   }
 
+  /**
+   * Writes the function call and the surface of a rejected message to its error, unless the error
+   * already has them.
+   *
+   * @return the same error
+   */
+  private static A2uiError withMessageContext(A2uiError error, Map<String, Object> message) {
+    String action = actionOf(message);
+    Map<String, Object> body = action == null ? null : Json.asObject(message.get(action));
+    if (error.functionCallId().isEmpty()
+        && body != null
+        && body.get("functionCallId") instanceof String functionCallId) {
+      ErrorFields.functionCallId(error, functionCallId);
+    }
+    if (error.surfaceId().isEmpty()) {
+      if (body != null && body.get("surfaceId") instanceof String surfaceId) {
+        ErrorFields.surfaceId(error, surfaceId);
+      } else if (action != null && SURFACE_ACTIONS.contains(action)) {
+        // The error of a surface message that names no surface is about the surface "".
+        ErrorFields.surfaceId(error, "");
+      }
+    }
+    return error;
+  }
+
+  /** Gets the first action key of a message, or null if the message has no action. */
+  private static String actionOf(Map<String, Object> message) {
+    return message.keySet().stream()
+        .filter(MessageSchemas.ACTIONS::containsKey)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Makes the error of a message with an envelope that is not correct.
+   *
+   * @param index the index of the message in the batch
+   * @param pointer the JSON Pointer of the problem in the message
+   * @param code the type of the problem
+   */
+  private static A2uiValidationError malformed(
+      int index, String pointer, String code, String problem) {
+    return ErrorFields.details(
+        new A2uiValidationError(problem),
+        List.of(new A2uiErrorDetail(batchPath(index, pointer), code, problem)));
+  }
+
+  /**
+   * Gets the path of a location in one message of a batch, for example {@code messages.0.version}.
+   */
+  private static String batchPath(int index, String pointer) {
+    return "messages." + index + pointer.replace('/', '.');
+  }
+
   private static Map<String, Object> frozen(Map<?, ?> raw) {
     try {
       return Json.asObject(Json.freeze(raw));
@@ -240,16 +307,33 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
   }
 
-  private void process(Map<String, Object> received, ValidationConfig config) {
+  /**
+   * Examines one message and applies it.
+   *
+   * @param index the index of the message in the batch, for the details of an error
+   */
+  private void process(int index, Map<String, Object> received, ValidationConfig config) {
     Map<String, Object> message = received;
     List<String> actions =
         message.keySet().stream().filter(MessageSchemas.ACTIONS::containsKey).toList();
+    Map<String, Object> update =
+        actions.equals(List.of("updateDataModel"))
+            ? Json.asObject(message.get("updateDataModel"))
+            : null;
+    if (update != null && update.get("path") instanceof String path) {
+      try {
+        checkPath("the updateDataModel message", path);
+      } catch (A2uiValidationError e) {
+        throw ErrorFields.path(e, "/path");
+      }
+    }
     checkValue(
         actions.size() == 1 ? "the " + actions.getFirst() + " message" : "the message", message, 0);
 
     Object version = message.get("version");
     if (version == null) {
-      throw new A2uiValidationError("Missing required version field in message.");
+      throw malformed(
+          index, "/version", Problem.MISSING_FIELD, "Missing required version field in message.");
     }
     if (!(version instanceof String text)
         || ProtocolVersion.tryParse(text).orElse(null) != ProtocolVersion.V1_0) {
@@ -286,7 +370,10 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
     Object surfaceId = body.get("surfaceId");
     if (surfaceId != null && !(surfaceId instanceof String)) {
-      throw new A2uiValidationError(
+      throw malformed(
+          index,
+          "/" + action + "/surfaceId",
+          Problem.TYPE_MISMATCH,
           "surfaceId must be a string in '" + action + "', but got: " + surfaceId);
     }
     // v1.0 removed `theme`. A renderer that accepts unknown elements removes the field. For each
@@ -299,10 +386,23 @@ public final class MessageProcessor<C extends ComponentApi> {
       message = changed;
       body = withoutTheme;
     }
-    List<String> problems = MessageSchemas.errors(action, message);
+    List<Problem> problems = MessageSchemas.problems(action, message);
     if (!problems.isEmpty()) {
-      throw new A2uiValidationError(
-          "Invalid " + action + " message: " + String.join("; ", problems));
+      A2uiValidationError error =
+          new A2uiValidationError("Invalid " + action + " message: " + listed(problems));
+      ErrorFields.details(
+          error,
+          problems.stream()
+              .map(problem ->
+                  new A2uiErrorDetail(
+                      batchPath(index, problem.path()), problem.code(), problem.message()))
+              .toList());
+      // The path of a problem in the body of the action is relative to the body.
+      String first = problems.getFirst().path();
+      if (first.startsWith("/" + action + "/")) {
+        ErrorFields.path(error, first.substring(action.length() + 1));
+      }
+      throw error;
     }
 
     switch (action) {
@@ -378,10 +478,12 @@ public final class MessageProcessor<C extends ComponentApi> {
     String path = body.get("path") instanceof String text && !text.isEmpty() ? text : "/";
     // The data model also accepts a relative path. The path of a message is always absolute.
     if (!path.startsWith("/")) {
-      throw new A2uiValidationError(
-          "Invalid path syntax in the updateDataModel message: '"
-              + path
-              + "' is not a JSON Pointer that starts with '/'.");
+      throw ErrorFields.path(
+          new A2uiValidationError(
+              "Invalid path syntax in the updateDataModel message: '"
+                  + path
+                  + "' is not a JSON Pointer that starts with '/'."),
+          "/path");
     }
     surface.dataModel().set(path, body.get("value"));
   }
@@ -411,8 +513,9 @@ public final class MessageProcessor<C extends ComponentApi> {
     boolean allowUnknown = acceptsUnknown(config);
     List<Planned> planned = new ArrayList<>(components.size());
     Set<String> ids = new HashSet<>();
-    List<String> problems = new ArrayList<>();
+    List<Located> problems = new ArrayList<>();
     for (int position = 0; position < components.size(); position++) {
+      int at = position;
       Map<String, Object> component = Json.asObject(components.get(position));
       String id = (String) component.get("id");
       if (!ids.add(id)) {
@@ -425,29 +528,79 @@ public final class MessageProcessor<C extends ComponentApi> {
         // A call that names no catalog runs in the default catalog of the surface. The catalog of
         // the component examines such a call only if it is that default catalog.
         boolean runsUnqualifiedCalls = entry.catalog() == defaultCatalog;
-        for (Problem problem :
-            checksFor(entry.catalog())
-                .componentProblems(entry.normalized(), runsUnqualifiedCalls, allowUnknown)) {
-          problems.add("component '" + id + "': " + problem);
-        }
+        checksFor(entry.catalog())
+            .componentProblems(entry.normalized(), runsUnqualifiedCalls, allowUnknown)
+            .forEach(problem -> problems.add(new Located(at, problem)));
       }
-      checkCallCatalogs(
-          surface,
-          entry,
-          entry.normalized(),
-          "/components/" + position,
-          config,
-          allowUnknown,
-          problems);
+      List<Problem> callProblems = new ArrayList<>();
+      checkCallCatalogs(surface, entry, entry.normalized(), "", config, allowUnknown, callProblems);
+      callProblems.forEach(problem -> problems.add(new Located(at, problem)));
     }
     if (!problems.isEmpty()) {
-      throw new A2uiValidationError(
-          "Invalid components for surface '" + surface.id() + "': " + String.join("; ", problems));
+      throw invalidComponents(surface, planned, problems);
     }
     if (config != null) {
       ComponentGraph.validate(candidateGraph(surface, planned), surface.rootId(), config);
     }
     return planned;
+  }
+
+  /**
+   * One problem of a component of an update.
+   *
+   * @param position the index of the component in the update
+   * @param problem the problem, with a path that is relative to the component
+   */
+  private record Located(int position, Problem problem) {}
+
+  /**
+   * Makes the error for the problems of the components of an update.
+   *
+   * <p>The path of the error is the deepest location that contains each problem of the first
+   * component that is not correct. The details have each problem of each component.
+   */
+  private static A2uiValidationError invalidComponents(
+      SurfaceModel<?> surface, List<Planned> planned, List<Located> problems) {
+    String listed =
+        problems.stream()
+            .map(located -> {
+              Planned component = planned.get(located.position());
+              return "component '"
+                  + component.id()
+                  + "' ("
+                  + component.type()
+                  + "): "
+                  + located.problem();
+            })
+            .collect(Collectors.joining("; "));
+    int firstPosition = problems.getFirst().position();
+    List<String> shared = null;
+    for (Located located : problems) {
+      if (located.position() != firstPosition) {
+        continue;
+      }
+      List<String> place = List.of(located.problem().path().split("/", -1));
+      if (shared == null) {
+        shared = place;
+      } else {
+        int same = 0;
+        while (same < Math.min(shared.size(), place.size())
+            && shared.get(same).equals(place.get(same))) {
+          same++;
+        }
+        shared = shared.subList(0, same);
+      }
+    }
+    String below = String.join("/", shared);
+    A2uiValidationError error =
+        new A2uiValidationError("Invalid components for surface '" + surface.id() + "': " + listed);
+    ErrorFields.path(
+        error,
+        "/components/"
+            + firstPosition
+            + (below.endsWith("/") ? below.substring(0, below.length() - 1) : below));
+    return ErrorFields.details(
+        error, problems.stream().map(located -> located.problem().toDetail()).toList());
   }
 
   /**
@@ -511,7 +664,7 @@ public final class MessageProcessor<C extends ComponentApi> {
    * catalog in which the call runs.
    *
    * @param owner the component that contains the node
-   * @param path the JSON Pointer of the node, for the messages
+   * @param path the JSON Pointer of the node in the component
    * @param problems the list that receives the problems
    */
   private void checkCallCatalogs(
@@ -521,7 +674,7 @@ public final class MessageProcessor<C extends ComponentApi> {
       String path,
       ValidationConfig config,
       boolean allowUnknown,
-      List<String> problems) {
+      List<Problem> problems) {
     if (node instanceof List<?> list) {
       for (int index = 0; index < list.size(); index++) {
         checkCallCatalogs(
@@ -546,13 +699,18 @@ public final class MessageProcessor<C extends ComponentApi> {
               ? owner.catalog() == surface.defaultCatalog().orElse(null)
               : catalogId.equals(owner.catalog().id());
       if (config != null && !examinedByOwner) {
-        checksFor(target)
-            .callProblems(map, path, allowUnknown)
-            .forEach(problem -> problems.add(problem.toString()));
+        problems.addAll(checksFor(target).callProblems(map, path, allowUnknown));
       }
     }
     map.forEach((key, value) ->
-        checkCallCatalogs(surface, owner, value, path + "/" + key, config, allowUnknown, problems));
+        checkCallCatalogs(
+            surface,
+            owner,
+            value,
+            path + "/" + Json.escapePointer(key),
+            config,
+            allowUnknown,
+            problems));
   }
 
   /**
@@ -683,6 +841,10 @@ public final class MessageProcessor<C extends ComponentApi> {
     return metadata == null
         ? null
         : new A2uiMetadata(Optional.ofNullable(Json.asObject(metadata.get("extensions"))));
+  }
+
+  private static String listed(List<Problem> problems) {
+    return problems.stream().map(Problem::toString).collect(Collectors.joining("; "));
   }
 
   private CatalogChecks checksFor(Catalog<?, ?> catalog) {
