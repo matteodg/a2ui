@@ -85,6 +85,7 @@ final class DialogModalPresenter implements ModalPresenter {
             ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
             ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
     scroll.setBorder(BorderFactory.createEmptyBorder());
+    scroll.setViewportBorder(BorderFactory.createEmptyBorder());
     dialog.getContentPane().add(scroll, BorderLayout.CENTER);
     // The first call connects the content to the screen of the dialog. Text has its correct size
     // only then, because a screen can have a scale.

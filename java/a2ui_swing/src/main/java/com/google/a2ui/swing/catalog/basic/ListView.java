@@ -259,9 +259,10 @@ final class ListView implements SwingComponentView {
     Scroller(Content content) {
       super(content);
       this.content = content;
-      // A border that is not from the look and feel stays when the look and feel changes.
+      // A border that is not from the look and feel stays when the look and feel changes. Nimbus
+      // gives a border to a viewport that has none.
       setBorder(BorderFactory.createEmptyBorder());
-      setViewportBorder(null);
+      setViewportBorder(BorderFactory.createEmptyBorder());
       setOpaque(false);
       getViewport().setOpaque(false);
     }

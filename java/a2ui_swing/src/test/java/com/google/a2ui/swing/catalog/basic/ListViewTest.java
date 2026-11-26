@@ -39,7 +39,10 @@ import java.util.Map;
 import javax.accessibility.AccessibleRole;
 import javax.swing.JComponent;
 import javax.swing.JScrollPane;
+import javax.swing.LookAndFeel;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -145,6 +148,28 @@ class ListViewTest {
       assertFalse(pane("root").isOpaque());
       assertFalse(pane("root").getViewport().isOpaque());
       assertFalse(content("root").isOpaque());
+    });
+  }
+
+  @Test
+  void aNewLookAndFeelKeepsTheListWithNoBorder() {
+    Edt.run(() -> {
+      show();
+      JScrollPane pane = pane("root");
+      LookAndFeel original = UIManager.getLookAndFeel();
+      try {
+        UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+        SwingUtilities.updateComponentTreeUI(fixture.view);
+        fixture.view.validate();
+
+        assertEquals(new Insets(0, 0, 0, 0), pane.getInsets());
+        assertEquals(new Insets(0, 0, 0, 0), pane.getViewportBorder().getBorderInsets(pane));
+        assertEquals(new Rectangle(0, 0, 400, 300), pane.getViewport().getBounds());
+        assertFalse(pane.isOpaque());
+        assertFalse(pane.getViewport().isOpaque());
+      } finally {
+        UIManager.setLookAndFeel(original);
+      }
     });
   }
 
