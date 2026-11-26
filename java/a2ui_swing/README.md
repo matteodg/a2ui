@@ -441,6 +441,15 @@ of `Tabs` show how a subclass of such a component implements `HeightForWidth`. A
 also the root of a layout for Swing. A scroll pane that must have the size of its content returns
 false from `isValidateRoot()`. Then a change of the content makes the parent do its layout again.
 
+The layout has two limits:
+
+- In a `Column`, a child that has a weight keeps the minimum height that Swing reports. That height
+  is one line for text that wraps. Thus a `Column` that is too short can cut a text that has a
+  weight.
+- Each `Row` divides its own width. Thus the cells that have a weight in different rows align only
+  when the minimum content of each cell fits in its share of the width, as with flex rows in a
+  browser. The rows are not the rows of one table.
+
 ## Fallbacks
 
 A component that did not arrive, a component of an unknown type and a reference that makes a cycle
