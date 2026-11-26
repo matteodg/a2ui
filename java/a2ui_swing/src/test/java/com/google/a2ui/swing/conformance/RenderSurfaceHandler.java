@@ -42,6 +42,7 @@ import javax.swing.AbstractButton;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
+import javax.swing.JFormattedTextField;
 import javax.swing.JSeparator;
 import javax.swing.JSlider;
 import javax.swing.JTabbedPane;
@@ -56,8 +57,9 @@ import javax.swing.text.JTextComponent;
  * text of a text component, the value of a control, the messages of the checks, the state of a
  * button. A step operates the Swing control: it sets the text of a text field, it clicks a button,
  * a check box or the options of a choice picker, it sets the accessible value of a slider, and it
- * selects a tab of a tabbed pane. The value of an option is its action command, and the value of a
- * slider is its accessible value.
+ * selects a tab of a tabbed pane. The value of an option is its action command, the value of a
+ * slider is its accessible value, and the value of a date field is the value of its formatted text
+ * field.
  *
  * <p>An input step for a component type that has no view in this version fails. The registry skips
  * the cases that need such a component.
@@ -236,8 +238,9 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
   private void userInput(AdapterSession session, Map<String, Object> step, String where) {
     MountedNode node = session.find(target(step, where));
     Object value = step.get("inputValue");
-    if (node.node().type().equals("TextField")
+    if ((node.node().type().equals("TextField") || node.node().type().equals("DateTimeInput"))
         && session.control(node) instanceof JTextComponent field) {
+      // The user types the text. The field of a DateTimeInput accepts ISO 8601 text.
       session.gesture = true;
       try {
         field.setText(asString(value, "inputValue of " + where));
@@ -489,6 +492,10 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
   /** Reads the value that the control of a component shows. */
   private static Object shownValue(AdapterSession session, MountedNode actual, String at) {
     JComponent control = session.control(actual);
+    if (control instanceof JFormattedTextField field) {
+      // The value of a formatted field is the value of the component, for example ISO 8601 text.
+      return field.getValue();
+    }
     if (control instanceof JTextComponent field) {
       return AdapterSession.documentText(field);
     }

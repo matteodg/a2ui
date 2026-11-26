@@ -212,8 +212,11 @@ final class TextFieldView implements SwingComponentView {
     }
   }
 
-  /** Paints the placeholder of a text control that is empty. */
-  private static void paintPlaceholder(JTextComponent control, Graphics graphics) {
+  /**
+   * Paints the placeholder of a text control that is empty. The placeholder is the value of the
+   * client property {@link #PLACEHOLDER_PROPERTY}. The view of {@code DateTimeInput} uses it too.
+   */
+  static void paintPlaceholder(JTextComponent control, Graphics graphics) {
     if (!(control.getClientProperty(PLACEHOLDER_PROPERTY) instanceof String text)
         || control.getDocument().getLength() > 0) {
       return;
