@@ -77,6 +77,45 @@ public abstract class SwingComponentImplementation extends ComponentApi {
   public abstract SwingComponentView createView(ViewContext context);
 
   /**
+   * Tells if this implementation can make a view. The default implementation returns true.
+   *
+   * <p>An implementation that returns false only declares the component. Then a message that uses
+   * the component is correct, but the surface cannot show the component. The adapter does not call
+   * {@link #createView(ViewContext)}. It shows the {@code error} fallback of the surface with the
+   * error type {@code no-view}, or nothing. See {@link #withoutView(ComponentApi)}.
+   *
+   * @return true if {@link #createView(ViewContext)} makes a view
+   */
+  public boolean hasView() {
+    return true;
+  }
+
+  /**
+   * Makes an implementation that declares a component and has no view for it. A catalog uses it for
+   * a component that the adapter cannot show at this time. Thus the catalog stays complete, and the
+   * agent can send the component.
+   *
+   * @param api the definition of the component
+   * @return the implementation. Its {@link #hasView()} returns false, and its {@link
+   *     #createView(ViewContext)} throws an {@code UnsupportedOperationException}.
+   */
+  public static SwingComponentImplementation withoutView(ComponentApi api) {
+    Objects.requireNonNull(api, "api");
+    return new SwingComponentImplementation(api) {
+      @Override
+      public SwingComponentView createView(ViewContext context) {
+        throw new UnsupportedOperationException(
+            "The component '" + name() + "' has no Swing view.");
+      }
+
+      @Override
+      public boolean hasView() {
+        return false;
+      }
+    };
+  }
+
+  /**
    * Makes an implementation from a function that makes the views.
    *
    * @param api the definition of the component

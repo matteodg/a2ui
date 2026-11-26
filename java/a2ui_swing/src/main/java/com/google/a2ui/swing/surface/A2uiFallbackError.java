@@ -22,10 +22,10 @@ import java.util.Optional;
 /**
  * The reason why a component cannot show, for the {@code error} fallback.
  *
- * @param type the type of the error: {@link #UNKNOWN_TYPE}, {@link #CYCLIC}, or a type that a later
- *     version adds. Thus a fallback must accept a type that it does not know.
- * @param componentType the type that the component declares, for {@link #UNKNOWN_TYPE}. It is empty
- *     for the other errors.
+ * @param type the type of the error: {@link #UNKNOWN_TYPE}, {@link #CYCLIC}, {@link #NO_VIEW}, or a
+ *     type that a later version adds. Thus a fallback must accept a type that it does not know.
+ * @param componentType the type that the component declares, for {@link #UNKNOWN_TYPE} and for
+ *     {@link #NO_VIEW}. It is empty for the other errors.
  */
 public record A2uiFallbackError(String type, Optional<String> componentType) {
   /** The type of the error for a component whose type no catalog of the surface declares. */
@@ -33,6 +33,12 @@ public record A2uiFallbackError(String type, Optional<String> componentType) {
 
   /** The type of the error for a reference that repeats a parent of the component. */
   public static final String CYCLIC = "cyclic";
+
+  /**
+   * The type of the error for a component that a catalog declares, but that the adapter has no view
+   * for. The adapter finds this error itself. The core reports nothing for it.
+   */
+  public static final String NO_VIEW = "no-view";
 
   /** Makes the reason. */
   public A2uiFallbackError {

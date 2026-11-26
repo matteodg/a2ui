@@ -18,6 +18,7 @@ package com.google.a2ui.swing.testing;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
 import com.google.a2ui.core.catalog.Catalog;
+import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionImplementation;
 import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.resolution.ComponentNode;
@@ -47,7 +48,8 @@ import javax.swing.JTextField;
  * A small custom catalog for the tests of the adapter. It shows that the public API is sufficient
  * to write components: a label, a text field with a two-way binding and checks, a button with an
  * action and one child, and a container with a list of children. The component {@code Broken} makes
- * no view, for the tests of a failure.
+ * no view, for the tests of a failure. The component {@code Declared} is in the catalog and has no
+ * view.
  *
  * <p>The catalog has the functions of the basic catalog with their code. It has none of the
  * components of the basic catalog.
@@ -108,7 +110,9 @@ public final class TestCatalog {
                 schema("Broken", Map.of()),
                 context -> {
                   throw new IllegalStateException("This component cannot make a view.");
-                }));
+                }),
+            SwingComponentImplementation.withoutView(
+                new ComponentApi("Declared", schema("Declared", Map.of()))));
     this.catalog =
         BasicCatalog.withFunctions(Locale.US, opened::add)
             .derive(ID, List.of(), List.of(), null, List.of(), null)

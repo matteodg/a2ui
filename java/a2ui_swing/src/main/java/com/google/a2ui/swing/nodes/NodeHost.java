@@ -50,6 +50,8 @@ import javax.swing.JComponent;
  *       the properties of the node and updates the view after each change. The host keeps the view
  *       when a new node has the same implementation.
  *   <li>For a node in a different state, the host shows the fallback of the surface, or nothing.
+ *   <li>For a resolved node whose implementation has no view, the host shows the {@code error}
+ *       fallback of the surface with the error type {@code no-view}, or nothing.
  * </ul>
  *
  * <p>The Swing component of a host can thus change, and it can be absent. The host tells its
@@ -239,7 +241,8 @@ public final class NodeHost {
       return null;
     }
     if (node.impl().orElse(null) instanceof SwingComponentImplementation implementation) {
-      return implementation;
+      // An implementation that only declares its component is handled as an error state.
+      return implementation.hasView() ? implementation : null;
     }
     SurfaceScope.log(
         "The component '"
@@ -311,7 +314,15 @@ public final class NodeHost {
                   id,
                   parentComponentType,
                   new A2uiFallbackError(A2uiFallbackError.CYCLIC, Optional.empty()));
-          case RESOLVED -> null;
+          // The catalog declares the component, but its implementation has no view.
+          case RESOLVED ->
+              placeholder.impl().orElse(null) instanceof SwingComponentImplementation
+                  ? new A2uiErrorInfo(
+                      id,
+                      parentComponentType,
+                      new A2uiFallbackError(
+                          A2uiFallbackError.NO_VIEW, Optional.of(placeholder.type())))
+                  : null;
         };
     if (Objects.equals(info, fallbackInfo)) {
       // The same description gives the same fallback. Thus the host keeps its component.

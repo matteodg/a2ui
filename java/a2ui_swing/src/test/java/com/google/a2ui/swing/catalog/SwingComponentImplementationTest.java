@@ -17,6 +17,7 @@
 package com.google.a2ui.swing.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -100,5 +101,17 @@ class SwingComponentImplementationTest {
         NullPointerException.class, () -> SwingComponentImplementation.of("Badge", SCHEMA, null));
     assertThrows(
         NullPointerException.class, () -> SwingComponentView.of(null, (node, props) -> {}));
+  }
+
+  @Test
+  void anImplementationWithoutViewDeclaresItsComponentAndMakesNoView() {
+    ComponentApi api = new ComponentApi("Card", SCHEMA);
+
+    SwingComponentImplementation card = SwingComponentImplementation.withoutView(api);
+
+    assertFalse(card.hasView());
+    assertEquals("Card", card.name());
+    assertEquals(api.schema(), card.schema());
+    assertThrows(UnsupportedOperationException.class, () -> card.createView(null));
   }
 }

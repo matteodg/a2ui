@@ -392,6 +392,52 @@ class NodeHostTest {
   }
 
   @Test
+  void aComponentWhoseImplementationHasNoViewShowsNothingWithoutAFallback() {
+    Edt.run(() -> {
+      try (LogCapture log = new LogCapture()) {
+        NodeHost host = rootHost(Map.of(), component("root", "Declared"));
+
+        assertEquals(NodeState.RESOLVED, host.node().state());
+        assertEquals(Optional.empty(), host.component());
+        assertEquals(Optional.empty(), host.view());
+        assertEquals(List.of(), log.messages);
+        assertEquals(List.of(), surface.errors);
+        assertEquals(0, scope.activeSubscriptions());
+      }
+    });
+  }
+
+  @Test
+  void aComponentWhoseImplementationHasNoViewShowsTheErrorFallback() {
+    Edt.run(() -> {
+      fallbacks =
+          A2uiFallbacks.NONE.withError(info -> {
+            fallbackInfos.add(info);
+            return fallbackLabel("!");
+          });
+      NodeHost host =
+          childHost(component("root", "Button", "child", "later"), component("later", "Declared"));
+      JComponent fallback = host.component().orElseThrow();
+
+      assertEquals("fallback", fallback.getName());
+      assertEquals(
+          List.of(
+              new A2uiErrorInfo(
+                  "later",
+                  Optional.of("Button"),
+                  new A2uiFallbackError(A2uiFallbackError.NO_VIEW, Optional.of("Declared")))),
+          fallbackInfos);
+
+      // A component with a view replaces the fallback at the same position.
+      surface.update(component("later", "Label", "text", "now"));
+      host.bind(child());
+
+      assertEquals("now", ((JLabel) host.component().orElseThrow()).getText());
+      assertEquals(List.of(), surface.errors);
+    });
+  }
+
+  @Test
   void theDisposalDisposesTheViewAndCancelsTheSubscription() {
     Edt.run(() -> {
       NodeHost host =
