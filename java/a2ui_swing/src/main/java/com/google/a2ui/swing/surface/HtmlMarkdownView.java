@@ -126,17 +126,41 @@ final class HtmlMarkdownView implements MarkdownView {
       sheet.addRule(code + " { font-family: Monospaced; font-size: " + font.getSize() + "pt; }");
     }
     pane.empty = blocks.isEmpty();
+    pane.contentChanged();
     pane.setText(blocks.isEmpty() ? "" : MarkdownHtml.toHtml(blocks, font.getSize2D()));
     pane.revalidate();
     pane.repaint();
   }
 
-  /** The text component of the view. */
+  /**
+   * The text component of the view.
+   *
+   * <p>The component gets the size of its text from the root view of its UI. The root view breaks
+   * the lines for a width, and it tells the component to do its layout again each time the height
+   * of the text changes. A question about a size must not start a new layout, because the answer to
+   * that question is a part of a layout. If it did, a window would do its layout again and again.
+   * Thus the component ignores the request of the root view during a question, gives the root view
+   * its own size back after the question, and keeps the answers.
+   */
   private static final class Pane extends JEditorPane implements HeightForWidth {
     private static final long serialVersionUID = 1L;
 
     /** True if the document has no blocks. Then the component has no height. */
     private boolean empty = true;
+
+    /** True while the component asks the root view for a size. */
+    private boolean measuring;
+
+    /** The size of the text with no line breaks, or null if the component must get it again. */
+    private Dimension natural;
+
+    /** The width of the longest word, or -1 if the component must get it again. */
+    private int narrowest = -1;
+
+    /** The last width that the component got a height for, or -1. */
+    private int wrappedWidth = -1;
+
+    private int wrappedHeight;
 
     Pane() {
       setEditorKit(new HTMLEditorKit());
@@ -150,9 +174,42 @@ final class HtmlMarkdownView implements MarkdownView {
       }
     }
 
+    /** Forgets the sizes of the text, after a change of the document or of the UI. */
+    void contentChanged() {
+      natural = null;
+      narrowest = -1;
+      wrappedWidth = -1;
+    }
+
+    @Override
+    public void updateUI() {
+      super.updateUI();
+      contentChanged();
+    }
+
+    @Override
+    public void revalidate() {
+      if (!measuring) {
+        super.revalidate();
+      }
+    }
+
+    @Override
+    public void repaint(long time, int x, int y, int width, int height) {
+      if (!measuring) {
+        super.repaint(time, x, y, width, height);
+      }
+    }
+
     @Override
     public Dimension getPreferredSize() {
-      return isPreferredSizeSet() ? super.getPreferredSize() : measure(Integer.MAX_VALUE);
+      if (isPreferredSizeSet()) {
+        return super.getPreferredSize();
+      }
+      Insets insets = getInsets();
+      Dimension text = naturalSize();
+      return new Dimension(
+          text.width + insets.left + insets.right, text.height + insets.top + insets.bottom);
     }
 
     @Override
@@ -161,12 +218,15 @@ final class HtmlMarkdownView implements MarkdownView {
         return super.getMinimumSize();
       }
       // The text can become as narrow as its longest word. Then it has more lines.
-      Dimension preferred = getPreferredSize();
       Insets insets = getInsets();
-      int width =
-          empty ? 0 : (int) Math.ceil(getUI().getRootView(this).getMinimumSpan(View.X_AXIS));
+      Dimension text = naturalSize();
+      if (narrowest < 0) {
+        narrowest =
+            empty ? 0 : (int) Math.ceil(getUI().getRootView(this).getMinimumSpan(View.X_AXIS));
+      }
       return new Dimension(
-          Math.min(preferred.width, width + insets.left + insets.right), preferred.height);
+          Math.min(text.width, narrowest) + insets.left + insets.right,
+          text.height + insets.top + insets.bottom);
     }
 
     @Override
@@ -175,27 +235,55 @@ final class HtmlMarkdownView implements MarkdownView {
         return super.getPreferredSize().height;
       }
       Insets insets = getInsets();
-      return measure(Math.max(1, width - insets.left - insets.right)).height;
+      int contentWidth = Math.max(1, width - insets.left - insets.right);
+      Dimension text = naturalSize();
+      int height = text.height;
+      if (contentWidth < text.width) {
+        if (wrappedWidth != contentWidth) {
+          wrappedHeight = measure(contentWidth).height;
+          wrappedWidth = contentWidth;
+        }
+        height = wrappedHeight;
+      }
+      return height + insets.top + insets.bottom;
+    }
+
+    /** Gets the size of the text with no line breaks, without the insets. */
+    private Dimension naturalSize() {
+      if (natural == null) {
+        natural = measure(Integer.MAX_VALUE);
+      }
+      return natural;
     }
 
     /**
-     * Gets the size of the text when the lines have a maximum width.
+     * Asks the root view for the size of the text when the lines have a maximum width.
      *
-     * @param contentWidth the maximum width of a line, without the insets
-     * @return the size of the component, with the insets
+     * @param contentWidth the maximum width of a line
+     * @return the size of the text, without the insets
      */
     private Dimension measure(int contentWidth) {
-      Insets insets = getInsets();
-      int width = 0;
-      int height = 0;
-      if (!empty) {
-        // The paint of the component sets the size of the root view again.
-        View root = getUI().getRootView(this);
-        root.setSize(contentWidth, Integer.MAX_VALUE);
-        width = (int) Math.min(contentWidth, Math.ceil(root.getPreferredSpan(View.X_AXIS)));
-        height = (int) Math.ceil(root.getPreferredSpan(View.Y_AXIS));
+      if (empty) {
+        return new Dimension(0, 0);
       }
-      return new Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom);
+      View root = getUI().getRootView(this);
+      measuring = true;
+      try {
+        root.setSize(contentWidth, Integer.MAX_VALUE);
+        Dimension size =
+            new Dimension(
+                (int) Math.min(contentWidth, Math.ceil(root.getPreferredSpan(View.X_AXIS))),
+                (int) Math.ceil(root.getPreferredSpan(View.Y_AXIS)));
+        Insets insets = getInsets();
+        int width = getWidth() - insets.left - insets.right;
+        int height = getHeight() - insets.top - insets.bottom;
+        if (width > 0 && height > 0) {
+          root.setSize(width, height);
+        }
+        return size;
+      } finally {
+        measuring = false;
+      }
     }
   }
 }

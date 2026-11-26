@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Snapshots;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -35,6 +36,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import javax.swing.BorderFactory;
 import javax.swing.JEditorPane;
+import javax.swing.JPanel;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
@@ -205,6 +207,42 @@ class HtmlMarkdownViewTest {
       pane.setSize(50, 50);
       assertEquals(half, wrapping.preferredHeightFor(lineWidth / 2 + 20));
       assertEquals(new Dimension(lineWidth, oneLine), pane.getPreferredSize());
+    });
+  }
+
+  @Test
+  void aQuestionAboutASizeDoesNotStartANewLayout() {
+    Edt.run(() -> {
+      view.setMarkdown(LONG_TEXT);
+      JPanel parent = new JPanel(new BorderLayout());
+      JPanel holder = new JPanel(null);
+      holder.add(parent);
+      parent.add(pane);
+      parent.addNotify();
+      parent.setSize(200, 200);
+      parent.validate();
+      HeightForWidth wrapping = (HeightForWidth) pane;
+      Dimension natural = pane.getPreferredSize();
+
+      assertTrue(parent.isValid());
+      assertTrue(pane.isValid());
+
+      int narrow = wrapping.preferredHeightFor(90);
+      int wide = wrapping.preferredHeightFor(150);
+
+      // The root view of a text component asks for a new layout when the height of its text
+      // changes. A window would then do its layout again after each layout.
+      assertTrue(narrow > wide && wide > natural.height);
+      assertEquals(natural, pane.getPreferredSize());
+      assertTrue(pane.getMinimumSize().width < 90);
+      assertTrue(pane.isValid(), "the component");
+      assertTrue(parent.isValid(), "the parent");
+
+      // The root view has the size of the component again. Thus a paint changes nothing.
+      Snapshots.render(pane);
+
+      assertTrue(pane.isValid(), "the component after the paint");
+      assertTrue(parent.isValid(), "the parent after the paint");
     });
   }
 
