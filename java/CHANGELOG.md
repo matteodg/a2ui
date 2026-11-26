@@ -32,7 +32,9 @@
   - `ExpressionParser` and `Expression` in `com.google.a2ui.core.expressions` parse `${...}`
     templates.
   - `A2uiError` with its subclasses, `A2uiErrorDetail` and `RpcErrorCode` are in
-    `com.google.a2ui.core.exceptions`. `Signal`, `ReadonlySignal`, `Reactive`, `EventNotifier`,
+    `com.google.a2ui.core.exceptions`. The code of a custom function or of a custom component can
+    give a path and details to `A2uiExpressionError` and to `A2uiValidationError`, and the `error`
+    message for the agent has them. `Signal`, `ReadonlySignal`, `Reactive`, `EventNotifier`,
     `EventSource`, `EventListener`, `Subscription`, `ProtocolVersion`, `SemVer`, `Uax31`,
     `Coercion` and `A2uiRegex` are in `com.google.a2ui.core.common`.
 - Add `a2ui-java-swing` (Java module `com.google.a2ui.swing`), the Swing adapter of the SDK. It

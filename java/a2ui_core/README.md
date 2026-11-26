@@ -209,6 +209,56 @@ message. `unifiedOutbound` without a listener causes an `IllegalArgumentExceptio
 The listener runs in the call that reports the action or the failure. Do not throw an exception from
 the listener.
 
+### The path and the details of your own errors
+
+The code of a catalog function and the view of a component can tell the agent where a problem is.
+Give a path and a list of `A2uiErrorDetail` to a constructor of `A2uiExpressionError` or of
+`A2uiValidationError`. A function throws the error. A view reports it with
+`SurfaceModel.dispatchError`.
+
+```java
+FunctionImplementation stockOf =
+    new FunctionImplementation(
+        "stockOf",
+        Map.of("returnType", "string"),
+        (args, context) -> {
+          throw new A2uiExpressionError(
+              "The stock is not available.",
+              "/args/product",
+              List.of(
+                  new A2uiErrorDetail(
+                      "/args/product", "unknown_product", "No product has the ID 'p9'.")));
+        });
+
+// In the view of a component:
+surface.dispatchError(
+    new A2uiValidationError(
+        "The series is not correct.",
+        null,
+        List.of(new A2uiErrorDetail("/series/1", "type_mismatch", "A point must be a number."))));
+```
+
+The listeners of `onError` get the error with its `path()` and its `details()`. With
+`unifiedOutbound`, the `error` message also has them:
+
+```java
+// {"version": "1.0", "error": {"code": "EXPRESSION_ERROR", "surfaceId": "main",
+//   "message": "The stock is not available.", "path": "/args/product",
+//   "details": [{"path": "/args/product", "code": "unknown_product",
+//     "message": "No product has the ID 'p9'."}]}}
+```
+
+- The path can be null, and the list of details can be empty.
+- Only the core writes the surface, the function call and the protocol error code. The code is
+  `EXPRESSION_ERROR` for a binding and `EXECUTION_ERROR` for an action, as for each other failure of
+  a function.
+- An `A2uiValidationError` with a path that a view reports gets the code `VALIDATION_FAILED`. The
+  schema of this code permits only the path and the message. Thus the message has no `details`, and
+  the listeners of `onError` continue to get them.
+- For an error that the core makes itself, the `error` message does not change: it has the path
+  only for the codes `VALIDATION_FAILED`, `UNALLOWED_PARENT` and `UNALLOWED_CHILD`, and it has no
+  `details`.
+
 ### Data for the agent
 
 `getRendererCapabilities` gives the catalogs that this renderer supports. `getRendererDataModel`
