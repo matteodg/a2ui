@@ -110,13 +110,12 @@
   shape of `help`. `Image` loads with the `imageLoader` service and
   applies `variant` and `fit`. `Video` and `AudioPlayer` show the view of the `mediaPlayer` service,
   or a control that opens the URL with the `urlOpener` service. Add `MediaUrls` in
-  `com.google.a2ui.swing.surface`: the safety rule for media URLs. Add
-  `SwingBasicCatalog.ICON_NAME_PROPERTY` and `SwingBasicCatalog.MEDIA_URL_PROPERTY`. The default
+  `com.google.a2ui.swing.surface`: the safety rule for media URLs. The default
   image loader now has timeouts, a limit for the bytes and for the pixels of an image, and it
   follows a redirection only to an `http` or `https` URL. An `ImageLoader` and a `MediaView` can
   now get a relative URL.
 - The `@accessibility` attribute `hidden` now hides all the components below its component. Add
-  `A2uiAccessibility.isHidden` and `A2uiAccessibility.HIDDEN_PROPERTY`.
+  `A2uiAccessibility.isHidden`.
 - The schema validation now asserts the formats `date`, `time` and `date-time` as ISO 8601 text.
   Thus a literal `min` or `max` of `DateTimeInput`, for example `2025-01-01`, is correct, and a
   literal that is not a date or a time is not correct. Before, the processor rejected each literal.

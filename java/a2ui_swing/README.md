@@ -49,8 +49,10 @@ The Java module name is `com.google.a2ui.swing`. It exports these packages:
 | `com.google.a2ui.swing.binding`       | `TextBinding` connects a Swing text component to a property in the two directions. `ValueBinding` does the same for a control that is not text, for example a check box.                                                                                           |
 | `com.google.a2ui.swing.catalog.basic` | `SwingBasicCatalog` makes the basic catalog with its Swing views. `FlexLayout` and `FlexPanel` are the layout of the `Row`, `Column` and `List` components. A custom container can also use them.                                                                  |
 
-The package `com.google.a2ui.swing.nodes` has the node dispatcher and the child reconciliation. It
-is not part of the API, and the module does not export it.
+The package `com.google.a2ui.swing.nodes` has the node dispatcher and the child reconciliation. The
+package `com.google.a2ui.swing.internal` has the marks that the views put on their Swing components
+for the tests of the module. These two packages are not part of the API, and the module does not
+export them.
 
 ## The basic catalog
 
@@ -185,8 +187,7 @@ These rules apply to the views:
   `http`, `https` and `data` URLs and relative paths, a host after the scheme, and no path that
   starts with two slashes. A URL that is not safe shows the neutral area or a control that the user
   cannot operate. That is not an error of the surface. A relative path is safe, but the default
-  services have no base location and load nothing for it. The accessible component of each of
-  these views has the accepted URL as the client property `SwingBasicCatalog.MEDIA_URL_PROPERTY`.
+  services have no base location and load nothing for it.
 
 To replace the view of one component, make a catalog with a different list:
 
