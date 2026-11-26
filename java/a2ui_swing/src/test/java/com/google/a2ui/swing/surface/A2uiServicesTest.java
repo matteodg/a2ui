@@ -26,8 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.a2ui.core.basic_catalog.v1_0.UrlOpener;
 import com.google.a2ui.swing.testing.Edt;
 import java.util.Optional;
-import javax.swing.JLabel;
-import javax.swing.JTextArea;
+import javax.swing.JEditorPane;
 import org.junit.jupiter.api.Test;
 
 class A2uiServicesTest {
@@ -45,7 +44,7 @@ class A2uiServicesTest {
 
   @Test
   void eachWithMethodReplacesOneServiceAndKeepsTheOthers() {
-    MarkdownRenderer markdown = PlainTextMarkdownView::new;
+    MarkdownRenderer markdown = HtmlMarkdownView::new;
     ImageLoader loader = (uri, onResult) -> () -> {};
     MediaPlayer player = kind -> Optional.empty();
     ModalPresenter presenter = (owner, content, onClosed) -> () -> {};
@@ -71,18 +70,17 @@ class A2uiServicesTest {
   }
 
   @Test
-  void theDefaultMarkdownViewShowsTheTextAsTheAgentWroteIt() {
+  void theDefaultMarkdownServiceMakesAViewOfTheMarkdownSubsetForEachCall() {
     Edt.run(() -> {
       MarkdownView view = A2uiServices.DEFAULT.markdown().createView();
       MarkdownView second = A2uiServices.DEFAULT.markdown().createView();
 
       view.setMarkdown("This is **bold** text.");
 
-      JTextArea area = (JTextArea) view.component();
-      assertEquals("This is **bold** text.", area.getText());
-      assertFalse(area.isEditable());
-      assertTrue(area.getLineWrap());
-      assertEquals(new JLabel().getFont(), area.getFont());
+      JEditorPane pane = (JEditorPane) view.component();
+      String shown = pane.getDocument().getText(0, pane.getDocument().getLength());
+      assertEquals("This is bold text.", shown.strip());
+      assertFalse(pane.isEditable());
       assertNotSame(view.component(), second.component());
       assertSame(view.component(), view.component());
     });

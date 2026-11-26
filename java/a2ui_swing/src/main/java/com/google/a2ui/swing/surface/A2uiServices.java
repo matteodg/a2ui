@@ -26,9 +26,10 @@ import java.util.Objects;
  * <p>The services of {@link #DEFAULT} are these:
  *
  * <ul>
- *   <li>{@code markdown}: shows the text as the agent wrote it, with the Markdown marks. The
- *       version of this module that adds the {@code Text} component replaces it with a view that
- *       shows the Markdown subset of the protocol.
+ *   <li>{@code markdown}: shows the Markdown subset of the protocol in a text component that the
+ *       user cannot edit: headings, emphasis, strong text, lists, code and quotes. It shows HTML as
+ *       plain text, and it shows a link and an image as their text only. The text breaks at the
+ *       width of the component.
  *   <li>{@code imageLoader}: reads {@code http}, {@code https} and {@code data} URLs with {@code
  *       ImageIO}, on a thread that is not the event dispatch thread. It reads the formats that
  *       {@code ImageIO} reads, for example PNG, JPEG, GIF and BMP. It has no cache.
@@ -56,7 +57,7 @@ public record A2uiServices(
   /** The default services. See the class description. */
   public static final A2uiServices DEFAULT =
       new A2uiServices(
-          PlainTextMarkdownView::new,
+          HtmlMarkdownView::new,
           new DefaultImageLoader(),
           MediaPlayer.NONE,
           new DialogModalPresenter(),

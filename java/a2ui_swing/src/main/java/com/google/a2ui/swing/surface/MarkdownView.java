@@ -24,6 +24,13 @@ import javax.swing.JComponent;
  * <p>The protocol permits a small subset of Markdown: emphasis, strong text, headings, lists and
  * inline code. A view shows raw HTML as plain text. It shows an image and a link as their text
  * only. Use a view only on the event dispatch thread.
+ *
+ * <p>The {@code Text} component sets the font and the foreground color of the component of the
+ * view. They are the base style of the text. A view shows its text again when one of the two
+ * changes.
+ *
+ * <p>The component of a view whose text wraps implements {@code HeightForWidth}. Then the layout of
+ * a container gives the component the height for its width.
  */
 public interface MarkdownView {
   /**
