@@ -1,0 +1,162 @@
+/*
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.a2ui.core.validation;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.google.a2ui.core.exceptions.A2uiCatalogError;
+import com.google.a2ui.core.internal.Json;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.Test;
+
+class JsonSchemaEngineTest {
+  private final JsonSchemaEngine engine =
+      new JsonSchemaEngine(
+          Json.asObject(
+              Json.parse(
+                  """
+                  {
+                    "$id": "https://example.com/the-name-in-the-document.json",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "components": {
+                      "Card": {
+                        "type": "object",
+                        "properties": {
+                          "title": {"$ref": "#/$defs/Title"},
+                          "count": {"type": "integer"},
+                          "tags": {"type": "array", "items": {"type": "string"}}
+                        },
+                        "required": ["title"],
+                        "unevaluatedProperties": false
+                      }
+                    },
+                    "$defs": {
+                      "Title": {"type": "string", "minLength": 1},
+                      "a/b": {"const": 1},
+                      "Identifier": {
+                        "type": "string",
+                        "pattern": "^[\\\\p{XID_Start}_][\\\\p{XID_Continue}]*$"
+                      },
+                      "Hex": {"type": "string", "pattern": "[0-9a-f]{2}"}
+                    }
+                  }
+                  """)));
+
+  @Test
+  void aValidValueHasNoErrors() {
+    Object card = Json.parse("{\"title\": \"Hello\", \"count\": 2, \"tags\": [\"a\"]}");
+
+    assertEquals(List.of(), engine.errors("/components/Card", card));
+    assertEquals(List.of(), engine.errors("/$defs/Title", "Hello"));
+    assertEquals(List.of(), engine.errors("/$defs/a~1b", 1L));
+  }
+
+  @Test
+  void eachProblemGivesOneMessageWithItsLocation() {
+    Object card = Json.parse("{\"title\": \"\", \"tags\": [\"a\", 2], \"extra\": null}");
+
+    List<String> errors = engine.errors("/components/Card", card);
+
+    assertEquals(3, errors.size(), errors.toString());
+    assertTrue(errors.stream().anyMatch(error -> error.startsWith("/title: ")), errors.toString());
+    assertTrue(errors.stream().anyMatch(error -> error.startsWith("/tags/1: ")), errors.toString());
+    assertTrue(errors.stream().anyMatch(error -> error.contains("extra")), errors.toString());
+  }
+
+  @Test
+  void aProblemOfTheValueItselfHasNoLocation() {
+    List<String> errors = engine.errors("/$defs/Title", 5L);
+
+    assertEquals(1, errors.size(), errors.toString());
+    assertFalse(errors.get(0).startsWith("/"), errors.toString());
+    assertFalse(errors.get(0).startsWith("$"), errors.toString());
+  }
+
+  @Test
+  void aNumberWithNoFractionIsAnInteger() {
+    assertEquals(List.of(), engine.errors("/components/Card/properties/count", 3.0));
+    assertEquals(1, engine.errors("/components/Card/properties/count", 3.5).size());
+    assertEquals(List.of(), engine.errors("/$defs/a~1b", 1.0));
+  }
+
+  @Test
+  void aPatternKnowsTheUnicodeIdentifierProperties() {
+    assertEquals(List.of(), engine.errors("/$defs/Identifier", "vendor_tag"));
+    assertEquals(List.of(), engine.errors("/$defs/Identifier", "_x1"));
+    assertEquals(List.of(), engine.errors("/$defs/Identifier", "größe"));
+    // U+20BB7 is not in the Basic Multilingual Plane.
+    assertEquals(List.of(), engine.errors("/$defs/Identifier", "𠮷"));
+    assertEquals(1, engine.errors("/$defs/Identifier", "has-dash").size());
+    assertEquals(1, engine.errors("/$defs/Identifier", "1st").size());
+    assertEquals(1, engine.errors("/$defs/Identifier", "").size());
+  }
+
+  @Test
+  void aPatternMatchesAPartOfTheValue() {
+    assertEquals(List.of(), engine.errors("/$defs/Hex", "xx7fxx"));
+    assertEquals(1, engine.errors("/$defs/Hex", "xyz").size());
+  }
+
+  @Test
+  void expandKeepsAPatternThatHasNoIdentifierProperty() {
+    assertEquals("^#[0-9a-fA-F]{6}$", UnicodeRegularExpressions.expand("^#[0-9a-fA-F]{6}$"));
+    assertEquals("\\p{L}+", UnicodeRegularExpressions.expand("\\p{L}+"));
+  }
+
+  @Test
+  void expandMakesCharacterClassesThatJavaCompiles() {
+    String expanded = UnicodeRegularExpressions.expand("^[\\p{XID_Start}_][\\p{XID_Continue}]*$");
+
+    assertFalse(expanded.contains("XID"), expanded.substring(0, 40));
+    Pattern pattern = Pattern.compile(expanded);
+    assertTrue(pattern.matcher("a·b").matches());
+    assertFalse(pattern.matcher("·a").matches());
+  }
+
+  @Test
+  void theEngineDoesNotUseTheIdOfTheDocument() {
+    JsonSchemaEngine other =
+        new JsonSchemaEngine(Map.of("$id", "urn:other", "$defs", Map.of("T", Map.of("const", 2L))));
+
+    assertEquals(List.of(), other.errors("/$defs/T", 2L));
+    assertEquals(List.of(), engine.errors("/$defs/a~1b", 1L));
+  }
+
+  @Test
+  void aReferenceThatIsNotInTheDocumentIsACatalogError() {
+    JsonSchemaEngine broken =
+        new JsonSchemaEngine(
+            Map.of(
+                "$defs",
+                Map.of(
+                    "Remote", Map.of("$ref", "https://example.com/other.json#/$defs/X"),
+                    "Sibling", Map.of("$ref", "common_types.json#/$defs/X"),
+                    "Dangling", Map.of("$ref", "#/$defs/Missing"))));
+
+    assertThrows(A2uiCatalogError.class, () -> broken.errors("/$defs/Remote", 1L));
+    assertThrows(A2uiCatalogError.class, () -> broken.errors("/$defs/Sibling", 1L));
+    assertThrows(A2uiCatalogError.class, () -> broken.errors("/$defs/Dangling", 1L));
+    A2uiCatalogError error =
+        assertThrows(A2uiCatalogError.class, () -> broken.errors("/$defs/NoSuchSchema", 1L));
+    assertTrue(error.getMessage().startsWith("The schema at '/$defs/NoSuchSchema'"));
+  }
+}

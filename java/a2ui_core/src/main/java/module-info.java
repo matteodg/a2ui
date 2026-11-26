@@ -30,5 +30,7 @@ module com.google.a2ui.core {
   exports com.google.a2ui.core.state;
 
   requires com.ibm.icu;
+  requires com.networknt.schema;
   requires tools.jackson.core;
+  requires tools.jackson.databind;
 }

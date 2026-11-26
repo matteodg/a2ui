@@ -40,10 +40,29 @@
       <groupId>com.ibm.icu</groupId>
       <artifactId>icu4j</artifactId>
     </dependency>
-    <!-- The JSON parser for the documents in the resources. It is not in the public API. -->
+    <!--
+      The JSON parser for the documents in the resources. It is not in the public API. The Jackson
+      BOM in the parent POM gives the same version to this module and to the Jackson modules of the
+      validator.
+    -->
     <dependency>
       <groupId>tools.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
+    </dependency>
+    <!--
+      The JSON Schema 2020-12 validator. It reads schemas from memory only. It is not in the public
+      API.
+    -->
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <exclusions>
+        <!-- The validator needs this module only to read YAML. The SDK gives it JSON only. -->
+        <exclusion>
+          <groupId>tools.jackson.dataformat</groupId>
+          <artifactId>jackson-dataformat-yaml</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
