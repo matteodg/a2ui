@@ -314,7 +314,10 @@ public final class CatalogChecks {
               "allOf",
               List.of(
                   reference("#/$defs/FunctionCommon"),
-                  reference("#/functions/" + Json.escapePointer(name))),
+                  reference("#/functions/" + Json.escapePointer(name)),
+                  // A function that describes no arguments accepts all arguments. The schema
+                  // examines only the arguments that the function describes.
+                  Map.of("properties", Map.of("args", Map.of("type", "object")))),
               "unevaluatedProperties",
               false));
     }

@@ -226,6 +226,43 @@ class PayloadValidatorTest {
   }
 
   @Test
+  void aFunctionThatDescribesNoArgumentsAcceptsAllArguments() {
+    Catalog<ComponentApi, FunctionApi> catalog =
+        new Catalog<>(
+            "urn:test:open",
+            List.of(),
+            List.of(
+                new FunctionApi("anything", Map.of("returnType", "any")),
+                new FunctionApi(
+                    "closed",
+                    Map.of(
+                        "returnType",
+                        "any",
+                        "properties",
+                        Map.of(
+                            "args",
+                            Map.of(
+                                "type",
+                                "object",
+                                "properties",
+                                Map.of("count", Map.of("type", "number")),
+                                "additionalProperties",
+                                false))))),
+            null,
+            ProtocolVersion.V1_0);
+    PayloadValidator open = new PayloadValidator(catalog);
+
+    open.validateFunction("anything", Map.of());
+    open.validateFunction("anything", Map.of("count", 1L, "label", "one"));
+    open.validateFunction("closed", Map.of("count", 1L));
+
+    assertThrows(
+        A2uiValidationError.class, () -> open.validateFunction("closed", Map.of("label", "one")));
+    assertThrows(
+        A2uiValidationError.class, () -> open.validateFunction("closed", Map.of("count", "one")));
+  }
+
+  @Test
   void aValueThatIsNotJsonIsRejected() {
     A2uiValidationError error =
         assertThrows(
