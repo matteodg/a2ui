@@ -12,6 +12,9 @@ implementations, the layout of the containers, the services, and the basic catal
 five components: `Text`, `Row`, `Column`, `Button` and `TextField`. A later version adds the views
 of the other components. See [the basic catalog](#the-basic-catalog).
 
+The sample application [`samples/client/swing`](../../samples/client/swing) is a gallery that shows
+the examples of the basic catalog with this module.
+
 ## Quick start
 
 ```java
@@ -187,6 +190,20 @@ model. Then the state that only a view has is lost, for example a scroll positio
 processor deletes the surface, the surface component becomes empty.
 
 To add the views to a catalog that only describes its components, use `Catalog.withComponents`.
+
+### A surface in a scroll pane
+
+`A2uiSurface` implements `Scrollable` and `HeightForWidth`. Thus it can be the view of a
+`JScrollPane`:
+
+```java
+JScrollPane scrollPane = new JScrollPane(new A2uiSurface(surface));
+```
+
+The surface has the width of the viewport, and its text breaks at that width. Its height is the
+height that its content needs at that width. Thus the scroll pane scrolls vertically. A surface
+that is shorter than the viewport keeps its height, at the top of the viewport. The scroll pane
+scrolls horizontally only when the viewport is narrower than the minimum width of the content.
 
 ## Threads
 

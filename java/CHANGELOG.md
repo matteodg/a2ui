@@ -85,3 +85,8 @@
   `FlexPanel` and `FlexLayout.preferredHeight` in `com.google.a2ui.swing.catalog.basic`. Thus text
   that wraps gets its height in one layout pass. The default `markdown` service of `A2uiServices`
   now shows the Markdown subset of the protocol. Before, it showed the text with its marks.
+- `A2uiSurface` now implements `Scrollable` and `HeightForWidth`. Thus a surface can be the view of
+  a `JScrollPane`: it has the width of the viewport, its text breaks at that width, and the scroll
+  pane scrolls vertically. A button of the variant `primary` or `borderless` now keeps its text
+  color, and the default Markdown component keeps its position in a scroll pane, after a change of
+  the look and feel at run time.
