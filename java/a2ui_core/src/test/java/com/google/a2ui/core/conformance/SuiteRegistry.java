@@ -95,6 +95,10 @@ final class SuiteRegistry {
 
   private static final String NOT_YET = "Not implemented in java-core yet";
 
+  private static final String UI_RPC =
+      "Starts a call to the agent from a binding or from an action. java-core does not send"
+          + " such a call to the agent yet";
+
   private static final String SELECT_CATALOG =
       "One case expects a 'Protocol version mismatch' error for a surface that gets a v0.9"
           + " catalog. In java-core only the MessageProcessor selects the catalogs of a surface,"
@@ -325,7 +329,14 @@ final class SuiteRegistry {
         "core/node_resolution.yaml",
         new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));
     suites.put("core/reserved_keys.yaml", processorSuite(List.of(PROCESS, VALIDATE)));
-    suites.put("core/rpc_functions.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/rpc_functions.yaml",
+        new Supported(
+            Map.of("handle_rpc", new HandleRpcHandler()),
+            reasons(
+                "handle_rpc.args.uiBindingScenario", UI_RPC,
+                "handle_rpc.args.uiActionFallbackScenario", UI_RPC),
+            Set.of()));
     suites.put("core/validation_result.yaml", processorSuite(List.of(VALIDATE)));
     suites.put("core/validator_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/validator_v0_9.yaml", new Unsupported(V1_ONLY));
