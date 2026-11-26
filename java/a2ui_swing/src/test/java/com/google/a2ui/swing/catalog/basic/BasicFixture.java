@@ -63,9 +63,14 @@ final class BasicFixture {
   /** The view of each component of the basic catalog that the adapter can show. */
   private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS =
       Map.of(
-          "Text", TextView::new,
-          "Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL),
-          "Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
+          "Text",
+          TextView::new,
+          "Button",
+          ButtonView::new,
+          "Row",
+          context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL),
+          "Column",
+          context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
 
   /** The URLs that the function {@code openUrl} opened. */
   final List<URI> opened = new ArrayList<>();
