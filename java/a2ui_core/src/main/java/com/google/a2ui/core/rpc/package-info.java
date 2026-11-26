@@ -16,8 +16,8 @@
 
 /**
  * Function calls between the renderer and the agent. {@link com.google.a2ui.core.rpc.RpcHandler}
- * sends a call to the agent and completes its future with the response. {@link
- * com.google.a2ui.core.rpc.RpcScheduler} runs the timeout of a call, and {@link
- * com.google.a2ui.core.rpc.CallOptions} are the options of one call.
+ * runs a renderer function that the agent calls, and it sends a call to the agent and completes its
+ * future with the response. {@link com.google.a2ui.core.rpc.RpcScheduler} runs the timeout of a
+ * call to the agent, and {@link com.google.a2ui.core.rpc.CallOptions} are the options of one call.
  */
 package com.google.a2ui.core.rpc;

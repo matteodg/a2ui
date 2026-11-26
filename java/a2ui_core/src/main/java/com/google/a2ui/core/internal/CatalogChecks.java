@@ -148,6 +148,22 @@ public final class CatalogChecks {
   }
 
   /**
+   * Finds the problems of the arguments of a call of a function of this catalog. The method does
+   * not examine who makes the call. Thus it is correct for a call of the agent.
+   *
+   * @param name the name of a function of this catalog
+   * @param args the resolved arguments, as {@link Json#freeze(Object)} makes them
+   * @return the problems. The list is empty if the arguments agree with the schema of the function.
+   * @throws A2uiCatalogError if the schema of the function has a reference that names nothing
+   */
+  public List<Problem> argumentProblems(String name, Map<String, Object> args) {
+    Map<String, Object> call = Map.of("@call", name, "args", args);
+    List<Problem> found = engine.problems("/" + CALLS + "/" + Json.escapePointer(name), call);
+    // A problem of an argument makes each argument look unused. Only the cause is reported.
+    return found.stream().filter(problem -> !problem.followsFrom(found, property -> true)).toList();
+  }
+
+  /**
    * Examines each function call that is a node or is below a node.
    *
    * @param path the JSON Pointer of the node

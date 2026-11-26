@@ -457,7 +457,13 @@ public final class DataContext {
     String subject = "Function call '" + name + "'";
     Catalog<?, ?> catalog;
     if (catalogId instanceof String id) {
-      catalog = surface.resolveCatalog(id, subject);
+      // A function can name its own catalog. The agent can call a function of a catalog that the
+      // processor got after the creation of the surface. Thus the surface possibly does not have
+      // that catalog.
+      catalog =
+          callCatalog != null && callCatalog.id().equals(id)
+              ? callCatalog
+              : surface.resolveCatalog(id, subject);
     } else {
       catalog = inherited != null ? inherited : surface.resolveCatalog(null, subject);
     }
