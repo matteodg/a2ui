@@ -77,3 +77,11 @@
   implementations. `TextBinding` is in `com.google.a2ui.swing.binding`, and `FlexLayout` is in
   `com.google.a2ui.swing.catalog.basic`. The module does not have the views of the components of the
   basic catalog in this change.
+- Add `SwingBasicCatalog` in `com.google.a2ui.swing.catalog.basic`. It makes the basic catalog of
+  protocol v1.0 with Swing views for `Text`, `Row`, `Column`, `Button` and `TextField`. Each other
+  component of the catalog is declared and has no view in this change. Add
+  `SwingComponentImplementation.withoutView` and `hasView`, and the error type
+  `A2uiFallbackError.NO_VIEW`. Add `HeightForWidth` in `com.google.a2ui.swing.catalog` and
+  `FlexPanel` and `FlexLayout.preferredHeight` in `com.google.a2ui.swing.catalog.basic`. Thus text
+  that wraps gets its height in one layout pass. The default `markdown` service of `A2uiServices`
+  now shows the Markdown subset of the protocol. Before, it showed the text with its marks.

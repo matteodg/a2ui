@@ -7,10 +7,34 @@ module `java.desktop`.
 The module implements the A2UI protocol v1.0. The design obeys
 [blueprints/modules/a2ui_framework_adapter.blueprint.md](../../blueprints/modules/a2ui_framework_adapter.blueprint.md).
 
-This version has the foundations of the adapter: the surface component, the node dispatcher, the
-types for component implementations, the layout of the containers and the services. It does not
-have the views of the components of the basic catalog. A later version adds them. Until then, an
-application supplies its own component implementations.
+This version has the surface component, the node dispatcher, the types for component
+implementations, the layout of the containers, the services, and the basic catalog with the views of
+five components: `Text`, `Row`, `Column`, `Button` and `TextField`. A later version adds the views
+of the other components. See [the basic catalog](#the-basic-catalog).
+
+## Quick start
+
+```java
+SwingUtilities.invokeLater(() -> {
+  MessageProcessor<SwingComponentImplementation> processor =
+      new MessageProcessor<>(List.of(SwingBasicCatalog.create()));
+  A2uiSwing.install(processor);
+
+  JFrame frame = new JFrame("A2UI");
+  processor
+      .model()
+      .onSurfaceCreated()
+      .subscribe(surface -> {
+        frame.setContentPane(new A2uiSurface(surface));
+        frame.revalidate();
+      });
+  frame.setSize(480, 320);
+  frame.setVisible(true);
+
+  // Give each message of the agent to the processor.
+  processor.processMessages(message);
+});
+```
 
 ## Packages
 
@@ -21,12 +45,81 @@ The Java module name is `com.google.a2ui.swing`. It exports these packages:
 | `com.google.a2ui.swing.surface`       | `A2uiSurface`, the Swing component that shows one surface. `A2uiFallbacks` and `A2uiServices` are its options. `A2uiSwing` has the helpers for the event dispatch thread. `MountedNode` and `A2uiAccessibility` let a test or a tool examine what a surface shows. |
 | `com.google.a2ui.swing.catalog`       | `SwingComponentImplementation`, a component definition that makes a view. `SwingComponentView` is the view of one component. `ViewContext` and `ChildViews` are the objects that the adapter gives to a view.                                                      |
 | `com.google.a2ui.swing.binding`       | `TextBinding` connects a Swing text component to a property in the two directions.                                                                                                                                                                                 |
-| `com.google.a2ui.swing.catalog.basic` | `FlexLayout`, the layout of the `Row`, `Column` and `List` components of the basic catalog. A custom container can also use it.                                                                                                                                    |
+| `com.google.a2ui.swing.catalog.basic` | `SwingBasicCatalog` makes the basic catalog with its Swing views. `FlexLayout` and `FlexPanel` are the layout of the `Row`, `Column` and `List` components. A custom container can also use them.                                                                  |
 
 The package `com.google.a2ui.swing.nodes` has the node dispatcher and the child reconciliation. It
 is not part of the API, and the module does not export it.
 
-## Show a surface
+## The basic catalog
+
+`SwingBasicCatalog.create()` makes the basic catalog of protocol v1.0: the functions of the core
+with their code, and each component of the catalog document. `create(locale)` sets the locale of the
+format functions. `create(locale, services)` also takes the URL opener of the function `openUrl`
+from the services. Give the same services to the `A2uiSurface`.
+
+| Component       | Swing component                                                     | State     |
+| :-------------- | :------------------------------------------------------------------ | :-------- |
+| `Text`          | The view of the `markdown` service. The default is a `JEditorPane`. | Available |
+| `Row`           | `FlexPanel` with a horizontal `FlexLayout`                          | Available |
+| `Column`        | `FlexPanel` with a vertical `FlexLayout`                            | Available |
+| `Button`        | `JButton` with the view of the child in it                          | Available |
+| `TextField`     | `JTextField`, `JTextArea` in a `JScrollPane`, or `JPasswordField`   | Available |
+| `List`          | `FlexPanel` in a `JScrollPane`                                      | Later     |
+| `Card`          | A panel with a border                                               | Later     |
+| `Tabs`          | `JTabbedPane`                                                       | Later     |
+| `Modal`         | The `modalPresenter` service. The default is a `JDialog`.           | Later     |
+| `Divider`       | `JSeparator`                                                        | Later     |
+| `CheckBox`      | `JCheckBox`                                                         | Later     |
+| `ChoicePicker`  | `JCheckBox`, `JRadioButton` or `JToggleButton` for each option      | Later     |
+| `Slider`        | `JSlider`                                                           | Later     |
+| `DateTimeInput` | `JSpinner` with a date model                                        | Later     |
+| `Image`         | A component that paints the image of the `imageLoader` service      | Later     |
+| `Icon`          | A component that paints an icon                                     | Later     |
+| `Video`         | The view of the `mediaPlayer` service                               | Later     |
+| `AudioPlayer`   | The view of the `mediaPlayer` service                               | Later     |
+
+The Swing class of a component with the state "Later" is the plan, and it can change.
+
+A component with the state "Later" is in the catalog, and it has no view
+(`SwingComponentImplementation.withoutView`). Thus a message that uses it is correct. The surface
+shows its `error` fallback for it, with the error type `no-view`, or nothing. Then the component
+uses no layout space. The adapter reports nothing to the agent. `SwingBasicCatalog.viewNames()`
+gives the components that have a view.
+
+These rules apply to the views:
+
+- **Text.** The default Markdown view shows the Markdown subset of the protocol: headings, emphasis,
+  strong text, lists, code, quotes and rules. It shows HTML as plain text. It shows a link and an
+  image as their text only. The text breaks at the width of the component. The variant `caption`
+  has 0.8 times the font size and a weaker color.
+- **Text style.** The base font and the text color are those of the Swing component above a view.
+  Thus `surface.setFont(font)` and `surface.setForeground(color)` on the `A2uiSurface` set the text
+  style of the full surface. A button gives its text color to its content in the same way.
+- **Spacing.** A `Row` and a `Column` have no padding, no gap and no background. Each `Text`,
+  `Button` and `TextField` has a margin of 8 pixels on its four sides. Text in a button has no
+  margin. This is the leaf margin strategy of the implementation guide.
+- **Row and Column.** `justify`, `align` and the `weight` of each child go to the `FlexLayout`.
+  With the default `align`, `stretch`, a child fills the cross axis. Thus a button in a column is as
+  wide as the column. Use `align: start` for a button with its preferred width.
+- **Button.** The view calls the action in the Swing listener of the gesture. The variant `default`
+  is the button of the look and feel. The adapter paints `primary` with the accent color of the look
+  and feel, and `borderless` as a link. The user cannot operate a button while a check of the
+  severity `error` fails. The messages of the failed checks are the tool tip of the button.
+- **TextField.** The view writes each edit to the data model. The value that comes back does not
+  move the caret. The variant `number` accepts only the text of a decimal number. The messages of
+  the failed checks show below the control. A warning and an information are hints that do not stop
+  the user.
+
+To replace the view of one component, make a catalog with a different list:
+
+```java
+List<SwingComponentImplementation> components = new ArrayList<>(SwingBasicCatalog.components());
+components.replaceAll(component -> component.name().equals("Button") ? myButton : component);
+Catalog<SwingComponentImplementation, FunctionImplementation> catalog =
+    SwingBasicCatalog.create().withComponents(components);
+```
+
+## Show a surface with custom components
 
 A component implementation is a component definition of the core that can also make a Swing view.
 It is an entry of a catalog. Thus the adapter has no registry of its own.
@@ -234,6 +327,13 @@ The components that have a weight share the space that the other components do n
 proportion to their weights. `Justify.STRETCH` gives the free space to all the components in equal
 parts. Each enum reads the text of the basic catalog: `Justify.fromWire("spaceBetween")`.
 
+`getPreferredSize()` of a Swing component has no width as its input. Thus text that wraps has the
+preferred height of one line. A component whose height depends on its width implements
+`HeightForWidth`. `FlexLayout` gives such a component the height for the width that it gets, in the
+same layout pass. `FlexPanel` is a `JPanel` with a `FlexLayout` that implements `HeightForWidth`
+for its content. It is not opaque, and it takes its font and its foreground color from the component
+above it. Use `FlexPanel` for a custom container. Then the text below it wraps correctly.
+
 ## Fallbacks
 
 A component that did not arrive, a component of an unknown type and a reference that makes a cycle
@@ -258,7 +358,7 @@ service has a default. `A2uiServices.DEFAULT.withImageLoader(loader)` replaces o
 
 | Service          | Interface          | Default                                                                                         |
 | :--------------- | :----------------- | :---------------------------------------------------------------------------------------------- |
-| `markdown`       | `MarkdownRenderer` | Shows the text with its Markdown marks. The version that adds the `Text` component replaces it. |
+| `markdown`       | `MarkdownRenderer` | Shows the Markdown subset of the protocol in a `JEditorPane` that the user cannot edit.         |
 | `imageLoader`    | `ImageLoader`      | Reads `http`, `https` and `data` URLs with `ImageIO`, not on the EDT. It has no cache.          |
 | `mediaPlayer`    | `MediaPlayer`      | `MediaPlayer.NONE`. Swing cannot play media. An application can supply a JavaFX or vlcj player. |
 | `modalPresenter` | `ModalPresenter`   | Shows a modal `JDialog` above the window of the surface. It needs a display.                    |
@@ -289,13 +389,17 @@ It connects an `A2uiSurface` with a call of `addNotify()`, in a parent that is n
 Then `validate()` does the layout, and `print(Graphics)` paints the component on an image. The test
 helpers `Edt`, `Headless` and `Snapshots` in `src/test/java` do this work.
 
-`SurfaceSnapshotTest` writes PNG images of a surface to `target/snapshots/`. Look at the images
-after a change of a view or of a layout. The build does not compare them.
+`SurfaceSnapshotTest` and `BasicCatalogSnapshotTest` write PNG images of surfaces to
+`target/snapshots/`. The second test writes each surface in three look and feels: the look and feel
+of the test JVM, Nimbus and the look and feel of the system. Look at the images after a change of a
+view or of a layout. The build does not compare them.
 
 The conformance harness of this module has the name `swing`. It registers each suite of the
 `adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
-only if the adapter has a view for each basic catalog component that the case uses. In this version
-the adapter has no such view. Thus the harness records each case as skipped, with its reason. See
+only if the adapter has a view for each basic catalog component that the case uses. The harness
+records each other case as skipped, with the names of the absent views. In this version, 19 cases
+run: the 7 cases of the Markdown subset, 8 cases of the surface suite and 4 cases of the
+accessibility suite. The harness does not run the `axeCore` rules, which need a DOM. See
 [the conformance section](../README.md#conformance) for the commands.
 
 ## References
