@@ -23,8 +23,10 @@ import com.google.a2ui.core.catalog.FunctionImplementation;
 import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
+import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.expressions.Expression;
+import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.state.DataModel;
 import com.google.a2ui.core.state.SurfaceModel;
@@ -267,7 +269,7 @@ public final class DataContext {
    * @return the resolved value. Maps and lists are read-only.
    * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
    *     no code, that only the agent can call, or that requires a user gesture when there is none,
-   *     or if a function fails
+   *     or if the code of a function throws an exception that is not an {@code A2uiError}
    * @throws A2uiCatalogError if the surface cannot use the catalog that a call names, or if a call
    *     names no catalog and the surface has no default catalog
    * @throws A2uiDataError if the path of a binding is not correct
@@ -310,7 +312,7 @@ public final class DataContext {
    * @return the value of the part
    * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
    *     no code, that only the agent can call, or that requires a user gesture when there is none,
-   *     or if a function fails
+   *     or if the code of a function throws an exception that is not an {@code A2uiError}
    * @throws A2uiCatalogError if no function runs in this context and the surface has no default
    *     catalog
    * @throws A2uiDataError if a data path is not correct
@@ -393,9 +395,18 @@ public final class DataContext {
               + catalog.id()
               + "' has no implementation in this renderer.");
     }
-    return implementation.execute(
-        coerceArguments(function, arguments.get()),
-        new DataContext(surface, path, index, userActivated, catalog, reads));
+    Map<String, Object> resolved = coerceArguments(function, arguments.get());
+    DataContext scope = new DataContext(surface, path, index, userActivated, catalog, reads);
+    try {
+      return implementation.execute(resolved, scope);
+    } catch (A2uiError error) {
+      // The function ran and failed. This is not a call that the context refused.
+      throw ErrorFields.raisedByFunction(error);
+    } catch (RuntimeException error) {
+      // Each exception of the code of a function becomes one type of failure for the caller.
+      throw ErrorFields.raisedByFunction(
+          new A2uiExpressionError("Function '" + name + "' failed: " + error.getMessage(), error));
+    }
   }
 
   /** Runs a function that the protocol defines. Such a function is in no catalog. */

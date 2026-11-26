@@ -25,6 +25,8 @@ import java.util.Objects;
  * Writes the context of an {@link A2uiError}: the surface, the function call, the path, the
  * protocol error code and the details.
  *
+ * <p>The class also keeps one fact that is not public: the code of a function caused the error.
+ *
  * <p>Only the core writes the context of an error. The public API of the error can only read it.
  * The error class gives its writer to this class, because this package is not exported. Thus code
  * outside the module cannot change an error.
@@ -74,6 +76,21 @@ public final class ErrorFields {
      * @param details the problems of the failure
      */
     void details(A2uiError error, List<A2uiErrorDetail> details);
+
+    /**
+     * Records that the code of a function caused an error.
+     *
+     * @param error the error to change
+     */
+    void raisedByFunction(A2uiError error);
+
+    /**
+     * Tells if the code of a function caused an error.
+     *
+     * @param error the error to examine
+     * @return true if the code of a function caused the error
+     */
+    boolean isRaisedByFunction(A2uiError error);
   }
 
   /** The writer of the error class. The initialization of that class sets it. */
@@ -157,5 +174,29 @@ public final class ErrorFields {
   public static <E extends A2uiError> E details(E error, List<A2uiErrorDetail> details) {
     writer.details(error, details);
     return error;
+  }
+
+  /**
+   * Records that the code of a function caused the failure. Without this record, the failure is a
+   * call that the core refused before the function ran.
+   *
+   * @param <E> the type of the error
+   * @param error the error to change
+   * @return the same error
+   */
+  public static <E extends A2uiError> E raisedByFunction(E error) {
+    writer.raisedByFunction(error);
+    return error;
+  }
+
+  /**
+   * Tells if the code of a function caused the failure.
+   *
+   * @param error the error to examine
+   * @return true if a function ran and failed. The result is false for a call that the core refused
+   *     before the function ran.
+   */
+  public static boolean isRaisedByFunction(A2uiError error) {
+    return writer.isRaisedByFunction(error);
   }
 }

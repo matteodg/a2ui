@@ -66,6 +66,16 @@ public sealed class A2uiError extends RuntimeException
           public void details(A2uiError error, List<A2uiErrorDetail> details) {
             error.details = details.toArray(A2uiErrorDetail[]::new);
           }
+
+          @Override
+          public void raisedByFunction(A2uiError error) {
+            error.raisedByFunction = true;
+          }
+
+          @Override
+          public boolean isRaisedByFunction(A2uiError error) {
+            return error.raisedByFunction;
+          }
         });
   }
 
@@ -85,6 +95,12 @@ public sealed class A2uiError extends RuntimeException
 
   /** The problems of the failure. */
   private A2uiErrorDetail[] details = NO_DETAILS;
+
+  /**
+   * True if the code of a function caused this error. False for a call that the core refused before
+   * the function ran.
+   */
+  private boolean raisedByFunction;
 
   /**
    * Makes an error with a message.
