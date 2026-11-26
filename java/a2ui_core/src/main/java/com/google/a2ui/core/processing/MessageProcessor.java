@@ -611,10 +611,28 @@ public final class MessageProcessor<C extends ComponentApi> {
       body.put("path", error.path().orElse("/"));
     }
     body.put("message", error.getMessage() == null ? "" : error.getMessage());
+    if (ErrorFields.hasContextForAgent(error) && !LOCATED_CODES.contains(code)) {
+      // The code of a function or of a component gave the path and the details. The schema of an
+      // error with a located code permits no other property. The schema of each other error
+      // permits more properties.
+      error.path().ifPresent(path -> body.put("path", path));
+      if (!error.details().isEmpty()) {
+        body.put("details", error.details().stream().map(MessageProcessor::detailJson).toList());
+      }
+    }
     Map<String, Object> message = new LinkedHashMap<>();
     message.put("version", ProtocolVersion.V1_0.wireValue());
     message.put("error", Collections.unmodifiableMap(body));
     return Collections.unmodifiableMap(message);
+  }
+
+  /** Makes the JSON object of one problem of a failure. */
+  private static Map<String, Object> detailJson(A2uiErrorDetail detail) {
+    Map<String, Object> json = new LinkedHashMap<>();
+    json.put("path", detail.path());
+    json.put("code", detail.code());
+    json.put("message", detail.message());
+    return Collections.unmodifiableMap(json);
   }
 
   /** Gets the protocol error code of an error that has no code of its own. */

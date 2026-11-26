@@ -73,6 +73,43 @@ class A2uiErrorTest {
   }
 
   @Test
+  void customCodeGivesThePathAndTheDetailsToAConstructor() {
+    A2uiErrorDetail detail = new A2uiErrorDetail("/text", "type_mismatch", "not a string");
+    List<A2uiErrorDetail> details = new ArrayList<>(List.of(detail));
+    IllegalStateException cause = new IllegalStateException("cause");
+
+    A2uiExpressionError expression = new A2uiExpressionError("m", "/a", details);
+    A2uiValidationError validation = new A2uiValidationError("m", "/b", details, cause);
+    A2uiExpressionError noPath = new A2uiExpressionError("m", null, List.of(), cause);
+    details.clear();
+
+    assertEquals("m", expression.getMessage());
+    assertEquals(Optional.of("/a"), expression.path());
+    assertEquals(List.of(detail), expression.details());
+    assertNull(expression.getCause());
+    assertEquals(Optional.of("/b"), validation.path());
+    assertEquals(List.of(detail), validation.details());
+    assertSame(cause, validation.getCause());
+    assertTrue(noPath.path().isEmpty());
+    assertTrue(noPath.details().isEmpty());
+    assertSame(cause, noPath.getCause());
+    assertThrows(UnsupportedOperationException.class, () -> expression.details().clear());
+    // Only the core writes the other parts of the context.
+    assertTrue(expression.surfaceId().isEmpty());
+    assertTrue(expression.functionCallId().isEmpty());
+    assertTrue(expression.errorCode().isEmpty());
+  }
+
+  @Test
+  void aConstructorRefusesDetailsThatAreNull() {
+    List<A2uiErrorDetail> withNull = new ArrayList<>();
+    withNull.add(null);
+
+    assertThrows(NullPointerException.class, () -> new A2uiExpressionError("m", "/a", null));
+    assertThrows(NullPointerException.class, () -> new A2uiValidationError("m", "/a", withNull));
+  }
+
+  @Test
   void theCoreWritesTheContextOfAnError() {
     A2uiErrorDetail detail = new A2uiErrorDetail("/text", "type_mismatch", "not a string");
     A2uiValidationError error = new A2uiValidationError("m");

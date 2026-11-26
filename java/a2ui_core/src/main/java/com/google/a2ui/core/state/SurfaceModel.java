@@ -405,7 +405,8 @@ public final class SurfaceModel<C extends ComponentApi> {
    * method writes the ID of this surface on it.
    *
    * <p>The view of a component uses this method for a failure of its own that the agent must know
-   * about.
+   * about. The view can give a path and details to a constructor of {@code A2uiExpressionError} or
+   * of {@code A2uiValidationError}.
    *
    * @param error the error to report
    */

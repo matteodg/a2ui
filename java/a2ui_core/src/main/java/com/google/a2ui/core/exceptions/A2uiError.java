@@ -27,6 +27,11 @@ import java.util.Optional;
  * <p>An error can have a context: the surface, the function call, the path, the protocol error code
  * and the details. The core writes the context. For example, the message processor writes the
  * surface of the message that it rejects.
+ *
+ * <p>The code of a catalog function and the code of a component can give two parts of the context:
+ * the path and the details. They give them to a constructor of {@link A2uiExpressionError} or of
+ * {@link A2uiValidationError}. Only the core writes the surface, the function call and the protocol
+ * error code.
  */
 public sealed class A2uiError extends RuntimeException
     permits A2uiValidationError,
@@ -86,6 +91,11 @@ public sealed class A2uiError extends RuntimeException
           public boolean isFailedByAgent(A2uiError error) {
             return error.failedByAgent;
           }
+
+          @Override
+          public boolean hasContextForAgent(A2uiError error) {
+            return error.contextForAgent;
+          }
         });
   }
 
@@ -119,6 +129,12 @@ public sealed class A2uiError extends RuntimeException
   private boolean failedByAgent;
 
   /**
+   * True if the code that made this error gave its path and its details to a public constructor.
+   * The {@code error} message for the agent then has the path and the details.
+   */
+  private boolean contextForAgent;
+
+  /**
    * Makes an error with a message.
    *
    * @param message the description of the failure
@@ -147,6 +163,22 @@ public sealed class A2uiError extends RuntimeException
   A2uiError(String message, String path, Throwable cause) {
     super(message, cause);
     this.path = path;
+  }
+
+  /**
+   * Makes an error with a message, a path, details and a cause. The path and the details are for
+   * the agent: the {@code error} message has them.
+   *
+   * @param message the description of the failure
+   * @param path the location of the problem, or null
+   * @param details the problems of the failure. The error keeps a copy.
+   * @param cause the exception that caused this failure, or null
+   */
+  A2uiError(String message, String path, List<A2uiErrorDetail> details, Throwable cause) {
+    super(message, cause);
+    this.path = path;
+    this.details = List.copyOf(details).toArray(A2uiErrorDetail[]::new);
+    this.contextForAgent = true;
   }
 
   /**

@@ -25,12 +25,14 @@ import java.util.Objects;
  * Writes the context of an {@link A2uiError}: the surface, the function call, the path, the
  * protocol error code and the details.
  *
- * <p>The class also keeps two facts that are not public: the code of a function caused the error,
- * and the agent failed a call that the renderer sent to it.
+ * <p>The class also keeps three facts that are not public: the code of a function caused the error,
+ * the agent failed a call that the renderer sent to it, and the code that made the error gave its
+ * path and its details for the agent.
  *
- * <p>Only the core writes the context of an error. The public API of the error can only read it.
- * The error class gives its writer to this class, because this package is not exported. Thus code
- * outside the module cannot change an error.
+ * <p>Only the core writes the context of an error after the constructor. The public API of the
+ * error can only read it. Code outside the module can give only the path and the details, and only
+ * to a constructor. The error class gives its writer to this class, because this package is not
+ * exported. Thus code outside the module cannot change an error.
  *
  * <p>Each method returns its error. Thus a {@code throw} statement can make an error and write its
  * context in one expression.
@@ -107,6 +109,14 @@ public final class ErrorFields {
      * @return true if the agent caused the error
      */
     boolean isFailedByAgent(A2uiError error);
+
+    /**
+     * Tells if the code that made an error gave the path and the details for the agent.
+     *
+     * @param error the error to examine
+     * @return true if the {@code error} message for the agent must have the path and the details
+     */
+    boolean hasContextForAgent(A2uiError error);
   }
 
   /** The writer of the error class. The initialization of that class sets it. */
@@ -238,5 +248,17 @@ public final class ErrorFields {
    */
   public static boolean isFailedByAgent(A2uiError error) {
     return writer.isFailedByAgent(error);
+  }
+
+  /**
+   * Tells if the code that made the error gave its path and its details to a public constructor.
+   * The core does not send the path and the details that it writes itself, because the schema of
+   * the {@code error} message does not define them for each protocol error code.
+   *
+   * @param error the error to examine
+   * @return true if the {@code error} message for the agent must have the path and the details
+   */
+  public static boolean hasContextForAgent(A2uiError error) {
+    return writer.hasContextForAgent(error);
   }
 }
