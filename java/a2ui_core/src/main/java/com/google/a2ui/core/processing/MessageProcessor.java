@@ -124,10 +124,29 @@ public final class MessageProcessor<C extends ComponentApi> {
   /**
    * Gets the catalogs that this processor supports.
    *
-   * @return the catalogs by ID. The map is read-only.
+   * @return the catalogs by ID. The map is a read-only view, and it shows each catalog that {@link
+   *     #addCatalog(Catalog)} adds subsequently.
    */
   public Map<String, Catalog<C, ?>> catalogs() {
     return catalogsView;
+  }
+
+  /**
+   * Adds a catalog to the catalogs that this processor supports.
+   *
+   * <p>A surface that a subsequent {@code createSurface} message makes can use the catalog. Each
+   * surface that exists keeps the catalogs that it had at its creation.
+   *
+   * @param catalog the catalog to add
+   * @throws A2uiCatalogError if the processor already has a catalog with the same ID
+   */
+  public void addCatalog(Catalog<C, ?> catalog) {
+    Objects.requireNonNull(catalog, "catalog");
+    if (catalogs.containsKey(catalog.id())) {
+      throw new A2uiCatalogError(
+          "The processor already has a catalog with the id '" + catalog.id() + "'.");
+    }
+    catalogs.put(catalog.id(), catalog);
   }
 
   /**

@@ -475,6 +475,29 @@ class MessageProcessorTest {
   }
 
   @Test
+  void anAddedCatalogIsForTheSurfacesThatTheProcessorMakesSubsequently() {
+    Catalog<ComponentApi, FunctionApi> custom = customCatalog();
+    Map<String, Object> createCustom =
+        message("createSurface", "surfaceId", "late", "catalogId", "urn:custom");
+    processor.processMessages(create());
+    assertThrows(A2uiCatalogError.class, () -> processor.processMessages(createCustom));
+
+    processor.addCatalog(custom);
+    processor.processMessages(createCustom);
+
+    assertEquals(Set.of(BasicCatalog.ID, "urn:custom"), processor.catalogs().keySet());
+    assertEquals(Set.of(BasicCatalog.ID), surface().orElseThrow().availableCatalogs().keySet());
+    assertSame(
+        custom, processor.model().getSurface("late").orElseThrow().defaultCatalog().orElseThrow());
+    A2uiCatalogError error =
+        assertThrows(A2uiCatalogError.class, () -> processor.addCatalog(custom));
+    assertEquals(
+        "The processor already has a catalog with the id 'urn:custom'.", error.getMessage());
+    assertThrows(
+        UnsupportedOperationException.class, () -> processor.catalogs().remove("urn:custom"));
+  }
+
+  @Test
   void theRpcMessagesAreNotHandledYet() {
     Map<String, Object> call =
         Map.of("@call", "openUrl", "catalogId", BasicCatalog.ID, "args", Map.of("url", "u"));
