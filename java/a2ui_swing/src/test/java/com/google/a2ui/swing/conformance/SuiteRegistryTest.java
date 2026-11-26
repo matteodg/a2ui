@@ -91,9 +91,9 @@ class SuiteRegistryTest {
   void aCaseSkipsWithTheNamesOfTheBasicComponentsThatHaveNoView() {
     String reason =
         SuiteRegistry.skipReason(
-            surfaceCase("1.0", "Text", "Column", "StatusBadge"), SURFACE_SUITE);
+            surfaceCase("1.0", "Text", "Divider", "Card", "StatusBadge"), SURFACE_SUITE);
 
-    assertEquals("needs the Swing views of the basic catalog: Column, Text", reason);
+    assertEquals("needs the Swing views of the basic catalog: Card, Divider", reason);
   }
 
   @Test

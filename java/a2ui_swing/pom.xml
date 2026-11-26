@@ -66,6 +66,26 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>default-testCompile</id>
+            <configuration>
+              <!--
+                The conformance harness examines the messages for the agent with the JSON Schema
+                engine of the core, as the tests of the core do. The engine is not a part of the
+                API of the core. Thus only the test compilation gets its package.
+              -->
+              <compilerArgs combine.children="append">
+                <arg>--add-exports</arg>
+                <arg>com.google.a2ui.core/com.google.a2ui.core.internal=com.google.a2ui.swing</arg>
+              </compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <!-- The tests need no display. Thus they also run on a build server. -->

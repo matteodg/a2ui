@@ -17,6 +17,7 @@
 package com.google.a2ui.swing.conformance;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
+import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,10 +65,11 @@ final class SuiteRegistry {
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
   /**
-   * The components of the basic catalog that have a Swing view. This version of the adapter has
-   * none. The commit that adds the view of a component adds its name.
+   * The components of the basic catalog that have a Swing view: Text, Row, Column, Button and
+   * TextField in this version. The commit that adds the view of a component adds its name to the
+   * catalog.
    */
-  static final Set<String> BASIC_VIEWS = Set.of();
+  static final Set<String> BASIC_VIEWS = SwingBasicCatalog.viewNames();
 
   /** The start of the reason to skip a case that uses a basic component that has no view. */
   static final String NEEDS_BASIC_VIEWS = "needs the Swing views of the basic catalog";
@@ -86,8 +88,15 @@ final class SuiteRegistry {
 
   private static Map<String, SuiteSupport> adapterSuites() {
     Map<String, SuiteSupport> suites = new LinkedHashMap<>();
-    suites.put("core/adapter_conformance.yaml", new Supported(Set.of("render_surface"), Map.of()));
-    suites.put("core/accessibility.yaml", new Supported(Set.of("accessibility_check"), Map.of()));
+    suites.put(
+        "core/adapter_conformance.yaml",
+        new Supported(
+            Set.of("render_surface"), Map.of("render_surface", new RenderSurfaceHandler())));
+    suites.put(
+        "core/accessibility.yaml",
+        new Supported(
+            Set.of("accessibility_check"),
+            Map.of("accessibility_check", new AccessibilityCheckHandler())));
     suites.put(
         "adapter/markdown_subset.yaml",
         new Supported(
