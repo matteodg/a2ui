@@ -22,6 +22,7 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +49,7 @@ public final class CatalogSchemaIndex {
 
   private final Catalog<?, ?> catalog;
   private final Map<String, List<Map<String, Object>>> blocks = new HashMap<>();
+  private final Map<String, Set<String>> declared = new HashMap<>();
 
   /** The document of the catalog as its author wrote it, or null before the first use. */
   private Map<String, Object> authored;
@@ -83,6 +85,24 @@ public final class CatalogSchemaIndex {
       }
     }
     return false;
+  }
+
+  /**
+   * Gets the property names that the schema of a component type declares. The names of the {@code
+   * allOf}, {@code oneOf} and {@code anyOf} members and of the local definitions that the schema
+   * refers to are part of the result.
+   *
+   * @param type the name of the component type
+   * @return the names. The set is empty if the catalog does not define the type.
+   */
+  public Set<String> declaredProperties(String type) {
+    return declared.computeIfAbsent(
+        type,
+        name -> {
+          Set<String> names = new LinkedHashSet<>();
+          propertyBlocks(name).forEach(block -> names.addAll(block.keySet()));
+          return names;
+        });
   }
 
   /**

@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Finds the problems of one component or of one function call against one v1.0 catalog.
@@ -49,8 +50,17 @@ public final class CatalogChecks {
   /** The member of the engine document that has the schema of a full call of each function. */
   private static final String CALLS = "x-a2ui-calls";
 
+  /** The properties that the envelope of each component declares. */
+  private static final Set<String> ENVELOPE =
+      Set.copyOf(
+          Json.asObject(
+                  Json.asObject(SchemaReferences.validationTypes().get("ComponentCommon"))
+                      .get("properties"))
+              .keySet());
+
   private final Catalog<?, ?> catalog;
   private final JsonSchemaEngine engine;
+  private final CatalogSchemaIndex index;
 
   /**
    * Makes the checks for one catalog.
@@ -62,6 +72,7 @@ public final class CatalogChecks {
   public CatalogChecks(Catalog<?, ?> catalog) {
     this.catalog = Objects.requireNonNull(catalog, "catalog");
     this.engine = new JsonSchemaEngine(engineDocument(catalog));
+    this.index = new CatalogSchemaIndex(catalog);
   }
 
   /**
@@ -82,7 +93,16 @@ public final class CatalogChecks {
       return errors;
     }
     if (catalog.components().containsKey(type)) {
-      errors.addAll(engine.problems("/" + COMPONENTS + "/" + Json.escapePointer(type), component));
+      List<Problem> found =
+          engine.problems("/" + COMPONENTS + "/" + Json.escapePointer(type), component);
+      // A problem of the schema of the type or of the envelope makes each of its properties look
+      // unused. Only the cause is reported.
+      Set<String> declared = index.declaredProperties(type);
+      for (Problem problem : found) {
+        if (!problem.followsFrom(found, name -> isDeclared(declared, name))) {
+          errors.add(problem);
+        }
+      }
     } else if (!allowUnknown) {
       errors.add(
           new Problem(
@@ -228,9 +248,18 @@ public final class CatalogChecks {
       }
       return;
     }
-    engine
-        .problems("/" + CALLS + "/" + Json.escapePointer(name), call)
-        .forEach(problem -> errors.add(problem.under(path)));
+    // A problem of an argument makes each argument look unused. Only the cause is reported.
+    List<Problem> found = engine.problems("/" + CALLS + "/" + Json.escapePointer(name), call);
+    for (Problem problem : found) {
+      if (!problem.followsFrom(found, property -> true)) {
+        errors.add(problem.under(path));
+      }
+    }
+  }
+
+  /** Tells if the schema of a component type or the component envelope declares a property. */
+  private static boolean isDeclared(Set<String> declaredByType, String name) {
+    return name.equals("component") || declaredByType.contains(name) || ENVELOPE.contains(name);
   }
 
   /** Makes a problem of a call that is not a problem of a schema. */

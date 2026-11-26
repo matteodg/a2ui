@@ -17,6 +17,7 @@
 package com.google.a2ui.core.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
@@ -98,6 +99,61 @@ class CatalogChecksTest {
     assertEquals(
         List.of("/1/a: unknown system function '@now'"),
         texts(checks.nestedCallProblems(value, true, true)));
+  }
+
+  @Test
+  void aProblemOfAPropertyIsReportedWithoutTheUnusedPropertiesThatFollowFromIt() {
+    Map<String, Object> text = Json.freezeObject(Map.of("id", "t", "component", "Text", "text", 5));
+
+    List<Problem> problems = checks.componentProblems(text, true, false);
+
+    assertFalse(problems.isEmpty());
+    assertTrue(
+        problems.stream().allMatch(problem -> problem.path().equals("/text")), problems.toString());
+    assertTrue(problems.stream().noneMatch(Problem::unevaluated), problems.toString());
+  }
+
+  @Test
+  void anAbsentPropertyAndAnUnknownPropertyHaveTheirOwnPath() {
+    Map<String, Object> absent = Json.freezeObject(Map.of("id", "t", "component", "Text"));
+    Map<String, Object> unknown =
+        Json.freezeObject(Map.of("id", "t", "component", "Text", "text", "x", "bogus", 1));
+
+    List<Problem> missing = checks.componentProblems(absent, true, false);
+    List<Problem> extra = checks.componentProblems(unknown, true, false);
+
+    assertEquals(1, missing.size(), missing.toString());
+    assertEquals("/text", missing.get(0).path());
+    assertEquals(Problem.MISSING_FIELD, missing.get(0).code());
+    assertEquals(1, extra.size(), extra.toString());
+    assertEquals("/bogus", extra.get(0).path());
+    assertEquals(Problem.INVALID_VALUE, extra.get(0).code());
+  }
+
+  @Test
+  void aProblemOfTheEnvelopeIsReportedWithoutTheUnusedPropertiesThatFollowFromIt() {
+    Map<String, Object> text =
+        Json.freezeObject(
+            Map.of("id", "t", "component", "Text", "text", "x", "@metadata", Map.of("bogus", 1)));
+
+    List<Problem> problems = checks.componentProblems(text, true, false);
+
+    assertEquals(1, problems.size(), problems.toString());
+    assertEquals("/@metadata/bogus", problems.get(0).path());
+  }
+
+  @Test
+  void aProblemOfAnArgumentIsReportedWithoutTheUnusedPropertiesThatFollowFromIt() {
+    Map<String, Object> call =
+        Json.freezeObject(
+            Map.of("@call", "formatDate", "args", Map.of("value", "now", "format", 5)));
+
+    List<Problem> problems = checks.nestedCallProblems(Map.of("label", call), true, false);
+
+    assertFalse(problems.isEmpty());
+    assertTrue(
+        problems.stream().allMatch(problem -> problem.path().equals("/label/args/format")),
+        problems.toString());
   }
 
   private static List<String> texts(List<Problem> problems) {

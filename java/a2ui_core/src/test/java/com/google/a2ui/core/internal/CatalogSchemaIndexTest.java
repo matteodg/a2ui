@@ -26,10 +26,20 @@ import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.internal.CatalogSchemaIndex.ChildReference;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class CatalogSchemaIndexTest {
   private final CatalogSchemaIndex basic = new CatalogSchemaIndex(BasicCatalog.api());
+
+  @Test
+  void declaredPropertiesHasTheNamesOfTheSchemaAndOfItsLocalDefinitions() {
+    Set<String> text = basic.declaredProperties("Text");
+
+    assertTrue(text.containsAll(Set.of("component", "text", "variant", "weight")), text.toString());
+    assertFalse(text.contains("children"), text.toString());
+    assertEquals(Set.of(), basic.declaredProperties("Mystery"));
+  }
 
   @Test
   void childrenFindsTheIdsOfAStaticChildList() {
