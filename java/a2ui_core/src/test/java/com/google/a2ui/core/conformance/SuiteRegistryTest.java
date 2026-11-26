@@ -135,6 +135,25 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void anUnsupportedKeyPathWithAValueSkipsOnlyTheCasesThatSetThatValue() {
+    Supported supported =
+        new Supported(
+            Map.of(),
+            SuiteRegistry.reasons("run.function=regex", "later", "run.args.n=1", "one"),
+            Set.of());
+    ConformanceCase regex = caseOf(Map.of("name", "a", "action", "run", "function", "regex"));
+    ConformanceCase email = caseOf(Map.of("name", "b", "action", "run", "function", "email"));
+    ConformanceCase noFunction = caseOf(Map.of("name", "c", "action", "run"));
+    ConformanceCase number =
+        caseOf(Map.of("name", "d", "action", "run", "function", "email", "args", Map.of("n", 1)));
+
+    assertEquals("later", SuiteRegistry.skipReason(regex, supported));
+    assertNull(SuiteRegistry.skipReason(email, supported));
+    assertNull(SuiteRegistry.skipReason(noFunction, supported));
+    assertEquals("one", SuiteRegistry.skipReason(number, supported));
+  }
+
+  @Test
   void eachSkippedNameIsTheNameOfACase() {
     Set<String> unknown = new TreeSet<>(SuiteRegistry.SKIP_TEST_NAMES.keySet());
     SuiteRegistry.CORE_SUITES
