@@ -28,6 +28,7 @@ import com.google.a2ui.core.exceptions.A2uiParseError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
 import com.google.a2ui.core.exceptions.A2uiStateError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -64,10 +65,11 @@ final class ExpectedErrors {
   /**
    * Runs a block and fails if it does not throw the expected error.
    *
-   * <p>The error must be an instance of the class for the {@code category}. Its message must
-   * contain the text {@code message}, or a match for {@code message} as a regular expression.
+   * <p>The error must be an instance of a class for the {@code category}. An expectation with no
+   * category accepts each SDK error. The message of the error must contain the text {@code
+   * message}, or a match for {@code message} as a regular expression.
    *
-   * @param expectError the expectation of the case
+   * @param expectError the expectation of the case: an object, or only the message as a string
    * @param where the location for failure messages
    * @param categories the classes that replace the default class for some categories
    * @param block the code to run
@@ -75,34 +77,46 @@ final class ExpectedErrors {
   static void assertRaises(
       Object expectError,
       String where,
-      Map<String, Class<? extends A2uiError>> categories,
+      Map<String, List<Class<? extends A2uiError>>> categories,
       Block block)
       throws Exception {
-    Map<String, Object> expected = asObject(expectError, "expectError in " + where);
+    Map<String, Object> expected =
+        expectError instanceof String message
+            ? Map.of("message", message)
+            : asObject(expectError, "expectError in " + where);
     KnownKeys.assertKnownKeys(expected, EXPECT_ERROR_KEYS, "expectError in " + where);
-    String category = asString(expected.get("category"), "expectError.category in " + where);
-    Class<? extends A2uiError> errorClass =
-        categories.getOrDefault(category, ERROR_CATEGORIES.get(category));
-    if (errorClass == null) {
+    String category =
+        expected.get("category") == null
+            ? null
+            : asString(expected.get("category"), "expectError.category in " + where);
+    List<Class<? extends A2uiError>> errorClasses;
+    if (category == null) {
+      errorClasses = List.of(A2uiError.class);
+    } else if (categories.containsKey(category)) {
+      errorClasses = categories.get(category);
+    } else if (ERROR_CATEGORIES.containsKey(category)) {
+      errorClasses = List.of(ERROR_CATEGORIES.get(category));
+    } else {
       throw new AssertionError("Unknown error category '" + category + "' in " + where);
     }
 
-    A2uiError thrown = null;
+    A2uiError caught = null;
     try {
       block.run();
     } catch (A2uiError e) {
-      thrown = e;
+      caught = e;
     }
-    if (thrown == null) {
+    if (caught == null) {
       throw new AssertionError(where + ": expected " + category + " but nothing was thrown");
     }
-    if (!errorClass.isInstance(thrown)) {
+    A2uiError thrown = caught;
+    if (errorClasses.stream().noneMatch(errorClass -> errorClass.isInstance(thrown))) {
       throw new AssertionError(
           where
               + ": expected "
               + category
               + " ("
-              + errorClass.getSimpleName()
+              + errorClasses.stream().map(Class::getSimpleName).toList()
               + ") but got "
               + thrown,
           thrown);

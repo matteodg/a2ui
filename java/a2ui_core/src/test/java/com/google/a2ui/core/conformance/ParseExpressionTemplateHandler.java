@@ -48,8 +48,8 @@ final class ParseExpressionTemplateHandler implements CaseHandler {
           "input");
 
   /** The suite uses the category {@code ParseError} for a template that is not correct. */
-  private static final Map<String, Class<? extends A2uiError>> CATEGORIES =
-      Map.of("ParseError", A2uiExpressionError.class);
+  private static final Map<String, List<Class<? extends A2uiError>>> CATEGORIES =
+      Map.of("ParseError", List.of(A2uiExpressionError.class));
 
   @Override
   public void run(ConformanceCase testCase) throws Exception {
