@@ -10,21 +10,21 @@ The module implements the A2UI protocol v1.0. The design obeys
 
 The Java module name is `com.google.a2ui.core`. It exports these packages:
 
-| Package                                   | Contents                                                                                          |
-| :---------------------------------------- | :------------------------------------------------------------------------------------------------ |
-| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these.                         |
-| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                  |
-| `com.google.a2ui.core.state`              | `DataModel`, the observable store of the data of one surface.                                     |
-| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                            |
-| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents.       |
-| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog. |
-| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                           |
+| Package                                   | Contents                                                                                                             |
+| :---------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these.                                            |
+| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                                     |
+| `com.google.a2ui.core.state`              | `DataModel`, the observable store of the data of one surface.                                                        |
+| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                               |
+| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents.                          |
+| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog.                    |
+| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                              |
+| `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain message processing, validation, function implementations and node
-resolution.
+The core does not yet contain message processing, function implementations and node resolution.
 
 ## Threads
 
@@ -105,6 +105,31 @@ and the permitted `$ref` targets. A document that does not obey a rule causes an
 The build copies the basic catalog from `catalogs/basic/v1/` and the schemas from
 `specification/v1_0/json/` into the JAR file. Thus the SDK does not contain a copy that a person can
 edit.
+
+## Validation
+
+`Catalog.validationSchema` gives a v1.0 catalog as one self-contained JSON Schema document. Each
+`$ref` in it is local. Each component is one object schema that has the content of its `allOf`
+mixins. `$defs` has each common type that the schema uses.
+
+`PayloadValidator` examines one component or one function call against one v1.0 catalog.
+`CommonTypeValidator` examines a value against one common type, for example `DynamicString`. A
+value that is not correct causes an `A2uiValidationError`. Its message lists each problem.
+
+```java
+PayloadValidator validator = new PayloadValidator(BasicCatalog.api());
+validator.validateComponent(Map.of("id", "title", "component", "Text", "text", "Hello"));
+validator.validateFunction("openUrl", Map.of("url", "https://example.com"));
+
+CommonTypeValidator.validate("DynamicBoolean", true);
+```
+
+A surface can use more than one catalog. A validator fully examines a nested function call only if
+the call runs in the catalog of the validator. For each other call, it examines the structure and
+the names only.
+
+The validators read nothing from the disk or from the network. The JSON Schema library and Jackson
+are not part of the API.
 
 ## Tests
 
