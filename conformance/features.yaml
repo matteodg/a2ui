@@ -370,6 +370,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
   uncovered:
     Covered by renderer accessibility conformance suite (conformance/core/accessibility.yaml)
     under F-RND-15.
@@ -403,6 +404,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
   uncovered: Architectural boundary verified by transport extension suites and live
     E2E agent-renderer pairs rather than isolated core YAML cases.
 - id: F-CORE-37
@@ -426,6 +428,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case is for an
+      earlier version or is a timing case of the performance job.
 - id: F-CORE-39
   title: RPC execution lifecycle safeguards (timeoutMs, maxPendingCalls, and userActivation
     gating)
@@ -457,6 +463,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case uses a
+      v0.9.1 fixture. NodeScenariosTest runs the fixtures as v1.0 outside the manifest.
 - id: F-CORE-42
   title: Canonical error codes and structured ValidationError reporting
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#standard-validation-error-format
@@ -1447,6 +1457,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
   uncovered: Covered by per-framework gallery integration tests and Playwright live-pair
     suites.
 - id: F-BP-16
