@@ -75,6 +75,15 @@
       <artifactId>snakeyaml-engine</artifactId>
       <scope>test</scope>
     </dependency>
+    <!--
+      The JSON Schema validator brings slf4j-api. This provider discards the log output of the
+      tests. Without a provider, SLF4J prints a warning in each test run.
+    -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
