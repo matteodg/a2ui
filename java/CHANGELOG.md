@@ -64,6 +64,10 @@
   update, if the validation configuration accepts dangling references and orphans.
 - Add `Catalog.withComponents` in `com.google.a2ui.core.catalog`. It makes a catalog with other
   components, for example the components of a framework adapter that have a view.
+- Add the component `userActivation` to `ActionDispatchOptions`, with the constant
+  `WITHOUT_USER_ACTIVATION` and the method `withUserActivation`. A `NodeAction` that code calls with
+  no user gesture does not run a function that requires one. The constructor with one argument
+  stays.
 - Add `a2ui-java-swing`, the Swing adapter of the SDK, with its foundations. `A2uiSurface` shows one
   `SurfaceModel`. `A2uiFallbacks`, `A2uiServices` and `A2uiSwing` are in
   `com.google.a2ui.swing.surface`. `SwingComponentImplementation`, `SwingComponentView`,

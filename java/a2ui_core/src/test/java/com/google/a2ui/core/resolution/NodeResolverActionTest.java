@@ -143,6 +143,53 @@ class NodeResolverActionTest {
   }
 
   @Test
+  void aFunctionActionWithNoUserGestureDoesNotRunAFunctionThatRequiresOne() {
+    ComponentNode<ComponentApi> root = button(Map.of(), open("https://example.com/a"));
+
+    action(root).invoke(ActionDispatchOptions.WITHOUT_USER_ACTIVATION);
+
+    assertEquals(List.of(), fixture.opened);
+    assertEquals(List.of(), fixture.actions);
+    assertEquals(1, fixture.errors.size());
+    A2uiError error = fixture.errors.getFirst();
+    assertInstanceOf(A2uiExpressionError.class, error);
+    assertTrue(error.getMessage().contains("openUrl"), error.getMessage());
+    assertEquals(Optional.of("EXPRESSION_ERROR"), error.errorCode());
+    assertEquals(Optional.of("s"), error.surfaceId());
+
+    // The same action runs the function when the options tell that the user operated the view.
+    action(root).invoke(ActionDispatchOptions.WITHOUT_USER_ACTIVATION.withUserActivation(true));
+
+    assertEquals(List.of(URI.create("https://example.com/a")), fixture.opened);
+    assertEquals(1, fixture.errors.size());
+  }
+
+  @Test
+  void anEventActionWithNoUserGestureReportsItsActionAndKeepsItsMetadata() {
+    ComponentNode<ComponentApi> root = button(Map.of(), Map.of("event", Map.of("name", "save")));
+    A2uiMetadata metadata = new A2uiMetadata(Optional.of(Map.of("com_example_signed", true)));
+
+    action(root).invoke(ActionDispatchOptions.withMetadata(metadata).withUserActivation(false));
+
+    assertEquals(1, fixture.actions.size());
+    assertEquals(Optional.of(metadata), fixture.actions.getFirst().metadata());
+    assertEquals(List.of(), fixture.errors);
+  }
+
+  @Test
+  void theOptionsOfACallAreTheResultOfAUserGestureUnlessTheyTellTheOpposite() {
+    A2uiMetadata metadata = new A2uiMetadata(Optional.of(Map.of("com_example_signed", true)));
+
+    assertTrue(ActionDispatchOptions.NONE.userActivation());
+    assertTrue(ActionDispatchOptions.withMetadata(metadata).userActivation());
+    assertTrue(new ActionDispatchOptions(Optional.of(metadata)).userActivation());
+    assertEquals(Optional.empty(), ActionDispatchOptions.WITHOUT_USER_ACTIVATION.metadata());
+    assertEquals(
+        new ActionDispatchOptions(Optional.empty(), false),
+        ActionDispatchOptions.WITHOUT_USER_ACTIVATION);
+  }
+
+  @Test
   void aFunctionActionThatFailsReportsItsFailure() {
     ComponentNode<ComponentApi> root = button(Map.of(), open("https://example.com/a"));
     int[] emissions = countProps(root);

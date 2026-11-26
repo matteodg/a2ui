@@ -535,7 +535,9 @@ fallback view for each node where `isPlaceholder()` is true.
 **Actions.** A view calls `NodeAction.invoke()` when the user operates the component. An event
 action resolves its context at that time and the surface reports a `RendererAction` to `onAction`.
 `SurfaceGroupModel.onAction()` gives the actions of all the surfaces. A function call action runs
-the function and reports no action. Each action runs with user activation.
+the function and reports no action. A call counts as the result of a user gesture. Code that calls
+an action with no gesture uses `invoke(ActionDispatchOptions.WITHOUT_USER_ACTIVATION)`. Then a
+function that requires a user gesture does not run, and the surface reports an `EXPRESSION_ERROR`.
 `invoke(ActionDispatchOptions.withMetadata(metadata))` sends an `action.metadata` with the event. If
 a key of its extensions is not a UAX #31 identifier, `invoke` throws an `A2uiValidationError`.
 

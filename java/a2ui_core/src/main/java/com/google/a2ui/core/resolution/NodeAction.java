@@ -38,6 +38,11 @@ import com.google.a2ui.core.exceptions.A2uiValidationError;
  *   <li>{@code CATALOG_ERROR}: the surface cannot use the catalog of a call.
  * </ul>
  *
+ * <p>A call counts as the result of a gesture of the user, because a view calls the action in the
+ * listener of the gesture. Thus a function that requires a user gesture can run. Code that calls an
+ * action with no gesture gives {@link ActionDispatchOptions#WITHOUT_USER_ACTIVATION}. Then such a
+ * function does not run, and the surface reports an {@code EXPRESSION_ERROR}.
+ *
  * <p>Metadata that is not correct is an error of the caller. Thus the action throws it.
  */
 @FunctionalInterface
@@ -51,7 +56,7 @@ public interface NodeAction {
    */
   void invoke(ActionDispatchOptions options);
 
-  /** Does the action with no options. */
+  /** Does the action as the result of a user gesture, with no metadata. */
   default void invoke() {
     invoke(ActionDispatchOptions.NONE);
   }

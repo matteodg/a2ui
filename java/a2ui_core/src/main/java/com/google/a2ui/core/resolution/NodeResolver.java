@@ -628,13 +628,13 @@ public final class NodeResolver<C extends ComponentApi> {
         return;
       }
       // The action resolves its values at this time, not at the time of the node. Thus it reports
-      // the data as it is now. The user operated the component. Thus a call can require a user
-      // gesture.
+      // the data as it is now. A view calls the action when the user operates the component. Thus
+      // a call can require a user gesture, unless the options tell that there is none.
       ActionRunner.run(
           surface,
           node.dataPath(),
           node.index(),
-          true,
+          options.userActivation(),
           payload,
           node.componentId(),
           options.metadata().orElse(null));
