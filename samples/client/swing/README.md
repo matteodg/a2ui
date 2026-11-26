@@ -134,8 +134,9 @@ The screenshot mode is a test of the adapter in a real window. It needs a displa
 
 The program opens the window and shows the example. If the properties are there, it changes the
 look and feel (`gallery.laf`) and then the size of the window (`gallery.size`), as a user does at
-run time. After each step, it waits until the event dispatch thread is idle. Then it writes an image
-of the window to the file and stops.
+run time. After each step, it waits until the event dispatch thread is idle. It also waits for the
+images of the example, for 40 seconds at most. Then it writes an image of the window to the file
+and stops. The last line of the output tells how many images loaded.
 
 If the event dispatch thread is not idle after 10 seconds, the program stops with a message and
 with the exit code 2. This occurs when a layout requests a new layout without end.

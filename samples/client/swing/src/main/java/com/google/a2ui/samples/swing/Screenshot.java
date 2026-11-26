@@ -41,7 +41,8 @@ import javax.swing.ToolTipManager;
 
 /**
  * The screenshot mode of the gallery. It opens the window, shows one example, waits until the event
- * dispatch thread has no more work, writes an image of the window and closes the window.
+ * dispatch thread has no more work and the image loader has no more requests, writes an image of
+ * the window and closes the window.
  *
  * <p>The mode is a test of the adapter in a window. A layout that requests a new layout without end
  * keeps the event dispatch thread busy. Then the mode fails with a message.
@@ -52,6 +53,9 @@ final class Screenshot {
 
   /** The time in which the event dispatch thread must become idle. */
   private static final long TIMEOUT_NANOS = 10_000_000_000L;
+
+  /** The longest time that the mode waits for the images of the example. */
+  private static final long IMAGES_NANOS = 40_000_000_000L;
 
   private Screenshot() {}
 
@@ -108,6 +112,7 @@ final class Screenshot {
       throw new IllegalStateException("The gallery has no examples.");
     }
     options.lookAndFeel().ifPresent(LookAndFeels::className);
+    CountingImageLoader images = new CountingImageLoader(A2uiServices.DEFAULT.imageLoader());
     CountingQueue queue = new CountingQueue();
     Toolkit.getDefaultToolkit().getSystemEventQueue().push(queue);
     long start = System.nanoTime();
@@ -116,7 +121,9 @@ final class Screenshot {
       // The mouse pointer of the user can be on the window. A tool tip must not be in the image.
       ToolTipManager.sharedInstance().setEnabled(false);
       LookAndFeels.apply(LookAndFeels.SYSTEM, null);
-      window[0] = new GalleryFrame(examples, A2uiServices.DEFAULT, LookAndFeels.SYSTEM);
+      window[0] =
+          new GalleryFrame(
+              examples, A2uiServices.DEFAULT.withImageLoader(images), LookAndFeels.SYSTEM);
       window[0].frame().setVisible(true);
     });
     GalleryFrame frame = window[0];
@@ -141,6 +148,8 @@ final class Screenshot {
             });
       });
       awaitIdle(queue, "after the selection of the example '" + example + "'");
+      awaitImages(images);
+      awaitIdle(queue, "after the images of the example '" + example + "'");
       if (options.lookAndFeel().isPresent()) {
         onEdt(() -> frame.setLookAndFeel(options.lookAndFeel().get()));
         awaitIdle(queue, "after the change of the look and feel");
@@ -161,7 +170,11 @@ final class Screenshot {
               + events
               + " events, "
               + millis
-              + " ms.");
+              + " ms, "
+              + images.loaded()
+              + " images, "
+              + (images.failed() + images.pending())
+              + " images that did not load.");
     } finally {
       onEdt(() -> frame.frame().dispose());
     }
@@ -210,6 +223,22 @@ final class Screenshot {
       ImageIO.write(image, "png", file.toFile());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Waits until the image loader has no more requests. An image that does not arrive in the time
+   * limit does not stop the mode: the image of the window then shows the area of that image.
+   */
+  private static void awaitImages(CountingImageLoader images) {
+    long start = System.nanoTime();
+    while (images.pending() > 0 && System.nanoTime() - start < IMAGES_NANOS) {
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("The wait for the images stopped.", e);
+      }
     }
   }
 
