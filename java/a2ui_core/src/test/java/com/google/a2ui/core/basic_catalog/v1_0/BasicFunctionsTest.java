@@ -146,6 +146,40 @@ class BasicFunctionsTest {
   }
 
   @Test
+  void theLogicFunctionsReadTheResultOfAValidationCallByItsValidity() {
+    Map<String, Object> present = call("required", "value", "x");
+    Map<String, Object> absent = call("required", "value", "");
+
+    assertEquals(true, evaluate("and", "values", List.of(present, present)));
+    assertEquals(false, evaluate("and", "values", List.of(present, absent)));
+    assertEquals(true, evaluate("or", "values", List.of(absent, present)));
+    assertEquals(false, evaluate("or", "values", List.of(absent, absent)));
+    assertEquals(true, evaluate("not", "value", absent));
+    assertEquals(false, evaluate("not", "value", call("not", "value", absent)));
+  }
+
+  @Test
+  void theLogicFunctionsCoerceTheOperandsOfADirectCall() {
+    Map<String, FunctionImplementation> functions = BasicCatalog.withFunctions().functions();
+    List<Object> mixed = List.of("TRUE", 2, Map.of("valid", true));
+
+    assertEquals(true, functions.get("and").execute(Map.of("values", mixed), context()));
+    assertEquals(
+        false, functions.get("or").execute(Map.of("values", List.of("yes", 0)), context()));
+    assertEquals(true, functions.get("not").execute(Map.of(), context()));
+  }
+
+  @Test
+  void andAndOrRequireTwoValues() {
+    for (String name : List.of("and", "or")) {
+      assertThrows(A2uiExpressionError.class, () -> evaluate(name, "values", List.of(true)));
+      assertThrows(A2uiExpressionError.class, () -> evaluate(name, "values", true));
+      A2uiExpressionError error = assertThrows(A2uiExpressionError.class, () -> evaluate(name));
+      assertEquals("The '" + name + "' function requires at least 2 values.", error.getMessage());
+    }
+  }
+
+  @Test
   void aFunctionThatTheSdkDoesNotImplementFailsWhenItRuns() {
     A2uiExpressionError error =
         assertThrows(

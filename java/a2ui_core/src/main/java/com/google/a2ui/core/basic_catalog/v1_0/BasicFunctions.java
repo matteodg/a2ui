@@ -18,11 +18,13 @@ package com.google.a2ui.core.basic_catalog.v1_0;
 
 import com.google.a2ui.core.catalog.FunctionBody;
 import com.google.a2ui.core.common.Coercion;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /** The code of the functions of the basic catalog. */
 final class BasicFunctions {
@@ -50,7 +52,23 @@ final class BasicFunctions {
     bodies.put(
         "numeric", (args, context) -> numeric(args.get("value"), args.get("min"), args.get("max")));
     bodies.put("email", (args, context) -> email(args.get("value")));
+    bodies.put(
+        "and",
+        (args, context) -> operands("and", args.get("values")).allMatch(Coercion::toBoolean));
+    bodies.put(
+        "or", (args, context) -> operands("or", args.get("values")).anyMatch(Coercion::toBoolean));
+    bodies.put("not", (args, context) -> !Coercion.toBoolean(args.get("value")));
     return bodies;
+  }
+
+  // Logic. Each operand is a boolean after the rules of `Coercion.toBoolean`. Thus the validation
+  // result of a validation function is an operand.
+
+  private static Stream<?> operands(String name, Object values) {
+    if (values instanceof Collection<?> list && list.size() >= 2) {
+      return list.stream();
+    }
+    throw new A2uiExpressionError("The '" + name + "' function requires at least 2 values.");
   }
 
   // Validation. Each function returns a validation result: an object with a boolean `valid`, and
