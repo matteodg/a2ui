@@ -181,7 +181,7 @@ class SurfaceModelTest {
     Instant before = Instant.now();
 
     surface.dispatchAction(
-        Map.of("event", Map.of("name", "submit", "context", context, "userMessage", 7L)), "save");
+        Map.of("event", Map.of("name", "submit", "context", context, "userMessage", "Go")), "save");
 
     assertEquals(1, actions.size());
     RendererAction action = actions.getFirst();
@@ -191,13 +191,28 @@ class SurfaceModelTest {
     assertFalse(action.timestamp().isBefore(before));
     assertEquals(context, action.context());
     assertThrows(UnsupportedOperationException.class, () -> action.context().put("x", 1L));
-    assertEquals(Optional.of("7"), action.userMessage());
+    assertEquals(Optional.of("Go"), action.userMessage());
     assertEquals(Optional.empty(), action.catalogId());
     assertEquals(Optional.empty(), action.metadata());
     assertEquals(
         List.of("name", "userMessage", "surfaceId", "sourceComponentId", "timestamp", "context"),
         List.copyOf(action.toJson().keySet()));
     assertEquals(action.timestamp().toString(), action.toJson().get("timestamp"));
+  }
+
+  @Test
+  void dispatchActionOmitsAUserMessageThatIsNotATextWithContent() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    List<RendererAction> actions = new ArrayList<>();
+    surface.onAction().subscribe(actions::add);
+
+    surface.dispatchAction(Map.of("event", Map.of("name", "a", "userMessage", 7L)), "save");
+    surface.dispatchAction(Map.of("event", Map.of("name", "b", "userMessage", "")), "save");
+
+    assertEquals(
+        List.of(Optional.empty(), Optional.empty()),
+        actions.stream().map(RendererAction::userMessage).toList());
+    assertFalse(actions.getFirst().toJson().containsKey("userMessage"));
   }
 
   @Test

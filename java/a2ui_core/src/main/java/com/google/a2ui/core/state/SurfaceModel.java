@@ -19,7 +19,6 @@ package com.google.a2ui.core.state;
 import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
-import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.common.EventNotifier;
 import com.google.a2ui.core.common.EventSource;
 import com.google.a2ui.core.common.ProtocolVersion;
@@ -305,6 +304,9 @@ public final class SurfaceModel<C extends ComponentApi> {
    * bindings before the call. A {@code functionCall} action is work of the renderer. Thus the
    * surface reports nothing for a payload that has no {@code event}.
    *
+   * <p>This method does not examine the {@code userMessage}. The action has a user message only if
+   * the {@code userMessage} of the event is a text that is not empty.
+   *
    * @param payload the action as a component declares it, with resolved bindings
    * @param sourceComponentId the ID of the component that the user operated
    * @param metadata the {@code action.metadata} to send with the action, or null
@@ -342,7 +344,9 @@ public final class SurfaceModel<C extends ComponentApi> {
             sourceComponentId,
             Instant.now(),
             context,
-            Optional.ofNullable(event.get("userMessage")).map(Coercion::toText),
+            event.get("userMessage") instanceof String text && !text.isEmpty()
+                ? Optional.of(text)
+                : Optional.empty(),
             sourceCatalog,
             extensions.map(map -> metadata)));
   }
