@@ -95,6 +95,11 @@ final class SuiteRegistry {
 
   private static final String NOT_YET = "Not implemented in java-core yet";
 
+  private static final String SELECT_CATALOG =
+      "One case expects a 'Protocol version mismatch' error for a surface that gets a v0.9"
+          + " catalog. In java-core only the MessageProcessor selects the catalogs of a surface,"
+          + " and it does not give a catalog of a different version to a surface";
+
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
   private static final String PROCESS = "process_messages";
@@ -282,8 +287,12 @@ final class SuiteRegistry {
     suites.put(
         "core/expressions.yaml",
         new Supported(
-            Map.of("parse_expression_template", new ParseExpressionTemplateHandler()),
-            reasons("validate", NOT_YET),
+            Map.of(
+                "parse_expression_template",
+                new ParseExpressionTemplateHandler(),
+                VALIDATE,
+                new ProcessMessagesHandler(true)),
+            reasons(),
             Set.of("parse_expression_template")));
     suites.put(
         "core/functions.yaml",
@@ -295,7 +304,7 @@ final class SuiteRegistry {
                 new ProcessMessagesHandler(true)),
             reasons(),
             Set.of()));
-    suites.put("core/index_function.yaml", new Unsupported(NOT_YET));
+    suites.put("core/index_function.yaml", processorSuite(List.of(VALIDATE)));
     suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
     suites.put("core/message_processor_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/message_processor_v0_9.yaml", new Unsupported(V1_ONLY));
@@ -306,7 +315,12 @@ final class SuiteRegistry {
             Map.of(
                 "get_renderer_capabilities", new RendererCapabilitiesHandler(),
                 "get_renderer_data_model", new RendererDataModelHandler())));
-    suites.put("core/multi_catalog.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/multi_catalog.yaml",
+        new Supported(
+            Map.of(VALIDATE, new ProcessMessagesHandler(true)),
+            reasons("select_catalog", SELECT_CATALOG),
+            Set.of()));
     suites.put(
         "core/node_resolution.yaml",
         new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));

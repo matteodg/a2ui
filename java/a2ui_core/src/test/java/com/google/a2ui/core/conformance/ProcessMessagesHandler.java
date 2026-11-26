@@ -28,10 +28,12 @@ import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionApi;
 import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.common.ProtocolVersion;
+import com.google.a2ui.core.common.Subscription;
 import com.google.a2ui.core.conformance.SuiteRegistry.CaseHandler;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.processing.MessageProcessor;
 import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeProps;
@@ -60,7 +62,13 @@ import java.util.function.Supplier;
  *
  * <p>A property of a component is correct if it is equal to the expected value as the message
  * writes it, or as the node tree of the surface resolves it. The handler reads the results of the
- * checks of a component from the node tree.
+ * checks of a component from the node tree. An expected component whose ID is not the ID of a
+ * component is one item of a list template, for example {@code row_0}.
+ *
+ * <p>A case can expect an error that is visible only when the core evaluates a binding, for example
+ * a {@code formatString} template that is not correct. The SDK reports such an error to the surface
+ * and does not throw it. Thus, for a case that expects an error, the handler also resolves the node
+ * tree of each surface and throws the first error that a surface reports.
  */
 final class ProcessMessagesHandler implements CaseHandler {
   private static final Set<String> CASE_KEYS =
@@ -163,7 +171,10 @@ final class ProcessMessagesHandler implements CaseHandler {
             location,
             PROCESSING_CATEGORIES,
             lastSent,
-            () -> processor.processMessages(payload));
+            () -> {
+              processor.processMessages(payload);
+              raiseResolutionErrors(processor);
+            });
         return;
       }
       processor.processMessages(payload);
@@ -183,7 +194,15 @@ final class ProcessMessagesHandler implements CaseHandler {
           expectError = ExpectedErrors.expectedError(fields);
         }
         if (expectError != null) {
-          ExpectedErrors.assertRaises(expectError, where, PROCESSING_CATEGORIES, lastSent, process);
+          ExpectedErrors.assertRaises(
+              expectError,
+              where,
+              PROCESSING_CATEGORIES,
+              lastSent,
+              () -> {
+                process.run();
+                raiseResolutionErrors(processor);
+              });
         } else {
           process.run();
           if (step.get("expect") != null) {
@@ -324,6 +343,24 @@ final class ProcessMessagesHandler implements CaseHandler {
     return Catalog.fromJson(BasicCatalog.api().toJson(), id, null)
         .<FunctionApi>withFunctions(
             BasicCatalog.withFunctions(Locale.US, uri -> {}).functions().values());
+  }
+
+  /**
+   * Resolves the node tree of each surface. If a surface reports an error, the method throws the
+   * first error as a validation error.
+   */
+  private static void raiseResolutionErrors(MessageProcessor<ComponentApi> processor) {
+    for (SurfaceModel<ComponentApi> surface : processor.model().all().values()) {
+      List<A2uiError> reported = new ArrayList<>();
+      Subscription subscription = surface.onError().subscribe(reported::add);
+      new NodeResolver<>(surface).dispose();
+      subscription.cancel();
+      if (!reported.isEmpty()) {
+        A2uiError first = reported.getFirst();
+        throw ErrorFields.surfaceId(
+            new A2uiValidationError(first.getMessage(), first), first.surfaceId().orElse(null));
+      }
+    }
   }
 
   /**
@@ -544,23 +581,27 @@ final class ProcessMessagesHandler implements CaseHandler {
     }
     expected.forEach((id, properties) -> {
       ComponentModel component = actual.get(id);
-      if (component == null) {
+      // An ID that is not the ID of a component names one item of a template, for example `row_0`.
+      ComponentNode<ComponentApi> item = component == null ? nodes.get().get(id) : null;
+      if (component == null && item == null) {
         throw new AssertionError(where + ": no component '" + id + "'");
       }
+      ComponentModel model = component != null ? component : actual.get(item.componentId());
       properties.forEach((key, value) -> {
         Object found =
             switch (key) {
-              case "id" -> component.id();
-              case "component" -> component.type();
-              case "@metadata" -> metadataJson(component.metadata());
-              default -> component.properties().get(key);
+              case "id" -> id;
+              case "component" -> model.type();
+              case "@metadata" -> metadataJson(model.metadata());
+              default -> model.properties().get(key);
             };
         String at = where + ", component '" + id + "', '" + key + "'";
         if (IDENTITY_KEYS.contains(key)) {
           assertJsonEquals(value, found, at);
           return;
         }
-        if (JsonValues.jsonEquals(value, found)) {
+        // The value of an item of a template is always a resolved value.
+        if (component != null && JsonValues.jsonEquals(value, found)) {
           return;
         }
         ComponentNode<ComponentApi> node = nodes.get().get(id);
