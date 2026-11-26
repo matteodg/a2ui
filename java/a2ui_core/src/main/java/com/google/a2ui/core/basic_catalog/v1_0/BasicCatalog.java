@@ -65,7 +65,8 @@ public final class BasicCatalog {
    * <p>The components and the document of the result are those of {@link #api()}. A function that
    * this SDK does not implement fails when a call runs it.
    *
-   * @param locale the locale of the text that {@code formatNumber} and {@code formatCurrency} write
+   * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
+   *     formatDate} and {@code pluralize} write
    * @return the catalog
    */
   public static Catalog<ComponentApi, FunctionImplementation> withFunctions(Locale locale) {

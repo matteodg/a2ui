@@ -302,6 +302,108 @@ class BasicFunctionsTest {
     assertThrows(A2uiExpressionError.class, () -> evaluate("formatCurrency", "value", 1));
   }
 
+  private static Object formatDate(Object value, Object format) {
+    return evaluate("formatDate", "value", value, "format", format);
+  }
+
+  @Test
+  void formatDateWritesEachFieldOfThePattern() {
+    assertEquals(
+        "2026 26 September Sep 09 9 Friday Fri 04 4",
+        formatDate("2026-09-04T21:05:09", "yyyy yy MMMM MMM MM M EEEE E dd d"));
+    assertEquals("21 21 09 9 05 09 PM", formatDate("2026-09-04T21:05:09", "HH H hh h mm ss a"));
+    assertEquals("00 0 12 12 07 08 AM", formatDate("2026-01-05T00:07:08Z", "HH H hh h mm ss a"));
+    assertEquals("12 PM, Sunday", formatDate("2026-09-06T12:00", "h a, EEEE"));
+    assertEquals("0999 99", formatDate("0999-01-01", "yyyy yy"));
+  }
+
+  @Test
+  void formatDateCopiesQuotedTextAndTheCharactersThatAreNotFields() {
+    assertEquals("9 o'clock", formatDate("2026-09-04T21:05:09", "h 'o''clock'"));
+    assertEquals("day 4", formatDate("2026-09-04", "'day' d"));
+    assertEquals("2026/09/04 @ 21:05", formatDate("2026-09-04T21:05:09", "yyyy/MM/dd @ HH:mm"));
+    assertEquals("it's 21", formatDate("2026-09-04T21:05:09", "'it''s' HH"));
+  }
+
+  @Test
+  void formatDateKeepsTheFieldsThatTheValueWrites() {
+    String value = "2026-09-04T21:05:09+02:00";
+
+    assertEquals("Sep 4, 26 at 9:05 PM", formatDate(value, "MMM d, yy 'at' h:mm a"));
+    assertEquals("2026-09-04T19:05:09.000Z", formatDate(value, "ISO"));
+    assertEquals("2026-09-04T21:05:09.120Z", formatDate("2026-09-04T21:05:09.1206", "ISO"));
+    assertEquals("2026-09-04T00:00:00.000Z", formatDate("2026-09-04", "ISO"));
+  }
+
+  @Test
+  void formatDateUsesTheDefaultPatternAndAcceptsMilliseconds() {
+    assertEquals("1970-01-02", formatDate(86_400_000, null));
+    assertEquals("2026-09-04", formatDate(" 2026-09-04T21:05:09Z ", ""));
+    assertEquals("2026-09-04", evaluate("formatDate", "value", "2026-09-04"));
+  }
+
+  @Test
+  void formatDateGivesAnEmptyStringForAValueThatIsNotATimestamp() {
+    for (Object value : Arrays.asList(null, "", "yesterday", "2026-02-30", "09/04/2026", true)) {
+      assertEquals("", formatDate(value, "yyyy"), String.valueOf(value));
+    }
+  }
+
+  @Test
+  void formatDateWritesTheNamesOfTheLocale() {
+    assertEquals(
+        "Freitag, 4. September",
+        evaluateIn(Locale.GERMANY, "formatDate", "value", "2026-09-04", "format", "EEEE, d. MMMM"));
+    // A month in a date has the form that the language uses after a day.
+    assertEquals(
+        "4 сентября",
+        evaluateIn(Locale.of("ru"), "formatDate", "value", "2026-09-04", "format", "d MMMM"));
+  }
+
+  @Test
+  void pluralizeSelectsTheCategoryOfTheLocale() {
+    assertEquals("apple", evaluate("pluralize", "value", 1, "one", "apple", "other", "apples"));
+    assertEquals("apples", evaluate("pluralize", "value", 0, "one", "apple", "other", "apples"));
+    assertEquals("apples", evaluate("pluralize", "value", 1.5, "one", "apple", "other", "apples"));
+    assertEquals("apple", evaluate("pluralize", "value", "1", "one", "apple", "other", "apples"));
+
+    Locale polish = Locale.of("pl");
+    Object[] forms = {"one", "plik", "few", "pliki", "many", "plików", "other", "pliku"};
+    assertEquals("pliki", evaluateIn(polish, "pluralize", with(forms, "value", 3)));
+    assertEquals("plików", evaluateIn(polish, "pluralize", with(forms, "value", 5)));
+    assertEquals("pliku", evaluateIn(polish, "pluralize", with(forms, "value", 1.5)));
+  }
+
+  @Test
+  void pluralizeUsesAnExactTextForZeroOneAndTwo() {
+    Object[] forms = {"zero", "none", "two", "a pair", "other", "some"};
+
+    assertEquals("none", evaluate("pluralize", with(forms, "value", 0)));
+    assertEquals("a pair", evaluate("pluralize", with(forms, "value", 2)));
+    assertEquals("some", evaluate("pluralize", with(forms, "value", 1)));
+    assertEquals("some", evaluate("pluralize", with(forms, "value", 3)));
+  }
+
+  @Test
+  void pluralizeUsesTheTextOtherIfTheTextOfTheCategoryIsAbsent() {
+    assertEquals("apples", evaluate("pluralize", "value", 1, "other", "apples"));
+    assertEquals("apples", evaluate("pluralize", "value", 1, "one", null, "other", "apples"));
+    assertEquals(
+        "apples", evaluate("pluralize", "value", "many", "one", "apple", "other", "apples"));
+    assertEquals("apples", evaluate("pluralize", "one", "apple", "other", "apples"));
+    assertEquals("", evaluate("pluralize", "value", 5, "one", "apple"));
+    assertEquals("7", evaluate("pluralize", "value", 5, "other", 7));
+  }
+
+  /** Makes a list of argument names and values that starts with the given name and value. */
+  private static Object[] with(Object[] namesAndValues, String name, Object value) {
+    Object[] all = new Object[namesAndValues.length + 2];
+    all[0] = name;
+    all[1] = value;
+    System.arraycopy(namesAndValues, 0, all, 2, namesAndValues.length);
+    return all;
+  }
+
   @Test
   void aFunctionThatTheSdkDoesNotImplementFailsWhenItRuns() {
     A2uiExpressionError error =

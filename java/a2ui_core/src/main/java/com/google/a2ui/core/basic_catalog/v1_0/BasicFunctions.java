@@ -25,6 +25,7 @@ import com.google.a2ui.core.resolution.DataContext;
 import com.ibm.icu.number.NumberFormatter;
 import com.ibm.icu.number.Precision;
 import com.ibm.icu.number.UnlocalizedNumberFormatter;
+import com.ibm.icu.text.PluralRules;
 import com.ibm.icu.util.Currency;
 import com.ibm.icu.util.ULocale;
 import java.math.RoundingMode;
@@ -54,6 +55,8 @@ final class BasicFunctions {
   private static final int MAX_DECIMALS = 100;
 
   private final ULocale locale;
+  private final DateFormatter dates;
+  private final PluralRules plurals;
 
   /**
    * Makes the functions for a locale.
@@ -62,6 +65,8 @@ final class BasicFunctions {
    */
   BasicFunctions(Locale locale) {
     this.locale = ULocale.forLocale(locale);
+    this.dates = new DateFormatter(this.locale);
+    this.plurals = PluralRules.forLocale(this.locale);
   }
 
   /**
@@ -87,7 +92,37 @@ final class BasicFunctions {
     bodies.put("formatNumber", (args, context) -> formatNumber(args, null));
     bodies.put(
         "formatCurrency", (args, context) -> formatNumber(args, currency(args.get("currency"))));
+    bodies.put(
+        "formatDate", (args, context) -> dates.format(args.get("value"), args.get("format")));
+    bodies.put("pluralize", (args, context) -> pluralize(args));
     return bodies;
+  }
+
+  /**
+   * Selects the text for the argument {@code value}.
+   *
+   * <p>If the value is exactly 0, 1 or 2 and the call gives the text {@code zero}, {@code one} or
+   * {@code two}, that text is the result. If not, the result is the text of the plural category of
+   * the value in the locale. If the call does not give that text, the result is the text {@code
+   * other}.
+   */
+  private String pluralize(Map<String, Object> args) {
+    OptionalDouble value = Coercion.parseNumber(args.get("value"));
+    String category = "other";
+    if (value.isPresent()) {
+      double number = value.getAsDouble();
+      if (number == 0 && args.containsKey("zero")) {
+        category = "zero";
+      } else if (number == 1 && args.containsKey("one")) {
+        category = "one";
+      } else if (number == 2 && args.containsKey("two")) {
+        category = "two";
+      } else {
+        category = plurals.select(number);
+      }
+    }
+    Object text = args.get(category);
+    return Coercion.toText(text != null ? text : args.get("other"));
   }
 
   // Number formats. ICU gives the separators, the digits and the currency symbols of the locale.
