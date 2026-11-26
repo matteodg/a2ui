@@ -77,6 +77,20 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void aSupportedSuiteReadsTheProtocolVersionOfTheCatalogOfTheFixture() {
+    Supported supported = new Supported(Map.of());
+    ConformanceCase before =
+        caseOf(Map.of("name", "a", "fixture", "test_data/node/two_people.yaml"));
+    ConformanceCase current =
+        caseOf(Map.of("name", "a", "fixture", "test_data/node/metadata.yaml"));
+
+    assertEquals("0.9.1", before.protocolVersion());
+    assertTrue(SuiteRegistry.skipReason(before, supported).startsWith("Protocol version 0.9.1"));
+    assertEquals("1.0", current.protocolVersion());
+    assertNull(SuiteRegistry.skipReason(current, supported));
+  }
+
+  @Test
   void aSupportedSuiteRunsACaseOfVersion1AndACaseWithNoVersion() {
     Supported supported = new Supported(Map.of());
 

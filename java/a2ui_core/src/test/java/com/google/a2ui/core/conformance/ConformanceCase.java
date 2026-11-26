@@ -47,12 +47,16 @@ record ConformanceCase(String suite, Map<String, Object> fields) {
    * Gets the protocol version of the case, or null if the case gives none.
    *
    * <p>The version is the top-level key {@code protocolVersion}. If that key is absent, the version
-   * is the key {@code protocolVersion} of the inline catalog.
+   * is the key {@code protocolVersion} of the inline catalog. If the case has no inline catalog and
+   * names a {@code fixture}, the version is the version of the catalog of the fixture.
    */
   String protocolVersion() {
     Object version = fields.get("protocolVersion");
     if (version == null && fields.get("catalog") instanceof Map<?, ?> catalog) {
       version = catalog.get("protocolVersion");
+    }
+    if (version == null && fields.get("fixture") instanceof String) {
+      version = ResolveNodesHandler.fixtureVersion(fields);
     }
     return version == null ? null : version.toString();
   }

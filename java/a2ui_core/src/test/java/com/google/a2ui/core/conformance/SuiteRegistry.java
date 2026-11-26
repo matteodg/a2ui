@@ -301,7 +301,9 @@ final class SuiteRegistry {
                 "get_renderer_capabilities", new RendererCapabilitiesHandler(),
                 "get_renderer_data_model", new RendererDataModelHandler())));
     suites.put("core/multi_catalog.yaml", new Unsupported(NOT_YET));
-    suites.put("core/node_resolution.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/node_resolution.yaml",
+        new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));
     suites.put("core/reserved_keys.yaml", processorSuite(List.of(PROCESS, VALIDATE)));
     suites.put("core/rpc_functions.yaml", new Unsupported(NOT_YET));
     suites.put("core/validation_result.yaml", new Unsupported(NOT_YET));
