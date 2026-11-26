@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -54,6 +55,16 @@ public final class JsonSchemaEngine {
       SchemaRegistryConfig.builder()
           .regularExpressionFactory(new UnicodeRegularExpressions())
           .build();
+
+  private static final String UNEVALUATED_PROPERTIES = "unevaluatedProperties";
+
+  /** The keywords whose problem is about one property of the value that they apply to. */
+  private static final Set<String> PROPERTY_KEYWORDS =
+      Set.of("required", "additionalProperties", UNEVALUATED_PROPERTIES);
+
+  /** The code of the problem of a keyword. Each other keyword has the code for a value. */
+  private static final Map<String, String> CODES =
+      Map.of("required", Problem.MISSING_FIELD, "type", Problem.TYPE_MISMATCH);
 
   private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
@@ -87,6 +98,24 @@ public final class JsonSchemaEngine {
    *     {@code $ref} that the engine cannot follow in the document
    */
   public List<String> errors(String pointer, Object value) {
+    return problems(pointer, value).stream().map(Problem::toString).toList();
+  }
+
+  /**
+   * Validates a value against one schema of the document, and gives the location and the type of
+   * each problem.
+   *
+   * <p>A property that is necessary and absent has the path that the property must have. A property
+   * that the schema does not permit has its own path. The path is not the path of the object that
+   * contains the property.
+   *
+   * @param pointer the JSON Pointer of the schema in the document
+   * @param value the value to validate, as plain JSON values that {@code Json.freeze} made
+   * @return the problems. The list is empty if the value is valid.
+   * @throws A2uiCatalogError if the document has no schema at the pointer, or if the schema has a
+   *     {@code $ref} that the engine cannot follow in the document
+   */
+  public List<Problem> problems(String pointer, Object value) {
     List<Error> errors;
     try {
       Schema schema =
@@ -97,15 +126,22 @@ public final class JsonSchemaEngine {
       throw new A2uiCatalogError(
           "The schema at '" + pointer + "' cannot validate a value: " + e.getMessage(), e);
     }
-    List<String> messages = new ArrayList<>();
+    List<Problem> problems = new ArrayList<>();
     for (Error error : errors) {
       String location = error.getInstanceLocation().toString();
-      messages.add(
-          location.isEmpty() || location.equals("$")
-              ? error.getMessage()
-              : location + ": " + error.getMessage());
+      if (location.startsWith("$")) {
+        location = location.substring(1);
+      }
+      String keyword = error.getKeyword();
+      String property = PROPERTY_KEYWORDS.contains(keyword) ? error.getProperty() : null;
+      problems.add(
+          new Problem(
+              property == null ? location : location + "/" + Json.escapePointer(property),
+              CODES.getOrDefault(keyword, Problem.INVALID_VALUE),
+              error.getMessage(),
+              UNEVALUATED_PROPERTIES.equals(keyword)));
     }
-    return messages;
+    return problems;
   }
 
   /** Converts a plain JSON value to the tree that the JSON Schema library reads. */

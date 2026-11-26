@@ -91,6 +91,41 @@ class JsonSchemaEngineTest {
   }
 
   @Test
+  void aProblemHasTheLocationAndTheTypeOfItsCause() {
+    Object card = Json.parse("{\"count\": \"two\", \"tags\": [\"a\", 2], \"ex/tra\": null}");
+
+    List<Problem> problems = engine.problems("/components/Card", card);
+
+    assertEquals(4, problems.size(), problems.toString());
+    assertEquals(Problem.MISSING_FIELD, codeAt(problems, "/title"));
+    assertEquals(Problem.TYPE_MISMATCH, codeAt(problems, "/count"));
+    assertEquals(Problem.TYPE_MISMATCH, codeAt(problems, "/tags/1"));
+    // The path of a property that the schema does not permit is an escaped JSON Pointer.
+    assertEquals(Problem.INVALID_VALUE, codeAt(problems, "/ex~1tra"));
+    assertEquals(
+        List.of("/ex~1tra"),
+        problems.stream().filter(Problem::unevaluated).map(Problem::path).toList());
+  }
+
+  @Test
+  void aProblemOfAConstraintIsAnInvalidValue() {
+    List<Problem> problems = engine.problems("/$defs/Title", "");
+
+    assertEquals(1, problems.size(), problems.toString());
+    assertEquals("", problems.get(0).path());
+    assertEquals(Problem.INVALID_VALUE, problems.get(0).code());
+    assertFalse(problems.get(0).unevaluated());
+  }
+
+  private static String codeAt(List<Problem> problems, String path) {
+    return problems.stream()
+        .filter(problem -> problem.path().equals(path))
+        .map(Problem::code)
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("No problem at " + path + " in " + problems));
+  }
+
+  @Test
   void aNumberWithNoFractionIsAnInteger() {
     assertEquals(List.of(), engine.errors("/components/Card/properties/count", 3.0));
     assertEquals(1, engine.errors("/components/Card/properties/count", 3.5).size());
