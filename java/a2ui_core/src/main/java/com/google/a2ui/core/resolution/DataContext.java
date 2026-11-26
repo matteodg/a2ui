@@ -288,7 +288,8 @@ public final class DataContext {
    *       in the catalog that the call names. If the call names none, the function runs in the
    *       default catalog of the surface.
    *   <li>The context resolves the bindings and the calls in each other object and in each list. In
-   *       such an object, the key {@code @@name} becomes {@code @name}.
+   *       such an object, the key {@code @@name} becomes {@code @name}. A different key that starts
+   *       with {@code @} is not correct.
    *   <li>Each other value stays as it is.
    * </ul>
    *
@@ -299,7 +300,8 @@ public final class DataContext {
    * @return the resolved value. Maps and lists are read-only.
    * @throws A2uiExpressionError if a call names a function that the catalog does not have, that has
    *     no code, that only the agent can call, or that requires a user gesture when there is none,
-   *     or if the code of a function throws an exception that is not an {@code A2uiError}
+   *     if the code of a function throws an exception that is not an {@code A2uiError}, or if an
+   *     object that is not a binding and not a call has a key that starts with one {@code @}
    * @throws A2uiRpcError if this context evaluates the calls of the agent, and a call names a
    *     function that only the renderer can call, or that requires a user gesture when there is
    *     none
@@ -320,7 +322,11 @@ public final class DataContext {
         object.forEach((key, item) -> {
           String name = String.valueOf(key);
           // A literal object writes `@@name` for a key that starts with `@`.
-          resolved.put(name.startsWith("@@") ? name.substring(1) : name, resolveDynamicValue(item));
+          boolean escaped = name.startsWith("@@");
+          if (name.startsWith("@") && !escaped) {
+            throw unknownReservedKey(name);
+          }
+          resolved.put(escaped ? name.substring(1) : name, resolveDynamicValue(item));
         });
         yield Collections.unmodifiableMap(resolved);
       }
@@ -421,6 +427,16 @@ public final class DataContext {
       }
     }
     call.args().values().forEach(this::examineForAgent);
+  }
+
+  /** Makes the error of a key of a literal object that starts with one {@code @}. */
+  private static A2uiExpressionError unknownReservedKey(String name) {
+    return new A2uiExpressionError(
+        "The key '"
+            + name
+            + "' is not a binding that this renderer knows. Write '@"
+            + name
+            + "' for a literal key.");
   }
 
   private Map<String, Object> resolveArguments(Map<?, ?> call) {

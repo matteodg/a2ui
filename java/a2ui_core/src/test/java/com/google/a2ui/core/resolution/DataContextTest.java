@@ -253,6 +253,22 @@ class DataContextTest {
   }
 
   @Test
+  void aLiteralObjectCannotHaveAKeyThatStartsWithOneAtSign() {
+    DataContext context = context();
+
+    A2uiExpressionError unknown =
+        assertThrows(
+            A2uiExpressionError.class,
+            () -> context.resolveDynamicValue(Map.of("label", Map.of("@unknown", 1L))));
+    A2uiExpressionError notText =
+        assertThrows(
+            A2uiExpressionError.class, () -> context.resolveDynamicValue(Map.of("@path", 5L)));
+
+    assertTrue(unknown.getMessage().contains("'@unknown'"));
+    assertTrue(notText.getMessage().contains("'@path'"));
+  }
+
+  @Test
   void aCallRunsInTheCatalogThatItNames() {
     DataContext context = context();
     Map<String, Object> args = Map.of("value", "Ada");
