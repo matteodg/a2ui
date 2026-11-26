@@ -24,6 +24,8 @@ import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
+import java.awt.GraphicsEnvironment;
+import java.awt.Point;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.List;
@@ -281,6 +283,15 @@ final class SliderView implements SwingComponentView {
       setOpaque(false);
     }
 
+    /**
+     * Gets the position of the mouse, or null on a computer with no display. Nimbus asks for the
+     * position in each layout of a slider, and AWT throws a {@code HeadlessException} there.
+     */
+    @Override
+    public Point getMousePosition() {
+      return GraphicsEnvironment.isHeadless() ? null : super.getMousePosition();
+    }
+
     @Override
     public AccessibleContext getAccessibleContext() {
       if (accessibleContext == null) {
@@ -326,16 +337,31 @@ final class SliderView implements SwingComponentView {
 
   /**
    * The text of the value next to the slider. Its width is the width of the widest value of the
-   * range. Thus the slider does not change its size while the user drags it.
+   * range, and at least the width of {@value #NARROWEST}. Thus the slider does not change its size
+   * while the user drags it, and the sliders of a form usually have the same length.
    */
   private static final class ValueText extends JLabel {
     private static final long serialVersionUID = 1L;
+
+    /** The text that gives the least width. */
+    private static final String NARROWEST = "000";
 
     /** The texts that give the width. */
     private transient List<String> samples = List.of();
 
     ValueText() {
       setHorizontalAlignment(SwingConstants.TRAILING);
+    }
+
+    /**
+     * Applies the look and feel, and then removes the font and the color that it set. Thus the
+     * value has the text style of the surface, as the text of a {@code Text} component.
+     */
+    @Override
+    public void updateUI() {
+      super.updateUI();
+      setFont(null);
+      setForeground(null);
     }
 
     void show(String value, List<String> widest) {
@@ -356,7 +382,7 @@ final class SliderView implements SwingComponentView {
       }
       FontMetrics metrics = getFontMetrics(getFont());
       int text = metrics.stringWidth(getText() == null ? "" : getText());
-      int widest = text;
+      int widest = Math.max(text, metrics.stringWidth(NARROWEST));
       for (String sample : samples) {
         widest = Math.max(widest, metrics.stringWidth(sample));
       }

@@ -22,6 +22,7 @@ import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.binding.ValueBinding;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.event.ActionEvent;
 import java.text.ParseException;
@@ -44,7 +45,9 @@ import javax.swing.JComponent;
 import javax.swing.JFormattedTextField;
 import javax.swing.JSpinner;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.event.ChangeListener;
+import javax.swing.plaf.FontUIResource;
 import javax.swing.text.DefaultFormatter;
 import javax.swing.text.DefaultFormatterFactory;
 
@@ -470,6 +473,28 @@ final class DateTimeInputView implements SwingComponentView {
     }
   }
 
+  /** The spinner of the view. Its text has the font of a text field. */
+  private static final class Spinner extends JSpinner {
+    private static final long serialVersionUID = 1L;
+
+    Spinner(IsoModel model) {
+      super(model);
+    }
+
+    /**
+     * Applies the look and feel, and then the font of a text field. Some look and feels give a
+     * spinner a bold font. The spinner gives its font to the text field of its editor.
+     */
+    @Override
+    public void updateUI() {
+      super.updateUI();
+      Font font = UIManager.getFont("TextField.font");
+      if (font != null) {
+        setFont(new FontUIResource(font));
+      }
+    }
+  }
+
   /** The text field of the spinner. It paints the form of the text while it is empty. */
   private static final class Field extends JFormattedTextField {
     private static final long serialVersionUID = 1L;
@@ -581,7 +606,7 @@ final class DateTimeInputView implements SwingComponentView {
    */
   DateTimeInputView(Clock clock) {
     model = new IsoModel(clock);
-    spinner = new JSpinner(model);
+    spinner = new Spinner(model);
     spinner.setEditor(new Editor(spinner, model));
     field = ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField();
     field.putClientProperty(TextFieldView.PLACEHOLDER_PROPERTY, model.mode().hint());
