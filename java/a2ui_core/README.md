@@ -10,21 +10,23 @@ The module implements the A2UI protocol v1.0. The design obeys
 
 The Java module name is `com.google.a2ui.core`. It exports these packages:
 
-| Package                                   | Contents                                                                                                             |
-| :---------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
-| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these.                                            |
-| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                                     |
-| `com.google.a2ui.core.state`              | `DataModel`, the observable store of the data of one surface.                                                        |
-| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                               |
-| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents.                          |
-| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog.                    |
-| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                              |
-| `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. |
+| Package                                   | Contents                                                                                                                                                                                      |
+| :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these.                                                                                                                     |
+| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                                                                                                              |
+| `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces.                                                                      |
+| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                        |
+| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents.                                                                                                   |
+| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog.                                                                                             |
+| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                       |
+| `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts. |
+| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces.                                                                                                   |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain message processing, function implementations and node resolution.
+The core does not yet contain function implementations, node resolution, and the messages from the
+renderer to the agent.
 
 ## Threads
 
@@ -105,6 +107,40 @@ and the permitted `$ref` targets. A document that does not obey a rule causes an
 The build copies the basic catalog from `catalogs/basic/v1/` and the schemas from
 `specification/v1_0/json/` into the JAR file. Thus the SDK does not contain a copy that a person can
 edit.
+
+## Message processing
+
+A `MessageProcessor` reads the messages of the agent as plain JSON values. The payload is one
+message, a list of messages, or a `{"messages": [...]}` wrapper. The processor examines a full
+message before it applies it. Thus a message that it rejects changes nothing.
+
+```java
+MessageProcessor<ComponentApi> processor =
+    new MessageProcessor<>(List.of(BasicCatalog.api()), ValidationConfig.RELAXED);
+processor.model().onSurfaceCreated().subscribe(surface -> System.out.println(surface.id()));
+
+processor.processMessages(messagesFromTheAgent);
+
+SurfaceModel<ComponentApi> surface = processor.model().getSurface("main").orElseThrow();
+surface.componentsModel().all(); // The components by ID, as the agent described them.
+surface.dataModel().get("/"); // The data of the surface.
+```
+
+The processor handles `createSurface`, `updateComponents`, `updateDataModel` and `deleteSurface`. It
+does not yet handle `callRendererFunction` and `agentFunctionResponse`.
+
+`ValidationConfig.STRICT` is the default. It rejects a surface that is not complete: a surface with
+no root component, a reference to a component that does not exist, or a component that the root
+does not reach. A renderer that receives a surface in parts uses `ValidationConfig.RELAXED`. To
+change one rule, use a `with` method, for example
+`ValidationConfig.STRICT.withAllowOrphanComponents(true)`.
+
+A surface can use each v1.0 catalog that the processor has at the creation of the surface.
+`addCatalog` adds a catalog for the surfaces that the processor makes subsequently.
+
+The models have public methods that change them, for example `SurfaceComponentsModel.addComponent`.
+These methods do not examine a schema or the graph of the surface. Only the message processor makes
+these checks.
 
 ## Validation
 

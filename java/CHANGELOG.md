@@ -12,3 +12,8 @@
   and `ProtocolVersion` in `com.google.a2ui.core.common`.
 - Add `PayloadValidator` and `CommonTypeValidator` in `com.google.a2ui.core.validation`, and
   `Catalog.validationSchema()`.
+- Add `MessageProcessor` in `com.google.a2ui.core.processing`, `SurfaceGroupModel`, `SurfaceModel`,
+  `SurfaceComponentsModel` and `ComponentModel` in `com.google.a2ui.core.state`, and
+  `ValidationConfig` in `com.google.a2ui.core.validation`. A v1.0 catalog document can now name a
+  common type as a local reference, for example `#/$defs/DynamicString`. The messages of
+  `PayloadValidator.validateComponent` for an absent type and for an unknown type have a new text.

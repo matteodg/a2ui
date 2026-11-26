@@ -16,6 +16,7 @@
 
 /**
  * Validation of the content of a v1.0 message: one component, one function call, or one value of a
- * common type.
+ * common type. {@link com.google.a2ui.core.validation.ValidationConfig} selects the problems that
+ * message processing accepts.
  */
 package com.google.a2ui.core.validation;
