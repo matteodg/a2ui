@@ -28,4 +28,6 @@
   and function calls. Add `FunctionImplementation`, `FunctionBody` and `Catalog.withFunctions` in
   `com.google.a2ui.core.catalog`, and `Coercion` in `com.google.a2ui.core.common`. Add
   `BasicCatalog.withFunctions` and `UrlOpener` in `com.google.a2ui.core.basic_catalog.v1_0`, with
-  the code of 13 of the 14 functions of the basic catalog. The `regex` function has no code yet.
+  the code of the 14 functions of the basic catalog.
+- Add `A2uiRegex` in `com.google.a2ui.core.common`. It compiles a pattern of the A2UI regex dialect
+  and applies the static safety rules of the protocol before `java.util.regex` gets the pattern.

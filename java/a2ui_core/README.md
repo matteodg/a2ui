@@ -13,7 +13,7 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | Package                                   | Contents                                                                                                                                                                                      |
 | :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                      |
-| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text.                                               |
+| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text. `A2uiRegex` is the A2UI regex dialect.        |
 | `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces.                                                                      |
 | `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                        |
 | `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents. A `FunctionImplementation` is a function with its code.                                           |
@@ -26,8 +26,8 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain the `regex` function, actions, node resolution and the function-call
-messages (`callRendererFunction`, `agentFunctionResponse`).
+The core does not yet contain actions, node resolution and the function-call messages
+(`callRendererFunction`, `agentFunctionResponse`).
 
 ## Threads
 
@@ -234,7 +234,8 @@ A context refuses these calls with an `A2uiExpressionError`:
 - A call of a function that only the agent can call (`allowedCallers` is `agentOnly`).
 - A call of a function that requires a user gesture, for example `openUrl`, in a context that is not
   the result of one. Use `context.withUserActivation()` in the handler of a click.
-- A call of a function that has no code. The `regex` function has no code yet.
+- A call of a function that has no code, for example a function of a catalog that has only
+  signatures.
 
 In a list template, `context.nested("items/2", 2)` gives the context of one item. Relative paths
 start at the item, and the `@index` function returns its position.
@@ -254,6 +255,38 @@ Catalog<ComponentApi, FunctionImplementation> custom =
 ```
 
 `Catalog.withFunctions` gives a catalog from a document the code of its functions.
+
+### Regular expressions
+
+An agent writes the pattern of the `regex` function. Thus the function does not give the pattern to
+`java.util.regex` as it is. `A2uiRegex.compile` reads the pattern as the regex dialect of the
+protocol, a subset of the ECMAScript patterns. It refuses a pattern that can use exponential time
+for a match. Use `A2uiRegex` in each function of your catalog that has a pattern argument.
+
+```java
+A2uiRegex postcode = A2uiRegex.compile("^\\d{5}(?:-\\d{4})?$");
+postcode.test("94043"); // true
+postcode.test("zip 94043"); // false
+
+A2uiRegex.compile("(a+)+$");
+// A2uiExpressionError: Invalid or unsafe regex pattern (NESTED_QUANTIFIER): ...
+```
+
+- A match is case-sensitive. `test` is true if a part of the value matches.
+- `\d`, `\w` and `\b` know only ASCII characters. `.` matches each code point that is not a line
+  terminator. `^` and `$` match only at the two ends of the value.
+- The dialect has no backreferences, no lookbehind, no named groups and no `\p{...}`.
+- A pattern longer than 256 code points is refused. A value longer than 4,096 code points never
+  matches.
+- The message of a refused pattern contains one of these tokens: `PATTERN_TOO_LONG`,
+  `UNSUPPORTED_SYNTAX`, `NESTED_QUANTIFIER`, `OVERLAPPING_ALTERNATION`, `ADJACENT_OVERLAP`.
+
+An `A2uiRegex` is immutable. The class does not keep the compiled patterns. If your code uses a
+pattern many times, keep the instance.
+
+`java.util.regex` uses one level of recursion for each repetition of a group such as `(ab|c)*`. If a
+long value causes a stack overflow, `test` does the match again on a temporary thread that has a
+large stack, and waits for the result.
 
 ## Validation
 
