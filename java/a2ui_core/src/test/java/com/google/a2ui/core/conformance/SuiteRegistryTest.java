@@ -135,6 +135,18 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void eachSkippedNameIsTheNameOfACase() {
+    Set<String> unknown = new TreeSet<>(SuiteRegistry.SKIP_TEST_NAMES.keySet());
+    SuiteRegistry.CORE_SUITES
+        .keySet()
+        .forEach(suite ->
+            ConformanceLoader.loadSuite(suite)
+                .forEach(testCase -> unknown.remove(testCase.name())));
+
+    assertEquals(Set.of(), unknown);
+  }
+
+  @Test
   void theFirstUnsupportedKeyThatAppliesGivesTheReason() {
     ConformanceCase testCase =
         caseOf(Map.of("name", "a", "action", "load", "expect", Map.of("first", 1, "second", 2)));

@@ -71,12 +71,29 @@ final class SuiteRegistry {
   /** The protocol versions that this SDK implements. */
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
+  private static final String NEEDS_RESOLUTION =
+      "Expects resolved property values, and java-core does not resolve nodes yet";
+
   /** The cases that the harness skips, by name. Each case has its reason. */
-  static final Map<String, String> SKIP_TEST_NAMES = Map.of();
+  static final Map<String, String> SKIP_TEST_NAMES =
+      Map.of(
+          "test_escaped_doubled_at_unescaping", NEEDS_RESOLUTION,
+          "test_escaped_doubled_at_metadata_unescaping", NEEDS_RESOLUTION);
 
   private static final String NOT_YET = "Not implemented in java-core yet";
+  private static final String NEEDS_ERROR_DETAILS =
+      "Examines the surface, the path or the outbound message of an error, and java-core does not"
+          + " have them yet";
+
+  /** The keys of an error expectation that go further than the category and the message. */
+  private static final List<String> ERROR_DETAIL_KEYS =
+      List.of("surfaceId", "rendererError", "path", "details", "functionCallId", "code");
+
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
+
+  private static final String PROCESS = "process_messages";
+  private static final String VALIDATE = "validate";
 
   /**
    * Each suite in {@code conformance/core/}.
@@ -179,6 +196,39 @@ final class SuiteRegistry {
     };
   }
 
+  /**
+   * Makes the support for a suite whose cases give messages to a message processor.
+   *
+   * <p>The harness skips each case whose error expectation, on the case or on one of its steps,
+   * goes further than the category and the message. The method makes these entries from the cases
+   * of the suite. Thus each entry applies to a case.
+   *
+   * @param suite the path of the suite
+   * @param actions the actions of the suite that the harness runs: {@code process_messages}, {@code
+   *     validate}, or the two
+   * @param alsoUnsupported more entries for {@link Supported#unsupported()}: each key, and after it
+   *     its reason
+   */
+  private static Supported processorSuite(
+      String suite, List<String> actions, String... alsoUnsupported) {
+    Map<String, CaseHandler> handlers = new LinkedHashMap<>();
+    SequencedMap<String, String> unsupported = new LinkedHashMap<>();
+    List<ConformanceCase> cases = ConformanceLoader.loadSuite(suite);
+    for (String action : actions) {
+      handlers.put(action, new ProcessMessagesHandler(action.equals(VALIDATE)));
+      for (String where : List.of("expectError", "steps.expectError")) {
+        for (String key : ERROR_DETAIL_KEYS) {
+          String target = action + "." + where + "." + key;
+          if (cases.stream().anyMatch(testCase -> matchesUnsupported(testCase, target))) {
+            unsupported.put(target, NEEDS_ERROR_DETAILS);
+          }
+        }
+      }
+    }
+    unsupported.putAll(reasons(alsoUnsupported));
+    return new Supported(handlers, Collections.unmodifiableSequencedMap(unsupported), Set.of());
+  }
+
   private static Map<String, SuiteSupport> coreSuites() {
     Map<String, SuiteSupport> suites = new LinkedHashMap<>();
     suites.put("core/accessibility.yaml", new Unsupported(ADAPTER));
@@ -207,17 +257,22 @@ final class SuiteRegistry {
             Map.of(
                 "common_types_schema", new SchemaDocumentHandler(SchemaDocuments::commonTypes),
                 "validate_common_type", new ValidateCommonTypeHandler())));
-    suites.put("core/composition_constraints.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/composition_constraints.yaml",
+        processorSuite("core/composition_constraints.yaml", List.of(PROCESS, VALIDATE)));
     suites.put(
         "core/data_context.yaml",
         new Supported(
             Map.of("resolve_path", new ResolvePathHandler()), reasons(), Set.of("resolve_path")));
-    suites.put("core/data_deletion.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/data_deletion.yaml", processorSuite("core/data_deletion.yaml", List.of(VALIDATE)));
     suites.put(
         "core/data_model.yaml",
         new Supported(
             Map.of("data_model", new DataModelHandler()), reasons(), Set.of("data_model")));
-    suites.put("core/data_model_pointers.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/data_model_pointers.yaml",
+        processorSuite("core/data_model_pointers.yaml", List.of(VALIDATE)));
     suites.put("core/error_responses.yaml", new Unsupported(NOT_YET));
     suites.put(
         "core/expressions.yaml",
@@ -230,15 +285,26 @@ final class SuiteRegistry {
     suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
     suites.put("core/message_processor_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/message_processor_v0_9.yaml", new Unsupported(V1_ONLY));
-    suites.put("core/message_processor_v1_0.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/message_processor_v1_0.yaml",
+        processorSuite(
+            "core/message_processor_v1_0.yaml",
+            List.of(PROCESS, VALIDATE),
+            "get_renderer_capabilities",
+            NOT_YET,
+            "get_renderer_data_model",
+            NOT_YET));
     suites.put("core/multi_catalog.yaml", new Unsupported(NOT_YET));
     suites.put("core/node_resolution.yaml", new Unsupported(NOT_YET));
-    suites.put("core/reserved_keys.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/reserved_keys.yaml",
+        processorSuite("core/reserved_keys.yaml", List.of(PROCESS, VALIDATE)));
     suites.put("core/rpc_functions.yaml", new Unsupported(NOT_YET));
     suites.put("core/validation_result.yaml", new Unsupported(NOT_YET));
     suites.put("core/validator_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/validator_v0_9.yaml", new Unsupported(V1_ONLY));
-    suites.put("core/validator_v1_0.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/validator_v1_0.yaml", processorSuite("core/validator_v1_0.yaml", List.of(VALIDATE)));
     return Collections.unmodifiableMap(suites);
   }
 }
