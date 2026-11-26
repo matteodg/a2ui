@@ -101,7 +101,15 @@ final class SuiteRegistry {
                   + " test_agent_routing_cancelled_call_is_sent_again_on_unrelated_change, as the"
                   + " suite permits"));
 
-  private static final String NOT_YET = "Not implemented in java-core yet";
+  /** The suite of the timing cases. {@code ScalingConformanceTest} runs it. */
+  static final String SCALING_SUITE = "core/message_processor_scaling.yaml";
+
+  /** The action of a timing case. */
+  static final String MEASURE_GROWTH = "measure_growth";
+
+  private static final String PERFORMANCE =
+      "performance: a timing case runs apart from the other tests, with"
+          + " `./mvnw -Pperformance verify`";
 
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
@@ -310,7 +318,12 @@ final class SuiteRegistry {
             reasons(),
             Set.of()));
     suites.put("core/index_function.yaml", processorSuite(List.of(VALIDATE)));
-    suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        SCALING_SUITE,
+        new Supported(
+            Map.of(MEASURE_GROWTH, new MeasureGrowthHandler()),
+            reasons(MEASURE_GROWTH, PERFORMANCE),
+            Set.of()));
     suites.put("core/message_processor_v0_8.yaml", new Unsupported(V1_ONLY));
     suites.put("core/message_processor_v0_9.yaml", new Unsupported(V1_ONLY));
     suites.put(

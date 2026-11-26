@@ -47,6 +47,13 @@
     <!-- The root directory of the A2UI repository. Each module sets its own value. -->
     <a2ui.repoRoot>${project.basedir}/..</a2ui.repoRoot>
 
+    <!--
+      The JUnit tags of the tests that the build runs and does not run. A test with the tag
+      "performance" measures a time. The profile "performance" runs only those tests.
+    -->
+    <a2ui.test.groups></a2ui.test.groups>
+    <a2ui.test.excludedGroups>performance</a2ui.test.excludedGroups>
+
     <icu4j.version>79.1</icu4j.version>
     <jackson.version>3.3.0</jackson.version>
     <json-schema-validator.version>3.0.9</json-schema-validator.version>
@@ -134,6 +141,8 @@
           <configuration>
             <!-- The tests use the class path. Thus they can read package-private classes. -->
             <useModulePath>false</useModulePath>
+            <groups>${a2ui.test.groups}</groups>
+            <excludedGroups>${a2ui.test.excludedGroups}</excludedGroups>
           </configuration>
         </plugin>
         <plugin>
@@ -171,4 +180,18 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <!--
+        Runs only the tests that measure a time: the timing cases of the conformance suites.
+        Use this profile on a computer that does no other work: ./mvnw -Pperformance verify
+      -->
+      <id>performance</id>
+      <properties>
+        <a2ui.test.groups>performance</a2ui.test.groups>
+        <a2ui.test.excludedGroups></a2ui.test.excludedGroups>
+      </properties>
+    </profile>
+  </profiles>
 </project>
