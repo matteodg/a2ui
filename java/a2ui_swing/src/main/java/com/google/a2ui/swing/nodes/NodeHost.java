@@ -20,6 +20,7 @@ import com.google.a2ui.core.common.Subscription;
 import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeState;
 import com.google.a2ui.core.state.SurfaceModel;
+import com.google.a2ui.swing.catalog.ChildViews;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
@@ -27,8 +28,13 @@ import com.google.a2ui.swing.surface.A2uiErrorInfo;
 import com.google.a2ui.swing.surface.A2uiFallbackError;
 import com.google.a2ui.swing.surface.A2uiPendingInfo;
 import com.google.a2ui.swing.surface.A2uiServices;
+import java.awt.Container;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import javax.swing.JComponent;
 
 /**
@@ -78,6 +84,10 @@ public final class NodeHost {
   private SwingComponentImplementation implementation;
 
   private SwingComponentView view;
+
+  /** The context of the view, or null if there is no view. */
+  private HostViewContext context;
+
   private Subscription propsSubscription;
 
   /** The description that made the fallback, or null if the host shows no fallback state. */
@@ -126,6 +136,22 @@ public final class NodeHost {
    */
   public Optional<SwingComponentView> view() {
     return Optional.ofNullable(view);
+  }
+
+  /**
+   * Gets the hosts of the children that the view of this host shows, through the {@code children}
+   * helpers of its context.
+   *
+   * @return the hosts, in the sequence of the helpers and then of the children. The list is a
+   *     read-only copy.
+   */
+  public List<NodeHost> childHosts() {
+    if (context == null) {
+      return List.of();
+    }
+    List<NodeHost> hosts = new ArrayList<>();
+    context.reconcilers.forEach(reconciler -> hosts.addAll(reconciler.hosts()));
+    return Collections.unmodifiableList(hosts);
   }
 
   /**
@@ -202,13 +228,16 @@ public final class NodeHost {
   }
 
   private void createView(SwingComponentImplementation resolved) {
+    HostViewContext created = new HostViewContext(resolved.name());
     try {
-      SwingComponentView created = resolved.createView(new HostViewContext());
-      Objects.requireNonNull(created, "createView returned null");
-      Objects.requireNonNull(created.component(), "the view has no component");
-      view = created;
+      SwingComponentView made = resolved.createView(created);
+      Objects.requireNonNull(made, "createView returned null");
+      Objects.requireNonNull(made.component(), "the view has no component");
+      view = made;
+      context = created;
       implementation = resolved;
     } catch (RuntimeException e) {
+      created.dispose();
       SurfaceScope.log("The implementation of '" + resolved.name() + "' did not make a view.", e);
     }
   }
@@ -267,8 +296,12 @@ public final class NodeHost {
       return;
     }
     SwingComponentView disposedView = view;
+    HostViewContext disposedContext = context;
     view = null;
+    context = null;
     implementation = null;
+    // The views of the children go first, as the children of a Swing component do.
+    disposedContext.dispose();
     try {
       disposedView.dispose();
     } catch (RuntimeException e) {
@@ -278,6 +311,14 @@ public final class NodeHost {
 
   /** The context of the view of this host. */
   private final class HostViewContext implements ViewContext {
+    private final String componentType;
+    private final List<ChildReconciler> reconcilers = new ArrayList<>();
+    private boolean contextDisposed;
+
+    HostViewContext(String componentType) {
+      this.componentType = componentType;
+    }
+
     @Override
     public SurfaceModel<? extends SwingComponentImplementation> surface() {
       return scope.surface();
@@ -286,6 +327,28 @@ public final class NodeHost {
     @Override
     public A2uiServices services() {
       return scope.services();
+    }
+
+    @Override
+    public ChildViews children(Container container) {
+      return children(container, null);
+    }
+
+    @Override
+    public ChildViews children(
+        Container container, Function<? super ComponentNode<?>, ?> constraints) {
+      if (contextDisposed) {
+        throw new IllegalStateException("The view of this context is disposed.");
+      }
+      ChildReconciler reconciler =
+          new ChildReconciler(scope, componentType, container, constraints);
+      reconcilers.add(reconciler);
+      return reconciler;
+    }
+
+    void dispose() {
+      contextDisposed = true;
+      reconcilers.forEach(ChildReconciler::dispose);
     }
   }
 

@@ -24,9 +24,12 @@ import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeAction;
 import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.binding.TextBinding;
+import com.google.a2ui.swing.catalog.ChildViews;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import com.google.a2ui.swing.catalog.basic.FlexLayout;
+import java.awt.BorderLayout;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,12 +39,13 @@ import java.util.Map;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JTextField;
 
 /**
  * A small custom catalog for the tests of the adapter. It shows that the public API is sufficient
- * to write components: a label, a text field with a two-way binding and checks, and a button with
- * an action.
+ * to write components: a label, a text field with a two-way binding and checks, a button with an
+ * action and one child, and a container with a list of children.
  *
  * <p>The catalog has the functions of the basic catalog with their code. It has none of the
  * components of the basic catalog.
@@ -82,7 +86,18 @@ public final class TestCatalog {
                         "label", ref("DynamicString"),
                         "child", ref("Child"),
                         "action", ref("Action"))),
-                context -> track(new ButtonView(context))));
+                context -> track(new ButtonView(context))),
+            SwingComponentImplementation.of(
+                "Box",
+                schema(
+                    "Box",
+                    Map.of(
+                        "children", ref("ChildList"),
+                        "direction", Map.of("type", "string"),
+                        "justify", Map.of("type", "string"),
+                        "align", Map.of("type", "string"),
+                        "gap", Map.of("type", "number"))),
+                context -> track(new BoxView(context))));
     this.catalog =
         BasicCatalog.withFunctions(Locale.US, opened::add)
             .derive(ID, List.of(), List.of(), null, List.of(), null)
@@ -199,17 +214,20 @@ public final class TestCatalog {
   }
 
   /**
-   * The view of a {@code Button}: a button that shows the property {@code label} and that does the
-   * property {@code action} when the user operates it. The button is disabled while a check of the
-   * component fails.
+   * The view of a {@code Button}: a button that shows the property {@code label} or the child of
+   * the property {@code child}, and that does the property {@code action} when the user operates
+   * it. The button is disabled while a check of the component fails.
    */
   public static final class ButtonView extends TestView {
     /** The Swing component. */
     public final JButton button = new JButton();
 
+    private final ChildViews child;
     private NodeAction action;
 
     ButtonView(ViewContext context) {
+      button.setLayout(new BorderLayout());
+      child = context.children(button);
       // The listener calls the action in the gesture of the user.
       button.addActionListener(event -> {
         if (action != null) {
@@ -228,6 +246,46 @@ public final class TestCatalog {
       button.setText(Coercion.toText(props.value("label")));
       button.setEnabled(props.isValid());
       action = props.action("action").orElse(null);
+      child.sync(props.child("child"));
+    }
+  }
+
+  /**
+   * The view of a {@code Box}: a panel with a {@link FlexLayout} that shows the children of the
+   * property {@code children}. The property {@code weight} of a child is its layout constraint.
+   */
+  public static final class BoxView extends TestView {
+    /** The Swing component. */
+    public final JPanel panel = new JPanel();
+
+    /** The layout of the panel. */
+    public final FlexLayout layout = new FlexLayout(FlexLayout.Axis.VERTICAL);
+
+    /** The helper that keeps the views of the children. */
+    public final ChildViews children;
+
+    BoxView(ViewContext context) {
+      panel.setLayout(layout);
+      panel.setOpaque(false);
+      children = context.children(panel, child -> child.props().get().value("weight"));
+    }
+
+    @Override
+    public JComponent component() {
+      return panel;
+    }
+
+    @Override
+    void show(NodeProps<?> props) {
+      layout.setAxis(
+          FlexLayout.Axis.fromWire(props.value("direction")).orElse(FlexLayout.Axis.VERTICAL));
+      layout.setJustify(
+          FlexLayout.Justify.fromWire(props.value("justify")).orElse(FlexLayout.Justify.START));
+      layout.setAlign(
+          FlexLayout.Align.fromWire(props.value("align")).orElse(FlexLayout.Align.STRETCH));
+      layout.setGap(props.value("gap") instanceof Number gap ? gap.intValue() : 0);
+      children.sync(props.children("children"));
+      panel.revalidate();
     }
   }
 }
