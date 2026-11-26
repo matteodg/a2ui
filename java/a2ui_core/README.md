@@ -427,6 +427,8 @@ Catalog<ComponentApi, FunctionImplementation> custom =
 ```
 
 `Catalog.withFunctions` gives a catalog from a document the code of its functions.
+`Catalog.withComponents` gives it components of a different type, for example components that have
+a view.
 
 If the code of a function throws an exception that is not an `A2uiError`, the context throws an
 `A2uiExpressionError` that has the exception as its cause. Thus the exception of one function does

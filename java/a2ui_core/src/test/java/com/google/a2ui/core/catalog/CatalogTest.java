@@ -18,6 +18,7 @@ package com.google.a2ui.core.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -145,6 +146,29 @@ class CatalogTest {
     Catalog<ComponentApi, FunctionApi> catalog = new Catalog<>("urn:test", List.of(text));
 
     assertThrows(A2uiCatalogError.class, () -> catalog.withFunctions(List.of(upper, upper)));
+  }
+
+  @Test
+  void withComponentsReplacesTheComponentsAndKeepsAllOtherParts() {
+    Catalog<ComponentApi, FunctionApi> catalog =
+        new Catalog<>("urn:test", List.of(text), List.of(upper), null, ProtocolVersion.V1_0);
+    ComponentApi view = new ComponentApi("Text", text.schema()) {};
+
+    Catalog<ComponentApi, FunctionApi> result = catalog.withComponents(List.of(view));
+
+    assertEquals("urn:test", result.id());
+    assertEquals(Optional.of(ProtocolVersion.V1_0), result.protocolVersion());
+    assertSame(view, result.components().get("Text"));
+    assertEquals(catalog.functions(), result.functions());
+    assertEquals(catalog.toJson(), result.toJson());
+    assertSame(text, catalog.components().get("Text"));
+  }
+
+  @Test
+  void withComponentsRejectsTwoComponentsWithTheSameName() {
+    Catalog<ComponentApi, FunctionApi> catalog = new Catalog<>("urn:test", List.of(text));
+
+    assertThrows(A2uiCatalogError.class, () -> catalog.withComponents(List.of(text, text)));
   }
 
   @Test

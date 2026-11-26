@@ -62,3 +62,5 @@
   `SurfaceModel.dispatchAction` now omits a `userMessage` that is not a text with content.
   `MessageProcessor` now examines only the changed part of the component graph of a surface for an
   update, if the validation configuration accepts dangling references and orphans.
+- Add `Catalog.withComponents` in `com.google.a2ui.core.catalog`. It makes a catalog with other
+  components, for example the components of a framework adapter that have a view.

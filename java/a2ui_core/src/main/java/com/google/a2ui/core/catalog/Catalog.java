@@ -404,6 +404,22 @@ public final class Catalog<C extends ComponentApi, F extends FunctionApi> {
   }
 
   /**
+   * Makes a catalog that has other components and that is equal to this catalog in all other parts.
+   *
+   * <p>An example is a catalog in which each component has its view. A framework adapter makes it
+   * from a catalog that only describes its components. The components of the result are the given
+   * components only.
+   *
+   * @param <D> the type of the new components
+   * @param components the components of the new catalog, in the sequence of their declaration
+   * @return the new catalog
+   * @throws A2uiCatalogError if two components have the same name
+   */
+  public <D extends ComponentApi> Catalog<D, F> withComponents(Collection<? extends D> components) {
+    return new Catalog<>(id, protocolVersion, components, functions.values(), layout);
+  }
+
+  /**
    * Makes a catalog with a new ID that has all the entries of this catalog. See {@link
    * #derive(String, Collection, Collection, Collection, Collection, String)}.
    *
