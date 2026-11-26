@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package com.google.a2ui.core.validation;
+package com.google.a2ui.core.internal;
 
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
-import com.google.a2ui.core.internal.Json;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaException;
@@ -44,10 +43,10 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Only this class and {@link UnicodeRegularExpressions} use the JSON Schema library. Thus the
  * library is not visible in the public API.
  *
- * <p>An engine is safe to use from more than one thread, because {@link CommonTypeValidator} has
- * one engine for all its callers.
+ * <p>An engine is safe to use from more than one thread, because the validator of the common types
+ * has one engine for all its callers.
  */
-final class JsonSchemaEngine {
+public final class JsonSchemaEngine {
   /** The name that the engine gives to its document. The name is not an address. */
   private static final String DOCUMENT_IRI = "https://a2ui.invalid/schema.json";
 
@@ -64,9 +63,9 @@ final class JsonSchemaEngine {
   /**
    * Makes an engine for one document.
    *
-   * @param document the schema document, as plain JSON values that {@code Json.freeze} made
+   * @param document the schema document, as plain JSON values that {@link Json#freeze(Object)} made
    */
-  JsonSchemaEngine(Map<String, Object> document) {
+  public JsonSchemaEngine(Map<String, Object> document) {
     // The engine uses its own name for the document. Thus the `$id` of the document has no effect.
     Map<String, Object> unnamed = new LinkedHashMap<>(document);
     unnamed.remove("$id");
@@ -87,7 +86,7 @@ final class JsonSchemaEngine {
    * @throws A2uiCatalogError if the document has no schema at the pointer, or if the schema has a
    *     {@code $ref} that the engine cannot follow in the document
    */
-  List<String> errors(String pointer, Object value) {
+  public List<String> errors(String pointer, Object value) {
     List<Error> errors;
     try {
       Schema schema =

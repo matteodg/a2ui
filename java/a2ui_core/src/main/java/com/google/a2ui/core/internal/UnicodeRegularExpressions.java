@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.a2ui.core.validation;
+package com.google.a2ui.core.internal;
 
 import com.ibm.icu.text.UnicodeSet;
 import com.networknt.schema.regex.RegularExpression;

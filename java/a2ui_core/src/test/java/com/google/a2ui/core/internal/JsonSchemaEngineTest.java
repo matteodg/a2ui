@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.a2ui.core.validation;
+package com.google.a2ui.core.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
-import com.google.a2ui.core.internal.Json;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;

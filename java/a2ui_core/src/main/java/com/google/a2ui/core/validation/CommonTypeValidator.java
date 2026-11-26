@@ -18,6 +18,7 @@ package com.google.a2ui.core.validation;
 
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.JsonSchemaEngine;
 import com.google.a2ui.core.internal.SchemaReferences;
 import java.util.Collections;
 import java.util.LinkedHashMap;

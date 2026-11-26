@@ -21,6 +21,7 @@ import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.JsonSchemaEngine;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
