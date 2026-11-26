@@ -30,6 +30,7 @@ import com.google.a2ui.core.state.SurfaceModel;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +73,11 @@ class BasicFunctionsTest {
 
   private static Object evaluate(String name, Object... namesAndValues) {
     return context().resolveDynamicValue(call(name, namesAndValues));
+  }
+
+  private static Object evaluateIn(Locale locale, String name, Object... namesAndValues) {
+    return context(BasicCatalog.withFunctions(locale), Map.of())
+        .resolveDynamicValue(call(name, namesAndValues));
   }
 
   private static Map<String, Object> invalid(String message) {
@@ -220,6 +226,80 @@ class BasicFunctionsTest {
   void formatStringFailsForATemplateThatIsNotCorrect() {
     assertThrows(A2uiExpressionError.class, () -> evaluate("formatString", "value", "${"));
     assertThrows(A2uiExpressionError.class, () -> evaluate("formatString", "value", "${nope()}"));
+  }
+
+  @Test
+  void formatNumberShowsAtMostThreeFractionDigitsByDefault() {
+    assertEquals("2.5", evaluate("formatNumber", "value", 2.5));
+    assertEquals("1,234.568", evaluate("formatNumber", "value", "1234.5678"));
+    assertEquals("1,234", evaluate("formatNumber", "value", 1234L));
+    assertEquals("-0.5", evaluate("formatNumber", "value", -0.5));
+  }
+
+  @Test
+  void formatNumberShowsTheRequestedFractionDigitsAndRoundsAHalfAwayFromZero() {
+    assertEquals("0.13", evaluate("formatNumber", "value", 0.125, "decimals", 2));
+    assertEquals("-0.13", evaluate("formatNumber", "value", -0.125, "decimals", 2));
+    assertEquals("3", evaluate("formatNumber", "value", 2.5, "decimals", 0));
+    assertEquals("2.50", evaluate("formatNumber", "value", 2.5, "decimals", "2"));
+    assertEquals("3", evaluate("formatNumber", "value", 2.5, "decimals", -1));
+    assertEquals("2.5", evaluate("formatNumber", "value", 2.5, "decimals", null));
+  }
+
+  @Test
+  void formatNumberGroupsTheDigitsUnlessGroupingIsFalse() {
+    assertEquals("1,234,567.891", evaluate("formatNumber", "value", 1234567.891));
+    assertEquals("1234567.891", evaluate("formatNumber", "value", 1234567.891, "grouping", false));
+    assertEquals("1,234", evaluate("formatNumber", "value", 1234, "grouping", "true"));
+    assertEquals("1234", evaluate("formatNumber", "value", 1234, "grouping", "no"));
+    assertEquals("1234", evaluate("formatNumber", "value", 1234, "grouping", null));
+  }
+
+  @Test
+  void formatNumberGivesAnEmptyStringForAValueThatIsNotANumber() {
+    assertEquals("", evaluate("formatNumber", "value", "abc"));
+    assertEquals("", evaluate("formatNumber", "value", null));
+    assertEquals("", evaluate("formatCurrency", "value", "abc", "currency", "USD"));
+  }
+
+  @Test
+  void theNumberFunctionsFollowTheLocale() {
+    assertEquals("1.234,5", evaluateIn(Locale.GERMANY, "formatNumber", "value", 1234.5));
+    assertEquals("12,34,567", evaluateIn(Locale.of("en", "IN"), "formatNumber", "value", 1234567));
+    assertEquals(
+        "1.234,50 €",
+        evaluateIn(Locale.GERMANY, "formatCurrency", "value", 1234.5, "currency", "EUR"));
+  }
+
+  @Test
+  void formatCurrencyShowsTheFractionDigitsOfTheCurrencyByDefault() {
+    assertEquals("$1,234.50", evaluate("formatCurrency", "value", 1234.5, "currency", "USD"));
+    assertEquals("$1,234.50", evaluate("formatCurrency", "value", 1234.5, "currency", "usd"));
+    assertEquals("¥1,235", evaluate("formatCurrency", "value", 1234.5, "currency", "JPY"));
+    assertEquals("-$5.00", evaluate("formatCurrency", "value", -5, "currency", "USD"));
+    assertEquals(
+        "$1235",
+        evaluate(
+            "formatCurrency",
+            "value",
+            1234.5,
+            "currency",
+            "USD",
+            "decimals",
+            0,
+            "grouping",
+            false));
+  }
+
+  @Test
+  void formatCurrencyFailsForACodeThatIsNotACurrencyCode() {
+    A2uiExpressionError error =
+        assertThrows(
+            A2uiExpressionError.class,
+            () -> evaluate("formatCurrency", "value", 1, "currency", "??"));
+
+    assertEquals("formatCurrency: '??' is not an ISO 4217 currency code.", error.getMessage());
+    assertThrows(A2uiExpressionError.class, () -> evaluate("formatCurrency", "value", 1));
   }
 
   @Test

@@ -22,8 +22,15 @@ import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.expressions.Expression;
 import com.google.a2ui.core.expressions.ExpressionParser;
 import com.google.a2ui.core.resolution.DataContext;
+import com.ibm.icu.number.NumberFormatter;
+import com.ibm.icu.number.Precision;
+import com.ibm.icu.number.UnlocalizedNumberFormatter;
+import com.ibm.icu.util.Currency;
+import com.ibm.icu.util.ULocale;
+import java.math.RoundingMode;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.regex.Pattern;
@@ -40,7 +47,22 @@ final class BasicFunctions {
    */
   private static final int MAX_EMAIL_LENGTH = 320;
 
-  BasicFunctions() {}
+  /** The number of fraction digits that {@code formatNumber} shows at most by default. */
+  private static final int DEFAULT_MAX_FRACTION = 3;
+
+  /** The largest number of fraction digits that a call can request. */
+  private static final int MAX_DECIMALS = 100;
+
+  private final ULocale locale;
+
+  /**
+   * Makes the functions for a locale.
+   *
+   * @param locale the locale of the text that the format functions write
+   */
+  BasicFunctions(Locale locale) {
+    this.locale = ULocale.forLocale(locale);
+  }
 
   /**
    * Gets the code of each function that this SDK implements.
@@ -62,7 +84,69 @@ final class BasicFunctions {
         "or", (args, context) -> operands("or", args.get("values")).anyMatch(Coercion::toBoolean));
     bodies.put("not", (args, context) -> !Coercion.toBoolean(args.get("value")));
     bodies.put("formatString", (args, context) -> formatString(args.get("value"), context));
+    bodies.put("formatNumber", (args, context) -> formatNumber(args, null));
+    bodies.put(
+        "formatCurrency", (args, context) -> formatNumber(args, currency(args.get("currency"))));
     return bodies;
+  }
+
+  // Number formats. ICU gives the separators, the digits and the currency symbols of the locale.
+
+  /**
+   * Writes the argument {@code value} as a number, or as an amount of a currency.
+   *
+   * <p>The result is the empty string if the value is not a number. The function rounds a half away
+   * from zero.
+   *
+   * <ul>
+   *   <li>With {@code decimals}, the text has that number of fraction digits.
+   *   <li>Without {@code decimals}, a number has at most three fraction digits, and an amount has
+   *       the number of fraction digits of its currency.
+   *   <li>The text has the grouping separators of the locale, unless {@code grouping} is false
+   *       after the rules of {@link Coercion#toBoolean(Object)}.
+   * </ul>
+   *
+   * @param currency the currency of the amount, or null for a number
+   */
+  private String formatNumber(Map<String, Object> args, Currency currency) {
+    OptionalDouble number = Coercion.parseNumber(args.get("value"));
+    if (number.isEmpty()) {
+      return "";
+    }
+    OptionalDouble decimals = Coercion.parseNumber(args.get("decimals"));
+    boolean grouped = !args.containsKey("grouping") || Coercion.toBoolean(args.get("grouping"));
+    Precision precision;
+    if (decimals.isPresent()) {
+      int digits = (int) Math.clamp(decimals.getAsDouble(), 0, MAX_DECIMALS);
+      precision = Precision.fixedFraction(digits);
+    } else {
+      precision =
+          currency == null
+              ? Precision.maxFraction(DEFAULT_MAX_FRACTION)
+              : Precision.currency(Currency.CurrencyUsage.STANDARD);
+    }
+    UnlocalizedNumberFormatter formatter =
+        NumberFormatter.with()
+            .roundingMode(RoundingMode.HALF_UP)
+            .grouping(
+                grouped
+                    ? NumberFormatter.GroupingStrategy.AUTO
+                    : NumberFormatter.GroupingStrategy.OFF)
+            .precision(precision);
+    if (currency != null) {
+      formatter = formatter.unit(currency);
+    }
+    return formatter.locale(locale).format(number.getAsDouble()).toString();
+  }
+
+  private static Currency currency(Object code) {
+    String text = Coercion.toText(code).strip().toUpperCase(Locale.ROOT);
+    try {
+      return Currency.getInstance(text);
+    } catch (IllegalArgumentException e) {
+      throw new A2uiExpressionError(
+          "formatCurrency: '" + text + "' is not an ISO 4217 currency code.", e);
+    }
   }
 
   /**

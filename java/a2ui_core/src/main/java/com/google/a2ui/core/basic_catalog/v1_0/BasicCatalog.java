@@ -25,7 +25,9 @@ import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.internal.Json;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 /** The basic catalog for protocol v1.0. It has 18 components and 14 functions. */
 public final class BasicCatalog {
@@ -47,15 +49,27 @@ public final class BasicCatalog {
   }
 
   /**
+   * Makes the catalog with the code of its functions, for a renderer. The functions write text for
+   * the locale {@link Locale#US}. Thus the text is the same on each computer. See {@link
+   * #withFunctions(Locale)}.
+   *
+   * @return the catalog
+   */
+  public static Catalog<ComponentApi, FunctionImplementation> withFunctions() {
+    return withFunctions(Locale.US);
+  }
+
+  /**
    * Makes the catalog with the code of its functions, for a renderer.
    *
    * <p>The components and the document of the result are those of {@link #api()}. A function that
    * this SDK does not implement fails when a call runs it.
    *
+   * @param locale the locale of the text that {@code formatNumber} and {@code formatCurrency} write
    * @return the catalog
    */
-  public static Catalog<ComponentApi, FunctionImplementation> withFunctions() {
-    return implement(new BasicFunctions().bodies());
+  public static Catalog<ComponentApi, FunctionImplementation> withFunctions(Locale locale) {
+    return implement(new BasicFunctions(Objects.requireNonNull(locale, "locale")).bodies());
   }
 
   private static Catalog<ComponentApi, FunctionImplementation> implement(
