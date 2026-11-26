@@ -29,6 +29,7 @@ import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.core.resolution.NodeResolver;
 import com.google.a2ui.swing.catalog.SwingComponentView;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiAccessibility;
 import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.MountedNode;
@@ -409,7 +410,7 @@ class AccessibilityTest {
       mountNested(false);
 
       assertFalse(A2uiAccessibility.isHidden(componentOf("status")));
-      assertNull(componentOf("status").getClientProperty(A2uiAccessibility.HIDDEN_PROPERTY));
+      assertFalse(ViewMarks.isHidden(componentOf("status")));
     });
   }
 

@@ -22,6 +22,7 @@ import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.MediaPlayer;
 import com.google.a2ui.swing.surface.MediaUrls;
 import com.google.a2ui.swing.surface.MediaView;
@@ -68,8 +69,8 @@ import javax.swing.JComponent;
  *
  * <p>The Swing component of the view is a panel that gives the margin of a leaf. The accessibility
  * attributes go to the component of the media view, or to the button. The accessible name of the
- * button tells what it does, unless the agent gave a label. The component has the URL that the view
- * accepted as the client property {@link SwingBasicCatalog#MEDIA_URL_PROPERTY}.
+ * button tells what it does, unless the agent gave a label. The component keeps the URL that the
+ * view accepted as a mark for the tests of the module. See {@link ViewMarks}.
  */
 final class VideoView implements SwingComponentView {
   /** The largest width of the substitute, in pixels. */
@@ -122,7 +123,7 @@ final class VideoView implements SwingComponentView {
   @Override
   public void update(ComponentNode<?> node, NodeProps<?> props) {
     Optional<URI> url = MediaUrls.safe(props.value("url"));
-    accessibleComponent().putClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY, url.orElse(null));
+    ViewMarks.setMediaUrl(accessibleComponent(), url.orElse(null));
     if (media != null) {
       MediaSupport.guarded(() -> media.setSource(url));
       MediaSupport.guarded(() -> media.setPoster(MediaUrls.safe(props.value("posterUrl"))));

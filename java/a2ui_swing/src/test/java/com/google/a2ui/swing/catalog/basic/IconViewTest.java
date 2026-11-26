@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.swing.catalog.HeightForWidth;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiAccessibility;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Snapshots;
@@ -104,7 +105,7 @@ class IconViewTest {
       assertEquals(BasicStyle.foregroundOf(glyph()), colorAt(7, 7));
       assertNotEquals(BasicStyle.foregroundOf(glyph()), colorAt(3, 3));
       assertNotEquals(BasicStyle.foregroundOf(glyph()), colorAt(20, 12));
-      assertEquals("stop", glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      assertEquals("stop", ViewMarks.iconName(glyph()).orElse(null));
     });
   }
 
@@ -118,7 +119,7 @@ class IconViewTest {
 
         assertTrue(glyph().hasShape(), name);
         assertTrue(paintedPixels() > 30, name + " painted " + paintedPixels() + " pixels");
-        assertEquals(name, glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+        assertEquals(name, ViewMarks.iconName(glyph()).orElse(null));
       }
     });
   }
@@ -133,7 +134,7 @@ class IconViewTest {
       fixture.setData("/name", "pause");
 
       assertSame(before, fixture.componentOf("icon"));
-      assertEquals("pause", glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      assertEquals("pause", ViewMarks.iconName(glyph()).orElse(null));
       assertNotEquals(play, paintedPixels());
     });
   }
@@ -155,7 +156,7 @@ class IconViewTest {
         assertTrue(sameImage(help, glyphImage()), unknown);
         assertEquals(new Rectangle(MARGIN, MARGIN, IconView.SIZE, IconView.SIZE), glyphBounds());
         // The property has the name that the agent gave. Assistive tools do not get a name.
-        assertEquals(unknown, glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+        assertEquals(unknown, ViewMarks.iconName(glyph()).orElse(null));
         assertNull(glyph().getAccessibleContext().getAccessibleName(), unknown);
       }
       assertEquals(List.of(), fixture.errors);
@@ -172,7 +173,7 @@ class IconViewTest {
         fixture.setData("/name", other);
         assertFalse(glyph().hasShape(), String.valueOf(other));
         assertEquals(0, paintedPixels(), String.valueOf(other));
-        assertNull(glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+        assertNull(ViewMarks.iconName(glyph()).orElse(null));
       }
       assertEquals(new Rectangle(MARGIN, MARGIN, IconView.SIZE, IconView.SIZE), glyphBounds());
       assertEquals(List.of(), fixture.errors);
@@ -209,7 +210,7 @@ class IconViewTest {
       assertEquals(BasicStyle.foregroundOf(glyph()), colorAt(3, 3));
       assertNotEquals(BasicStyle.foregroundOf(glyph()), colorAt(0, 0));
       assertEquals(20 * 20, paintedPixels(), 44);
-      assertNull(glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      assertNull(ViewMarks.iconName(glyph()).orElse(null));
     });
   }
 

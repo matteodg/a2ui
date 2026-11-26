@@ -34,6 +34,7 @@ import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiAccessibility;
 import com.google.a2ui.swing.surface.A2uiFallbacks;
 import com.google.a2ui.swing.surface.A2uiServices;
@@ -344,11 +345,8 @@ final class AdapterSession {
    */
   static Optional<Object> basicProperty(JComponent control, String property) {
     return switch (property) {
-      case "name" ->
-          Optional.ofNullable(control.getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
-      case "url" ->
-          Optional.ofNullable(control.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY))
-              .map(String::valueOf);
+      case "name" -> ViewMarks.iconName(control).map(name -> (Object) name);
+      case "url" -> ViewMarks.mediaUrl(control).map(url -> (Object) url.toString());
       default -> Optional.empty();
     };
   }

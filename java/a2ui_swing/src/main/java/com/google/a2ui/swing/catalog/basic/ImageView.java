@@ -22,6 +22,7 @@ import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import com.google.a2ui.swing.internal.ViewMarks;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -80,8 +81,8 @@ import javax.swing.JComponent;
  * proportions of the image when the image arrives.
  *
  * <p>The Swing component of the view is a panel that gives the margin of a leaf. The accessibility
- * attributes go to the component that paints the image. Its accessible role is an icon. It has the
- * URL that the view accepted as the client property {@link SwingBasicCatalog#MEDIA_URL_PROPERTY}.
+ * attributes go to the component that paints the image. Its accessible role is an icon. It keeps
+ * the URL that the view accepted as a mark for the tests of the module. See {@link ViewMarks}.
  */
 final class ImageView implements SwingComponentView {
   /** The width and the height of the variant {@code icon}, in pixels. */
@@ -173,7 +174,7 @@ final class ImageView implements SwingComponentView {
                     ? Picture.Fit.COVER
                     : Picture.Fit.FILL);
     source.show(props.value("url"));
-    canvas.putClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY, source.url().orElse(null));
+    ViewMarks.setMediaUrl(canvas, source.url().orElse(null));
     Object text = props.value("description");
     description = text == null ? "" : Coercion.toText(text).strip();
     canvas.setToolTipText(description.isEmpty() ? null : description);

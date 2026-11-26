@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.MediaPlayer;
 import com.google.a2ui.swing.testing.Edt;
@@ -133,8 +134,7 @@ class VideoViewTest {
 
       poster().doClick(0);
       assertEquals(List.of(URI.create(VIDEO), URI.create(OTHER)), opened);
-      assertEquals(
-          URI.create(OTHER), poster().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(OTHER), ViewMarks.mediaUrl(poster()).orElse(null));
     });
   }
 
@@ -179,7 +179,7 @@ class VideoViewTest {
 
   private Object urlPropertyOf(Object value) {
     fixture.setData("/url", value);
-    return poster().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY);
+    return ViewMarks.mediaUrl(poster()).orElse(null);
   }
 
   @Test
@@ -281,8 +281,7 @@ class VideoViewTest {
       // The component of the media view has the width of the container.
       assertEquals(400 - 2 * MARGIN, view.label.getWidth());
       assertEquals(40 + 2 * MARGIN, fixture.bounds("video").height);
-      assertEquals(
-          URI.create(VIDEO), view.label.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(VIDEO), ViewMarks.mediaUrl(view.label).orElse(null));
       assertEquals(List.of(), loader.requests);
 
       fixture.setData("/url", "javascript:alert(1)");
@@ -290,7 +289,7 @@ class VideoViewTest {
 
       assertEquals(Optional.empty(), view.sources.getLast());
       assertEquals(Optional.empty(), view.posters.getLast());
-      assertNull(view.label.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertNull(ViewMarks.mediaUrl(view.label).orElse(null));
       assertEquals(List.of(), opened);
 
       fixture.update(component("root", "Column", "children", List.of("after")));

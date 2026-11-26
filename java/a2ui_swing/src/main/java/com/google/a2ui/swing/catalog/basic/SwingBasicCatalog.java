@@ -94,23 +94,6 @@ import java.util.function.Function;
  * }</pre>
  */
 public final class SwingBasicCatalog {
-  /**
-   * The key of the client property that has the name of the icon that the view of an {@code Icon}
-   * shows. The Swing component is the {@code accessibleComponent()} of the view. The value is the
-   * name that the agent gave, for example {@code arrowBack}. For a name that the catalog does not
-   * have, the value is that name, and the icon shows the shape of the name {@code help}. The
-   * property is absent if the icon shows SVG path data or shows nothing.
-   */
-  public static final String ICON_NAME_PROPERTY = "a2ui.basic.iconName";
-
-  /**
-   * The key of the client property that has the URL that the view of an {@code Image}, a {@code
-   * Video} or an {@code AudioPlayer} shows. The Swing component is the {@code
-   * accessibleComponent()} of the view. The value is a {@code java.net.URI}. The property is absent
-   * if the component has no URL or if its URL is not safe. See {@code MediaUrls}.
-   */
-  public static final String MEDIA_URL_PROPERTY = "a2ui.basic.mediaUrl";
-
   /** The function that makes the view of each component that has one, in the catalog sequence. */
   private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS = views();
 

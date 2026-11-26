@@ -18,6 +18,7 @@ package com.google.a2ui.swing.nodes;
 
 import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.catalog.SwingComponentView;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiAccessibility;
 import java.util.Objects;
 import java.util.Optional;
@@ -83,7 +84,7 @@ final class Accessibility {
     // An explicit label is before the name that the view infers from its visible text. A hidden
     // component has an empty name, because Swing cannot remove it from the accessible tree.
     hidden = attributes.hidden() || hiddenAbove;
-    component.putClientProperty(A2uiAccessibility.HIDDEN_PROPERTY, hidden ? Boolean.TRUE : null);
+    ViewMarks.setHidden(component, hidden);
     hiddenFocus.apply(view.component(), component, hidden);
     String name = hidden ? "" : attributes.label().or(view::inferredAccessibleName).orElse(null);
     String description = hidden ? "" : attributes.description().orElse(null);

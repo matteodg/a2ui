@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.swing.catalog.basic.ImageView.Variant;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Snapshots;
@@ -114,7 +115,7 @@ class ImageViewTest {
       assertEquals(RED, colorAt(1, 1));
       assertEquals(RED, colorAt(298, 148));
       assertEquals(background(), colorAt(302, 75));
-      assertEquals(URI.create(A), canvas().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(A), ViewMarks.mediaUrl(canvas()).orElse(null));
     });
   }
 
@@ -154,7 +155,7 @@ class ImageViewTest {
       assertSame(before, canvas());
       assertEquals(List.of(URI.create(A), URI.create(B)), loader.requests);
       assertEquals(ImageSource.State.LOADING, canvas().state());
-      assertEquals(URI.create(B), canvas().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(B), ViewMarks.mediaUrl(canvas()).orElse(null));
 
       complete(B, TestImageLoader.solid(50, 100, Color.BLUE));
 
@@ -214,7 +215,7 @@ class ImageViewTest {
         fixture.setData("/url", value);
 
         assertEquals(ImageSource.State.NONE, canvas().state(), String.valueOf(value));
-        assertNull(canvas().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+        assertNull(ViewMarks.mediaUrl(canvas()).orElse(null));
         assertEquals(new Dimension(300, 200), canvas().box());
       }
       assertEquals(List.of(), loader.requests);

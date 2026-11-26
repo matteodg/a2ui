@@ -16,6 +16,7 @@
 
 package com.google.a2ui.swing.surface;
 
+import com.google.a2ui.swing.internal.ViewMarks;
 import java.util.Objects;
 import java.util.Optional;
 import javax.swing.JComponent;
@@ -48,12 +49,6 @@ public record A2uiAccessibility(
     Optional<String> label, Optional<String> description, boolean hidden, Optional<String> live) {
   /** The key of the client property of a Swing component that has the attributes. */
   public static final String CLIENT_PROPERTY = "a2ui.accessibility";
-
-  /**
-   * The key of the client property that marks a Swing component in a hidden part of a surface. The
-   * value is {@code Boolean.TRUE}, or the property is absent.
-   */
-  public static final String HIDDEN_PROPERTY = "a2ui.accessibility.hidden";
 
   /** The attributes of a component that has none. */
   public static final A2uiAccessibility NONE =
@@ -88,6 +83,6 @@ public record A2uiAccessibility(
    * @return true if the component is in a hidden part of a surface
    */
   public static boolean isHidden(JComponent component) {
-    return Boolean.TRUE.equals(component.getClientProperty(HIDDEN_PROPERTY));
+    return ViewMarks.isHidden(component);
   }
 }

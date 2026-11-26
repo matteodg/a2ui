@@ -20,6 +20,7 @@ import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeProps;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
+import com.google.a2ui.swing.internal.ViewMarks;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -61,8 +62,8 @@ import javax.swing.JComponent;
  * accessible name is the name of the icon as words, for example {@code arrow back}, unless the
  * agent gave a label. An icon from path data has no name. An icon whose name the catalog does not
  * have also has no name: the view does not tell the word {@code help} for it. A button whose
- * content is only icons takes its name from the names of the icons. The component has the name that
- * the agent gave as the client property {@link SwingBasicCatalog#ICON_NAME_PROPERTY}.
+ * content is only icons takes its name from the names of the icons. The component keeps the name
+ * that the agent gave as a mark for the tests of the module. See {@link ViewMarks}.
  */
 final class IconView implements SwingComponentView {
   /** The least width and height of an icon, in pixels. */
@@ -181,7 +182,7 @@ final class IconView implements SwingComponentView {
     void show(Shape nextShape, String sentName, String knownName) {
       shape = nextShape;
       name = knownName;
-      putClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY, sentName);
+      ViewMarks.setIconName(this, sentName);
       repaint();
     }
 

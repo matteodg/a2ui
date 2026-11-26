@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.swing.catalog.HeightForWidth;
+import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.MediaPlayer;
 import com.google.a2ui.swing.testing.Edt;
@@ -162,8 +163,7 @@ class AudioPlayerViewTest {
 
       fixture.setData("/url", OTHER);
       assertEquals(1, opened.size());
-      assertEquals(
-          URI.create(OTHER), button().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(OTHER), ViewMarks.mediaUrl(button()).orElse(null));
 
       button().doClick(0);
       assertEquals(List.of(URI.create(AUDIO), URI.create(OTHER)), opened);
@@ -197,11 +197,9 @@ class AudioPlayerViewTest {
       assertEquals("Episode 1", text().getText());
 
       fixture.setData("/url", "file:///C:/a.mp3");
-      assertNull(button().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertNull(ViewMarks.mediaUrl(button()).orElse(null));
       fixture.setData("/url", "audio/a.mp3");
-      assertEquals(
-          URI.create("audio/a.mp3"),
-          button().getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create("audio/a.mp3"), ViewMarks.mediaUrl(button()).orElse(null));
 
       fixture.setData("/url", AUDIO);
       assertTrue(button().isEnabled());
@@ -261,14 +259,13 @@ class AudioPlayerViewTest {
       assertEquals(List.of(), view.posters);
       assertEquals(400 - 2 * MARGIN, view.label.getWidth());
       assertEquals(40 + 2 * MARGIN, fixture.bounds("audio").height);
-      assertEquals(
-          URI.create(AUDIO), view.label.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertEquals(URI.create(AUDIO), ViewMarks.mediaUrl(view.label).orElse(null));
       // The description is the accessible name of the component of the media view.
       assertEquals("Episode 1", view.label.getAccessibleContext().getAccessibleName());
 
       fixture.setData("/url", "ftp://example.com/a.mp3");
       assertEquals(Optional.empty(), view.sources.getLast());
-      assertNull(view.label.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY));
+      assertNull(ViewMarks.mediaUrl(view.label).orElse(null));
       assertEquals(List.of(), opened);
 
       fixture.update(component("root", "Column", "children", List.of("after")));
