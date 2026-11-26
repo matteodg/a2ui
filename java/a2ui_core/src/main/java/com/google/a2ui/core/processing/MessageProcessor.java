@@ -44,6 +44,7 @@ import com.google.a2ui.core.validation.ValidationConfig;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -246,6 +247,54 @@ public final class MessageProcessor<C extends ComponentApi> {
         throw e;
       }
     }
+  }
+
+  /**
+   * Gets the capabilities of this renderer, without the inline catalogs. See {@link
+   * #getRendererCapabilities(Collection, boolean)}.
+   *
+   * @param versions the protocol versions to tell the capabilities for
+   * @return the capabilities by the wire value of each version, as read-only plain JSON values
+   * @throws A2uiValidationError if there is no version
+   */
+  public Map<String, Object> getRendererCapabilities(Collection<ProtocolVersion> versions) {
+    return getRendererCapabilities(versions, false);
+  }
+
+  /**
+   * Gets the capabilities of this renderer, for the agent.
+   *
+   * <p>For each version, the result has the IDs of the catalogs for that version, in sorted
+   * sequence, as {@code supportedCatalogIds}. If the caller asks for the inline catalogs, the
+   * result also has the document of each of these catalogs, as {@code inlineCatalogs}. A transport
+   * can write the result as JSON and send it.
+   *
+   * @param versions the protocol versions to tell the capabilities for
+   * @param includeInlineCatalogs true to also give the document of each catalog
+   * @return the capabilities by the wire value of each version, as read-only plain JSON values
+   * @throws A2uiValidationError if there is no version
+   */
+  public Map<String, Object> getRendererCapabilities(
+      Collection<ProtocolVersion> versions, boolean includeInlineCatalogs) {
+    Objects.requireNonNull(versions, "versions");
+    if (versions.isEmpty()) {
+      throw new A2uiValidationError("Renderer capabilities need at least one protocol version.");
+    }
+    Map<String, Object> capabilities = new LinkedHashMap<>();
+    for (ProtocolVersion version : versions) {
+      List<Catalog<C, ?>> supported =
+          catalogs.values().stream()
+              .filter(catalog -> catalog.protocolVersion().orElse(null) == version)
+              .sorted(Comparator.comparing((Catalog<C, ?> catalog) -> catalog.id()))
+              .toList();
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("supportedCatalogIds", supported.stream().map(Catalog::id).toList());
+      if (includeInlineCatalogs) {
+        entry.put("inlineCatalogs", supported.stream().map(Catalog::toJson).toList());
+      }
+      capabilities.put(version.wireValue(), Collections.unmodifiableMap(entry));
+    }
+    return Collections.unmodifiableMap(capabilities);
   }
 
   /** Deletes each surface and removes each listener. */

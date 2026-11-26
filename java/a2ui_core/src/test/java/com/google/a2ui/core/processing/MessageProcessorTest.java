@@ -525,6 +525,38 @@ class MessageProcessorTest {
     assertTrue(processor.model().all().isEmpty());
   }
 
+  @Test
+  void theCapabilitiesListTheCatalogsOfEachVersion() {
+    MessageProcessor<ComponentApi> mixed =
+        new MessageProcessor<>(List.of(customCatalog(), BasicCatalog.api()));
+
+    Map<String, Object> ids = mixed.getRendererCapabilities(List.of(ProtocolVersion.V1_0));
+    Map<String, Object> inline =
+        mixed.getRendererCapabilities(List.of(ProtocolVersion.V1_0, ProtocolVersion.V0_9), true);
+
+    // The IDs are in sorted sequence.
+    assertEquals(
+        Map.of("1.0", Map.of("supportedCatalogIds", List.of(BasicCatalog.ID, "urn:custom"))), ids);
+    assertEquals(List.of("1.0", "v0.9"), List.copyOf(inline.keySet()));
+    assertEquals(
+        List.of(BasicCatalog.api().toJson(), customCatalog().toJson()),
+        ((Map<?, ?>) inline.get("1.0")).get("inlineCatalogs"));
+    assertEquals(
+        Map.of("supportedCatalogIds", List.of(), "inlineCatalogs", List.of()), inline.get("v0.9"));
+    assertThrows(UnsupportedOperationException.class, () -> ids.clear());
+  }
+
+  @Test
+  void theCapabilitiesNeedAVersionAndShowAnAddedCatalog() {
+    assertThrows(A2uiValidationError.class, () -> processor.getRendererCapabilities(List.of()));
+
+    processor.addCatalog(customCatalog());
+
+    assertEquals(
+        Map.of("1.0", Map.of("supportedCatalogIds", List.of(BasicCatalog.ID, "urn:custom"))),
+        processor.getRendererCapabilities(List.of(ProtocolVersion.V1_0)));
+  }
+
   private String failure(Object payload) {
     return assertThrows(A2uiValidationError.class, () -> processor.processMessages(payload))
         .getMessage();
