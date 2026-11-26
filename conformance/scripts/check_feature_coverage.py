@@ -48,6 +48,7 @@ HARNESS_ALIASES: dict[str, frozenset[str]] = {
     "web_core": frozenset({"ts-web-core", "web_core"}),
     "dart-core": frozenset({"dart-core"}),
     "swift-core": frozenset({"swift-core"}),
+    "java-core": frozenset({"java-core"}),
     "python-agent": frozenset({"python-agent"}),
     "python-a2a": frozenset({"python-a2a"}),
     "python-adk": frozenset({"python-adk"}),
@@ -63,6 +64,8 @@ HARNESS_ALIASES: dict[str, frozenset[str]] = {
     "flutter": frozenset({"flutter-renderer", "flutter"}),
     "swiftui-renderer": frozenset({"swiftui-renderer", "swiftui"}),
     "swiftui": frozenset({"swiftui-renderer", "swiftui"}),
+    "swing-renderer": frozenset({"swing-renderer", "swing"}),
+    "swing": frozenset({"swing-renderer", "swing"}),
     "markdown-it-renderer": frozenset(
         {"markdown-it-renderer", "markdown-it", "markdown_it"}
     ),

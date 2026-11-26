@@ -22,6 +22,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case is for an
+      earlier version.
 - id: F-CORE-02
   title: updateComponents message handling (incremental add, replace, and root validation)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#updatecomponents
@@ -31,6 +35,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case is for an
+      earlier version or is a timing case of the performance job.
 - id: F-CORE-03
   title: updateDataModel message handling (root replacement, JSON Pointer paths, and
     key deletion)
@@ -41,6 +49,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-04
   title: deleteSurface message handling and lifecycle resource cleanup
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#deletesurface
@@ -50,6 +59,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case is for an
+      earlier version.
 - id: F-CORE-05
   title: callRendererFunction inbound RPC message execution and response dispatch
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#callrendererfunction
@@ -59,6 +72,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-06
   title: agentFunctionResponse inbound RPC settlement for pending callAgentFunction
     requests
@@ -69,6 +83,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-07
   title: Protocol version discrimination and routing (v0.8, v0.9, v0.9.1, and v1.0)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#envelope-message-structure
@@ -78,6 +93,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-08
   title: Catalog structure and identification (catalogId, components, functions, and
     theme)
@@ -88,6 +104,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-09
   title: Catalog entity naming rules (UAX 31 identifier validation for components
     and functions)
@@ -98,6 +115,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-10
   title: Mixable catalogs and multi-catalog component and function resolution per
     surface
@@ -108,6 +126,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-11
   title: Adjacency-list UI composition model with flat component array and id/root
     references
@@ -118,6 +137,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-12
   title: Composition validation rules (root existence, dangling references, cycles,
     and orphans)
@@ -128,6 +148,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-13
   title: Dynamic child list templates (template.componentId and template.dataBinding
     for arrays and maps)
@@ -138,6 +159,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-14
   title: Root-scope RFC 6901 JSON Pointer path resolution
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#the-root-scope
@@ -147,6 +169,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-15
   title: Collection-scope relative path resolution within list templates
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#collection-scopes-relative-paths
@@ -156,6 +179,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-16
   title: Data binding syntax and normalization across v0.9 path and v1.0 @path forms
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#path-resolution-scope
@@ -165,6 +189,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-17
   title: Two-way input binding read/write contract and reactive local DataModel mutation
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#two-way-binding-input-components
@@ -174,6 +199,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-18
   title: Missing-path read/write semantics (null read resolution and auto-vivifying
     object/array writes)
@@ -184,6 +210,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-19
   title: formatString function with ${...} interpolation, data bindings, nested calls,
     and escaping
@@ -194,6 +221,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-20
   title: regex validation function and ReDoS safety check
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#the-regex-function
@@ -203,6 +231,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-21
   title: "@index contextual function with collection-scope restriction and step/offset
     arguments"
@@ -213,6 +242,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-22
   title: Built-in Basic Catalog functions (length, numeric, email, required, and,
     or, not, openUrl)
@@ -223,6 +253,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-23
   title: Outbound action event message formatting and context binding resolution (v0.9
     and v1.0)
@@ -233,6 +264,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-24
   title: Outbound callAgentFunction RPC request message generation
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#callagentfunction
@@ -242,6 +274,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-25
   title: Outbound rendererFunctionResponse RPC result and error message generation
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#rendererfunctionresponse
@@ -251,6 +284,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-26
   title: Outbound error event reporting (VALIDATION_FAILED, INTEGRITY_ERROR, EXPRESSION_ERROR)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#error
@@ -260,6 +294,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-27
   title: Component validation and CheckRule evaluation (ValidationResult and DynamicBoolean
     coercion)
@@ -270,6 +305,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-28
   title: Polymorphic function usage in UI content (dynamic bindings, CheckRule conditions,
     and actions)
@@ -280,6 +316,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-29
   title: Asynchronous function evaluation, pending states, and stale call cancellation
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#2-asynchronous-evaluation-pending-states
@@ -289,6 +326,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-30
   title: Function failure propagation and recovery rules across bindings, CheckRules,
     and actions
@@ -299,6 +337,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-31
   title: Renderer capabilities generation (v0.9 supportedCatalogIds and v1.0 catalogs/inlineCatalogs)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#renderer-capabilities
@@ -308,6 +347,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-32
   title: Renderer data model synchronization envelope (sendDataModel flag and clientDataModel
     output)
@@ -318,6 +358,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case is for an
+      earlier version.
 - id: F-CORE-33
   title: Catalog-agnostic accessibility metadata (accessibility.label and accessibility.description)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#catalog-agnostic-accessibility-requirements
@@ -338,6 +382,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-35
   title: Basic Catalog v1.0 schema modernization (Modal entryPointChild, Icon.name,
     CheckBox.value)
@@ -348,6 +393,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-36
   title: Transport decoupling across A2A, AG-UI, and MCP bindings
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#transport-decoupling
@@ -369,6 +415,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-38
   title: ValidationConfig limits (maxComponentsPerSurface, maxComponentDepth, maxDataModelDepth,
     maxDataModelBytes)
@@ -389,6 +436,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-40
   title: Granular reactivity and observer isolation across surfaces, components, and
     data paths
@@ -399,6 +447,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-41
   title: GenericBinder two-way binding lifecycle, initial sync, and disposal
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#the-readwrite-contract
@@ -417,6 +466,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-43
   title: Agent-side vs renderer-side MessageProcessor execution patterns and ExecutionContext
   specAnchor: specification/v1_0/docs/sdks_spec.md#a2ui-core-sdk-a2ui_core-a2uicore
@@ -437,6 +487,7 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
 - id: F-CORE-45
   title: Node Resolution Layer (ResolvedNode, ChildList, NodeKey, ActionDispatcher,
     and resolve())
@@ -446,6 +497,10 @@
     - ts-web-core
     - dart-core
     - swift-core
+    - java-core
+  knownGaps:
+    java-core: java-core implements protocol v1.0 only, and each tagged case uses a
+      v0.9.1 fixture. NodeScenariosTest runs the fixtures as v1.0 outside the manifest.
 - id: F-AGT-01
   title: CatalogTransformer base pipeline and sequential chaining
   specAnchor: specification/v1_0/docs/sdks_spec.md#inference-sdk-a2ui_inference-a2uiinference
@@ -995,6 +1050,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-02
   title: Hierarchical tree rendering from flat adjacency list in declared child order
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#ui-composition-the-adjacency-list-model
@@ -1005,6 +1061,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-03
   title: Dynamic child list template expansion for arrays and maps with @index support
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#collection-scopes-relative-paths
@@ -1015,6 +1072,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-04
   title: Reactive one-way data binding from updateDataModel to rendered component
     properties
@@ -1026,6 +1084,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-05
   title: Two-way input binding for TextField, CheckBox, Slider, ChoicePicker, and
     DateTimeInput
@@ -1037,6 +1096,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-06
   title: User-initiated action dispatch resolving context bindings and emitting outbound
     action envelope
@@ -1048,6 +1108,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-07
   title: Local function action execution (action.functionCall) without outbound agent
     message
@@ -1059,6 +1120,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-08
   title: User activation gating for requiresUserActivation functions (such as openUrl)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#local-actions
@@ -1069,6 +1131,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-09
   title: CheckRule reactive validation states, error message display, and Button disabled
     gating
@@ -1080,6 +1143,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
   knownGaps:
     lit-renderer: Skips validation_results_error_disables_warning_allows pending warning/info
       hints rendering.
@@ -1110,6 +1174,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-12
   title: Basic Catalog layout components (Row, Column, List, Card, Tabs, Modal, Divider)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#components
@@ -1120,6 +1185,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-13
   title: Basic Catalog display and media components (Text, Image, Icon, Video, AudioPlayer)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#components
@@ -1130,6 +1196,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-14
   title: Basic Catalog interactive components (Button, TextField, CheckBox, ChoicePicker,
     Slider, DateTimeInput)
@@ -1141,6 +1208,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-15
   title: Accessibility label and description mapping to platform semantics (aria-label,
     aria-describedby, Semantics)
@@ -1152,6 +1220,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-16
   title: Safe Markdown subset rendering in Text (headings, emphasis, lists, links,
     code, raw HTML sanitization)
@@ -1164,6 +1233,7 @@
     - flutter-renderer
     - swiftui-renderer
     - markdown-it-renderer
+    - swing-renderer
   knownGaps:
     lit-renderer: adapter/markdown_subset.yaml runs against standalone markdown-it;
       Text component Markdown rendering is covered by renderer unit tests.
@@ -1182,6 +1252,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-18
   title: Multi-version Basic Catalog support (v0.9 and v1.0 property shapes)
   specAnchor: specification/v1_0/docs/evolution_guide.md#22-standard-catalogs-basic
@@ -1202,6 +1273,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-RND-20
   title: Universal Custom Elements interop across Lit, React, and Angular renderers
   specAnchor: specification/v1_0/docs/sdks_spec.md#framework-adapters-react_renderer-compose_renderer-etc
@@ -1220,6 +1292,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-01
   title: Adapter consumes ResolvedNode, ChildList, and ActionDispatcher without reimplementing
     Core logic
@@ -1231,6 +1304,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-02
   title: Surface component mounts root NodeView and scopes catalog lookup to SurfaceModel
   specAnchor: specification/v1_0/docs/sdks_spec.md#framework-adapters-react_renderer-compose_renderer-etc
@@ -1241,6 +1315,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-03
   title: NodeView dispatcher resolves ComponentImplementation by type and renders
     Placeholder when unresolved
@@ -1252,6 +1327,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-04
   title: ChildList keyed reconciliation using NodeKey (componentId and instanceId)
   specAnchor: specification/v1_0/docs/sdks_spec.md#framework-adapters-react_renderer-compose_renderer-etc
@@ -1262,6 +1338,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-05
   title: ComponentImplementation Form 1/2/3/4 idiomatic property and binding access
   specAnchor: specification/v1_0/docs/sdks_spec.md#framework-adapters-react_renderer-compose_renderer-etc
@@ -1272,6 +1349,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-06
   title: User-activation propagation into ActionDispatcher.dispatch(action, userActivated)
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#local-actions
@@ -1282,6 +1360,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-07
   title: Accessibility wrapper applies resolved label and description to host semantics
   specAnchor: specification/v1_0/docs/a2ui_protocol.md#catalog-agnostic-accessibility-requirements
@@ -1292,6 +1371,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-08
   title: Node teardown hooks (addCleanup and onDestroyed) invoked on component removal
     or surface deletion
@@ -1303,6 +1383,7 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
 - id: F-BP-09
   title: Shared v0.9 and v1.0 Basic Catalog component implementations via normalized
     props
@@ -1379,3 +1460,4 @@
     - angular-renderer
     - flutter-renderer
     - swiftui-renderer
+    - swing-renderer
