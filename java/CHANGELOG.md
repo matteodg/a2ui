@@ -37,3 +37,12 @@
   a surface for a UI adapter. Add `DataContext.get`. Add `onAction`, `onError`, `onDisposing`,
   `dispatchAction` and `dispatchError` to `SurfaceModel`, `onAction` to `SurfaceGroupModel`, and
   `RendererAction` in `com.google.a2ui.core.state`.
+- Add a `MessageProcessor` constructor with the flag `unifiedOutbound`. With the flag, the outbound
+  listener also receives an `action` message for each event action and an `error` message for each
+  failure that a surface reports. An action that fails now reports an error with the code
+  `INVALID_ACTION`, `EXECUTION_ERROR`, `EXPRESSION_ERROR` or `CATALOG_ERROR`, and a binding that
+  fails reports `EXPRESSION_ERROR` or `CATALOG_ERROR`. `NodeAction.invoke` now throws an
+  `A2uiValidationError` for metadata with a key that is not a UAX #31 identifier. An event action
+  now runs with user activation, and a `userMessage` that is not text is an error.
+  `DataContext.resolveDynamicValue` and `DataContext.evaluate` now throw an `A2uiExpressionError`
+  when the code of a function throws an exception that is not an `A2uiError`.

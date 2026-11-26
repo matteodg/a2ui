@@ -21,13 +21,13 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | `com.google.a2ui.core.resolution`         | `NodeResolver` makes the live tree of `ComponentNode` objects of a surface. `NodeProps`, `ResolvedBinding`, `WritableBinding`, `NodeAction` and `ValidationResult` are the resolved values of a node. `DataContext` resolves the data bindings and the function calls. |
 | `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                                                                                                |
 | `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts.                                                                          |
-| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent.                                                                                                             |
+| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent: actions and errors.                                                                                         |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet send actions and errors of a surface to the agent. It does not yet contain
-the function-call messages (`callRendererFunction`, `agentFunctionResponse`).
+The core does not yet contain the function-call messages (`callRendererFunction`,
+`agentFunctionResponse`).
 
 ## Threads
 
@@ -180,6 +180,33 @@ The processor also rejects a component ID or a component type that is not a UAX 
 component that calls an `agentOnly` function, and an `updateDataModel` path that does not start with
 `/`.
 
+### Messages for the agent
+
+A surface reports each event action of the user to `onAction`, and each failure to `onError`. To
+send them to the agent, make the processor with `unifiedOutbound`. Then the outbound listener also
+receives an `action` message for each event action and an `error` message for each failure. A
+transport needs only this listener.
+
+```java
+MessageProcessor<ComponentApi> processor =
+    new MessageProcessor<>(
+        List.of(BasicCatalog.withFunctions()),
+        ValidationConfig.STRICT,
+        message -> transport.send(message),
+        true);
+// {"version": "1.0", "action": {"name": "save", "surfaceId": "main", "sourceComponentId": "ok",
+//   "timestamp": "2026-11-26T10:15:30Z", "context": {"who": "Ada"}}}
+// {"version": "1.0", "error": {"code": "EXPRESSION_ERROR", "surfaceId": "main", "message": ...}}
+```
+
+Each message is a read-only map of plain JSON values with the structure of the schema
+`renderer_to_agent.json`. The listeners of `onAction` and of `onError` continue to receive their
+events. Without `unifiedOutbound`, the listener receives only the `error` message of a rejected
+message. `unifiedOutbound` without a listener causes an `IllegalArgumentException`.
+
+The listener runs in the call that reports the action or the failure. Do not throw an exception from
+the listener.
+
 ### Data for the agent
 
 `getRendererCapabilities` gives the catalogs that this renderer supports. `getRendererDataModel`
@@ -255,6 +282,10 @@ Catalog<ComponentApi, FunctionImplementation> custom =
 ```
 
 `Catalog.withFunctions` gives a catalog from a document the code of its functions.
+
+If the code of a function throws an exception that is not an `A2uiError`, the context throws an
+`A2uiExpressionError` that has the exception as its cause. Thus the exception of one function does
+not stop the resolution of a surface.
 
 A function reads data with `context.get(path)`, not directly from the data model. The node resolver
 records each path that a function reads through its context. Then it evaluates the binding again
@@ -341,7 +372,9 @@ component gives the form of each property, and the name of a property does not:
 binding in new properties. A binding is a `WritableBinding` only if the message bound the property
 to a data path. `set` writes at that path, in the data scope of the node. A property that is a
 boolean has a boolean value, with the coercion rules of the protocol. A binding that the core cannot
-evaluate has the value `null`, and the surface reports the failure to `onError` one time.
+evaluate has the value `null`, and the surface reports the failure to `onError` one time. The error
+has the code `EXPRESSION_ERROR`. If the surface cannot use the catalog of a call, the code is
+`CATALOG_ERROR`.
 
 **Templates.** A template in a child list makes one node for each item of the data list.
 `dataPath()` is the path of the item, for example `/people/1`, and `index()` is its position.
@@ -355,8 +388,22 @@ fallback view for each node where `isPlaceholder()` is true.
 **Actions.** A view calls `NodeAction.invoke()` when the user operates the component. An event
 action resolves its context at that time and the surface reports a `RendererAction` to `onAction`.
 `SurfaceGroupModel.onAction()` gives the actions of all the surfaces. A function call action runs
-the function with user activation and reports no action. A failure goes to `onError`.
-`invoke(ActionDispatchOptions.withMetadata(metadata))` sends an `action.metadata` with the event.
+the function and reports no action. Each action runs with user activation.
+`invoke(ActionDispatchOptions.withMetadata(metadata))` sends an `action.metadata` with the event. If
+a key of its extensions is not a UAX #31 identifier, `invoke` throws an `A2uiValidationError`.
+
+An action that fails reports no action. The failure goes to `onError`, and `errorCode()` tells its
+cause:
+
+| Code               | Cause                                                                                       |
+| :----------------- | :------------------------------------------------------------------------------------------ |
+| `INVALID_ACTION`   | The event has no name, or its `userMessage` is not text.                                    |
+| `EXECUTION_ERROR`  | A function ran and failed.                                                                  |
+| `EXPRESSION_ERROR` | The core refused a call before the function ran, for example a call of an unknown function. |
+| `CATALOG_ERROR`    | The surface cannot use the catalog of a call.                                               |
+
+The core resolves the context entries of an event in their sequence, and then the `userMessage`. The
+first failure stops the action. A `userMessage` that has no value is absent from the action.
 
 **Checks.** A component that has `@checks` has three more properties. `props.isValid()` is false if
 a check of the severity `error` failed. `props.validationErrors()` has the messages of these checks.
