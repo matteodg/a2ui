@@ -139,26 +139,64 @@ class IconViewTest {
   }
 
   @Test
-  void aNameThatTheCatalogDoesNotHaveShowsNothingAndKeepsItsSpace() {
+  void aNameThatTheCatalogDoesNotHaveShowsTheShapeOfHelp() {
     Edt.run(() -> {
-      show(Map.of("name", "noSuchIcon"), path("/name"));
+      show(Map.of("name", "help"), path("/name"));
+      BufferedImage help = glyphImage();
+      assertEquals("help", glyph().getAccessibleContext().getAccessibleName());
 
-      assertFalse(glyph().hasShape());
-      assertEquals(0, paintedPixels());
-      assertEquals(new Rectangle(MARGIN, MARGIN, IconView.SIZE, IconView.SIZE), glyphBounds());
-      assertNull(glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
-      assertEquals(List.of(), fixture.errors);
+      for (String unknown : new String[] {"noSuchIcon", "Help", "arrow_back", ""}) {
+        fixture.setData("/name", "check");
+        assertFalse(sameImage(help, glyphImage()));
 
-      fixture.setData("/name", "check");
-      assertTrue(glyph().hasShape());
+        fixture.setData("/name", unknown);
 
-      for (Object other : new Object[] {"", 5L, true, List.of("check"), Map.of("x", "y")}) {
-        fixture.setData("/name", other);
-        assertFalse(glyph().hasShape(), String.valueOf(other));
-        assertEquals(0, paintedPixels(), String.valueOf(other));
+        assertTrue(glyph().hasShape(), unknown);
+        assertTrue(sameImage(help, glyphImage()), unknown);
+        assertEquals(new Rectangle(MARGIN, MARGIN, IconView.SIZE, IconView.SIZE), glyphBounds());
+        // The property has the name that the agent gave. Assistive tools do not get a name.
+        assertEquals(unknown, glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+        assertNull(glyph().getAccessibleContext().getAccessibleName(), unknown);
       }
       assertEquals(List.of(), fixture.errors);
     });
+  }
+
+  @Test
+  void aValueThatIsNotATextAndNotPathDataShowsNothingAndKeepsItsSpace() {
+    Edt.run(() -> {
+      show(Map.of("name", "check"), path("/name"));
+      assertTrue(glyph().hasShape());
+
+      for (Object other : new Object[] {5L, true, List.of("check"), Map.of("x", "y")}) {
+        fixture.setData("/name", other);
+        assertFalse(glyph().hasShape(), String.valueOf(other));
+        assertEquals(0, paintedPixels(), String.valueOf(other));
+        assertNull(glyph().getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      }
+      assertEquals(new Rectangle(MARGIN, MARGIN, IconView.SIZE, IconView.SIZE), glyphBounds());
+      assertEquals(List.of(), fixture.errors);
+    });
+  }
+
+  /** Gets the image of the area of the glyph. */
+  private BufferedImage glyphImage() {
+    Rectangle area = glyphBounds();
+    return Snapshots.render(fixture.view).getSubimage(area.x, area.y, area.width, area.height);
+  }
+
+  private static boolean sameImage(BufferedImage first, BufferedImage second) {
+    if (first.getWidth() != second.getWidth() || first.getHeight() != second.getHeight()) {
+      return false;
+    }
+    for (int y = 0; y < first.getHeight(); y++) {
+      for (int x = 0; x < first.getWidth(); x++) {
+        if (first.getRGB(x, y) != second.getRGB(x, y)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   @Test
@@ -343,9 +381,11 @@ class IconViewTest {
   @Test
   void aButtonWithOnlyIconsTakesItsNameFromTheIcons() {
     Edt.run(() -> {
+      // A literal name that the catalog does not have is not correct for the validator. Thus the
+      // name comes from the data model.
       fixture.create(
-          Map.of(),
-          component("root", "Column", "children", List.of("icons", "mixed", "shape")),
+          Map.of("other", "noSuchIcon"),
+          component("root", "Column", "children", List.of("icons", "mixed", "shape", "other")),
           component("icons", "Button", "child", "icons_row", "action", event("a")),
           component("icons_row", "Row", "children", List.of("first", "second")),
           component("first", "Icon", "name", "skipNext"),
@@ -355,12 +395,16 @@ class IconViewTest {
           component("mixed_icon", "Icon", "name", "send"),
           component("mixed_text", "Text", "text", "Send the form"),
           component("shape", "Button", "child", "shape_icon", "action", event("c")),
-          component("shape_icon", "Icon", "name", Map.of("svgPath", SQUARE)));
+          component("shape_icon", "Icon", "name", Map.of("svgPath", SQUARE)),
+          component("other", "Button", "child", "other_icon", "action", event("d")),
+          component("other_icon", "Icon", "name", path("/other")));
 
       assertEquals("skip next volume up", name("icons"));
       // Visible text is before the names of the icons.
       assertEquals("Send the form", name("mixed"));
       assertTrue(name("shape") == null || name("shape").isEmpty(), name("shape"));
+      // The shape of help for a name that the catalog does not have gives no name.
+      assertTrue(name("other") == null || name("other").isEmpty(), name("other"));
     });
   }
 

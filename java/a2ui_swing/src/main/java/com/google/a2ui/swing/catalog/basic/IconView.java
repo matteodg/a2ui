@@ -43,8 +43,9 @@ import javax.swing.JComponent;
  *   <tr><td>{@code name}</td><td>A name of the catalog, for example {@code arrowBack}, shows the
  *       shape of the module for that name. An object with the key {@code svgPath} shows the SVG
  *       path data of the agent, in a view box of 24 by 24 units and with the non-zero fill rule.
- *       A name that the catalog does not have, and path data that is not correct, show no shape.
- *       The icon keeps its space then.</td></tr>
+ *       A text that is not a name of the catalog shows the shape of the name {@code help}. Thus
+ *       the user sees that an icon is there. Path data that is not correct, and a value that is
+ *       not a text and not path data, show no shape. The icon keeps its space then.</td></tr>
  * </table>
  *
  * <p>The icon is a square of {@value #SIZE} pixels, or of 1.5 times the size of the font if that is
@@ -58,9 +59,10 @@ import javax.swing.JComponent;
  * <p>The Swing component of the view is a panel that gives the margin of a leaf. The accessibility
  * attributes go to the component that paints the shape. Its accessible role is an icon. Its
  * accessible name is the name of the icon as words, for example {@code arrow back}, unless the
- * agent gave a label. An icon from path data has no name. A button whose content is only icons
- * takes its name from the names of the icons. The component has the name of the catalog as the
- * client property {@link SwingBasicCatalog#ICON_NAME_PROPERTY}.
+ * agent gave a label. An icon from path data has no name. An icon whose name the catalog does not
+ * have also has no name: the view does not tell the word {@code help} for it. A button whose
+ * content is only icons takes its name from the names of the icons. The component has the name that
+ * the agent gave as the client property {@link SwingBasicCatalog#ICON_NAME_PROPERTY}.
  */
 final class IconView implements SwingComponentView {
   /** The least width and height of an icon, in pixels. */
@@ -70,6 +72,9 @@ final class IconView implements SwingComponentView {
   private static final float FONT_SCALE = 1.5f;
 
   private static final String SVG_PATH = "svgPath";
+
+  /** The name of the shape that the view shows for a name that the catalog does not have. */
+  static final String UNKNOWN_NAME_SHAPE = "help";
 
   private final LeafPanel panel = new LeafPanel();
   private final Glyph glyph = new Glyph();
@@ -109,14 +114,20 @@ final class IconView implements SwingComponentView {
     first = false;
     shown = name;
     Shape shape = null;
+    String sent = null;
     String known = null;
     if (name instanceof String text) {
+      sent = text;
       shape = IconShapes.named(text).orElse(null);
-      known = shape == null ? null : text;
+      if (shape != null) {
+        known = text;
+      } else {
+        shape = IconShapes.named(UNKNOWN_NAME_SHAPE).orElse(null);
+      }
     } else if (name instanceof Map<?, ?> map && map.get(SVG_PATH) instanceof String data) {
       shape = SvgPath.parse(data).orElse(null);
     }
-    glyph.show(shape, known);
+    glyph.show(shape, sent, known);
   }
 
   /** Gets the name of a named icon as words, as the name of the icon for assistive tools. */
@@ -150,7 +161,7 @@ final class IconView implements SwingComponentView {
     /** The shape in the view box, or null if the icon shows nothing. */
     private transient Shape shape;
 
-    /** The name of the catalog that the shape has, or null. */
+    /** The name of the catalog that the shape has, or null if the shape is not of a name. */
     private String name;
 
     Glyph() {
@@ -159,11 +170,18 @@ final class IconView implements SwingComponentView {
       setFocusable(false);
     }
 
-    /** Sets the shape, and the name of the catalog that the shape has. */
-    void show(Shape nextShape, String nextName) {
+    /**
+     * Sets the shape.
+     *
+     * @param nextShape the shape, or null if the icon shows nothing
+     * @param sentName the name that the agent gave, or null if the agent gave no name
+     * @param knownName the name of the catalog that the shape has, or null. The name is null for a
+     *     name that the catalog does not have, although the icon shows a shape then.
+     */
+    void show(Shape nextShape, String sentName, String knownName) {
       shape = nextShape;
-      name = nextName;
-      putClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY, nextName);
+      name = knownName;
+      putClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY, sentName);
       repaint();
     }
 
