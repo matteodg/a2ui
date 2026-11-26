@@ -51,7 +51,8 @@ import javax.swing.JComponent;
  *       default is {@code mediumFeature}.</td></tr>
  *   <tr><td>{@code fit}</td><td>How the image fills its box, as CSS {@code object-fit}: {@code
  *       contain}, {@code cover}, {@code fill}, {@code none} or {@code scaleDown}. The default is
- *       {@code fill}, and {@code cover} for the variant {@code header}.</td></tr>
+ *       {@code fill}. For the variants {@code avatar} and {@code header}, the default is {@code
+ *       cover}. Thus a photograph keeps its proportions in these boxes.</td></tr>
  * </table>
  *
  * <p>The box of each variant is this:
@@ -167,7 +168,10 @@ final class ImageView implements SwingComponentView {
     canvas.variant = variant;
     canvas.fit =
         Picture.Fit.fromWire(props.value("fit"))
-            .orElse(variant == Variant.HEADER ? Picture.Fit.COVER : Picture.Fit.FILL);
+            .orElse(
+                variant == Variant.HEADER || variant == Variant.AVATAR
+                    ? Picture.Fit.COVER
+                    : Picture.Fit.FILL);
     source.show(props.value("url"));
     canvas.putClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY, source.url().orElse(null));
     Object text = props.value("description");

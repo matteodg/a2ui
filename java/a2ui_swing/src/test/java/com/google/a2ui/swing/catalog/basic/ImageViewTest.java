@@ -453,6 +453,32 @@ class ImageViewTest {
   }
 
   @Test
+  void anAvatarCoversItsBoxWithNoFit() {
+    Edt.run(() -> {
+      show(Map.of(), "url", A, "variant", "avatar");
+      // The image is wide, with a blue band at its left side.
+      BufferedImage image = red(80, 40);
+      for (int y = 0; y < 40; y++) {
+        for (int x = 0; x < 20; x++) {
+          image.setRGB(x, y, Color.BLUE.getRGB());
+        }
+      }
+      complete(A, image);
+
+      // The circle shows the center of the image.
+      assertEquals(RED, colorAt(5, 20));
+      assertEquals(RED, colorAt(35, 20));
+
+      update("url", A, "variant", "avatar", "fit", "fill");
+      assertEquals(Color.BLUE, colorAt(5, 20));
+      assertEquals(RED, colorAt(35, 20));
+
+      update("url", A, "variant", "icon");
+      assertEquals(Color.BLUE, colorAt(2, 12));
+    });
+  }
+
+  @Test
   void aLargeImageHasTheWidthOfItsContainerAndALimitForItsHeight() {
     Edt.run(() -> {
       show(Map.of(), "url", A, "variant", "largeFeature");
