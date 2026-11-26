@@ -20,10 +20,15 @@ import com.google.a2ui.core.common.Subscription;
 import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeResolver;
 import com.google.a2ui.core.state.SurfaceModel;
+import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.nodes.NodeHost;
 import com.google.a2ui.swing.nodes.SurfaceScope;
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Insets;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +36,9 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JViewport;
+import javax.swing.Scrollable;
+import javax.swing.SwingConstants;
 
 /**
  * The Swing component that shows one surface.
@@ -54,11 +62,20 @@ import javax.swing.JPanel;
  * <p>The root view fills the component. While the surface has no root component, the component
  * shows the {@code pending} fallback, or nothing.
  *
+ * <p>The component can be the view of a {@code JScrollPane}. Then it has the width of the viewport,
+ * and its text breaks at that width. Its height is the height that its content needs at that width.
+ * Thus the scroll pane scrolls vertically. The scroll pane scrolls horizontally only when the
+ * viewport is narrower than the minimum width of the content. A content that is shorter than the
+ * viewport fills the viewport.
+ *
  * <p>Use the component only on the event dispatch thread. The constructors and the life cycle
  * methods throw an {@code IllegalStateException} on each other thread.
  */
-public final class A2uiSurface extends JPanel {
+public final class A2uiSurface extends JPanel implements HeightForWidth, Scrollable {
   private static final long serialVersionUID = 1L;
+
+  /** The distance of one step of a scroll bar, in pixels. */
+  private static final int SCROLL_UNIT = 16;
 
   private final transient SurfaceModel<? extends SwingComponentImplementation> surface;
   private final transient A2uiFallbacks fallbacks;
@@ -199,6 +216,116 @@ public final class A2uiSurface extends JPanel {
     A2uiSwing.requireEventDispatchThread();
     unmount();
     super.removeNotify();
+  }
+
+  /**
+   * Gets the preferred height of this component at a width. The height is the height that the
+   * content needs when its text breaks at that width.
+   *
+   * @param width the width of this component in pixels, with its insets
+   * @return the height in pixels, with the insets
+   */
+  @Override
+  public int preferredHeightFor(int width) {
+    if (isPreferredSizeSet()) {
+      return super.getPreferredSize().height;
+    }
+    Insets insets = getInsets();
+    int height = 0;
+    if (content != null && content.isVisible()) {
+      height =
+          content instanceof HeightForWidth wrapping
+              ? wrapping.preferredHeightFor(Math.max(0, width - insets.left - insets.right))
+              : content.getPreferredSize().height;
+    }
+    return height + insets.top + insets.bottom;
+  }
+
+  /**
+   * Gets the preferred size of this component. In a viewport, the size is the size of the content
+   * at the width of the viewport. In each other parent, it is the size of the content with no line
+   * breaks, as Swing specifies.
+   *
+   * @return the preferred size
+   */
+  @Override
+  public Dimension getPreferredSize() {
+    Dimension natural = super.getPreferredSize();
+    if (isPreferredSizeSet()
+        || !(getParent() instanceof JViewport viewport)
+        || viewport.getWidth() <= 0) {
+      return natural;
+    }
+    int width = Math.max(viewport.getWidth(), getMinimumSize().width);
+    return new Dimension(width, preferredHeightFor(width));
+  }
+
+  /**
+   * Sets the position and the size of this component. In a viewport, a new width changes the
+   * preferred height. Thus the scroll pane does its layout again, after the layout that is in
+   * progress. Swing ignores a request that code makes during a layout.
+   */
+  @Override
+  public void setBounds(int x, int y, int width, int height) {
+    boolean widthChanged = width != getWidth();
+    super.setBounds(x, y, width, height);
+    if (widthChanged && getParent() instanceof JViewport) {
+      EventQueue.invokeLater(this::revalidate);
+    }
+  }
+
+  /**
+   * Gets the size of the viewport that shows the full content with no line breaks.
+   *
+   * @return the preferred size of the content
+   */
+  @Override
+  public Dimension getPreferredScrollableViewportSize() {
+    return super.getPreferredSize();
+  }
+
+  /**
+   * Gets the distance of one step of a scroll bar.
+   *
+   * @return the distance in pixels
+   */
+  @Override
+  public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+    return SCROLL_UNIT;
+  }
+
+  /**
+   * Gets the distance of one page of a scroll bar. It is the visible part less one step.
+   *
+   * @return the distance in pixels
+   */
+  @Override
+  public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+    int visible = orientation == SwingConstants.VERTICAL ? visibleRect.height : visibleRect.width;
+    return Math.max(SCROLL_UNIT, visible - SCROLL_UNIT);
+  }
+
+  /**
+   * Tells if this component has the width of its viewport.
+   *
+   * @return false only if the viewport is narrower than the minimum width of the content
+   */
+  @Override
+  public boolean getScrollableTracksViewportWidth() {
+    return !(getParent() instanceof JViewport viewport)
+        || viewport.getWidth() >= getMinimumSize().width;
+  }
+
+  /**
+   * Tells if this component has the height of its viewport.
+   *
+   * @return true if the content is not higher than the viewport. Then the content fills the
+   *     viewport.
+   */
+  @Override
+  public boolean getScrollableTracksViewportHeight() {
+    return getParent() instanceof JViewport viewport
+        && viewport.getHeight() >= getPreferredSize().height;
   }
 
   private void unmount() {
