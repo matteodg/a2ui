@@ -87,3 +87,8 @@ uv run --project ../conformance python ../conformance/scripts/check_executed_cas
 - Core design: [blueprints/modules/a2ui_core.blueprint.md](../blueprints/modules/a2ui_core.blueprint.md)
 - Adapter design:
   [blueprints/modules/a2ui_framework_adapter.blueprint.md](../blueprints/modules/a2ui_framework_adapter.blueprint.md)
+- Local decisions of the core:
+  [blueprints/codebases/java/a2ui_core/codebase.blueprint.md](../blueprints/codebases/java/a2ui_core/codebase.blueprint.md)
+- Local decisions of the adapter:
+  [blueprints/codebases/java/a2ui_swing/codebase.blueprint.md](../blueprints/codebases/java/a2ui_swing/codebase.blueprint.md)
+- Changes: [CHANGELOG.md](CHANGELOG.md)

@@ -7,10 +7,9 @@ module `java.desktop`.
 The module implements the A2UI protocol v1.0. The design obeys
 [blueprints/modules/a2ui_framework_adapter.blueprint.md](../../blueprints/modules/a2ui_framework_adapter.blueprint.md).
 
-This version has the surface component, the node dispatcher, the types for component
-implementations, the layout of the containers, the services, and the basic catalog with the views of
-five components: `Text`, `Row`, `Column`, `Button` and `TextField`. A later version adds the views
-of the other components. See [the basic catalog](#the-basic-catalog).
+The module has the surface component, the node dispatcher, the types for component implementations,
+the layout of the containers, the services, and the basic catalog. The basic catalog has a view for
+each of its 18 components. See [the basic catalog](#the-basic-catalog).
 
 The sample application [`samples/client/swing`](../../samples/client/swing) is a gallery that shows
 the examples of the basic catalog with this module.
