@@ -19,6 +19,9 @@ package com.google.a2ui.core.basic_catalog.v1_0;
 import com.google.a2ui.core.catalog.FunctionBody;
 import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
+import com.google.a2ui.core.expressions.Expression;
+import com.google.a2ui.core.expressions.ExpressionParser;
+import com.google.a2ui.core.resolution.DataContext;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -58,7 +61,22 @@ final class BasicFunctions {
     bodies.put(
         "or", (args, context) -> operands("or", args.get("values")).anyMatch(Coercion::toBoolean));
     bodies.put("not", (args, context) -> !Coercion.toBoolean(args.get("value")));
+    bodies.put("formatString", (args, context) -> formatString(args.get("value"), context));
     return bodies;
+  }
+
+  /**
+   * Replaces each <code>${...}</code> expression of a template with its value as text.
+   *
+   * <p>The context of the call evaluates each expression. Thus a relative path starts at the
+   * position of the call, and a function call in the template runs in the catalog of this function.
+   */
+  private static String formatString(Object template, DataContext context) {
+    StringBuilder text = new StringBuilder();
+    for (Expression part : ExpressionParser.parseTemplate(Coercion.toText(template))) {
+      text.append(Coercion.toText(context.evaluate(part)));
+    }
+    return text.toString();
   }
 
   // Logic. Each operand is a boolean after the rules of `Coercion.toBoolean`. Thus the validation

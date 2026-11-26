@@ -180,6 +180,49 @@ class BasicFunctionsTest {
   }
 
   @Test
+  void formatStringReadsPathsFromThePositionOfTheCall() {
+    Map<String, Object> data =
+        Map.of("title", "List", "items", List.of(Map.of("n", 1), Map.of("n", 3)));
+    DataContext item = context(BasicCatalog.withFunctions(), data).nested("items/1", 1);
+
+    Object text =
+        item.resolveDynamicValue(
+            call("formatString", "value", "${/title} #${@index(offset: 1)}: ${n}"));
+
+    assertEquals("List #2: 3", text);
+  }
+
+  @Test
+  void formatStringWritesEachValueAsText() {
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("whole", 3.0);
+    data.put("fraction", 2.5);
+    data.put("flag", true);
+    data.put("object", Map.of("a", List.of(1, 2.5)));
+    DataContext context = context(BasicCatalog.withFunctions(), data);
+    String template = "${/whole}|${/fraction}|${/flag}|${/object}|${/missing}|${null}|\\${x}";
+
+    Object text = context.resolveDynamicValue(call("formatString", "value", template));
+
+    assertEquals("3|2.5|true|{\"a\":[1,2.5]}|||${x}", text);
+    assertEquals("5", evaluate("formatString", "value", 5));
+    assertEquals("", evaluate("formatString", "value", null));
+  }
+
+  @Test
+  void formatStringRunsTheCallsOfItsTemplate() {
+    String template = "${not(value: required(value: ''))} ${not(value: not(value: 'true'))}";
+
+    assertEquals("true true", evaluate("formatString", "value", template));
+  }
+
+  @Test
+  void formatStringFailsForATemplateThatIsNotCorrect() {
+    assertThrows(A2uiExpressionError.class, () -> evaluate("formatString", "value", "${"));
+    assertThrows(A2uiExpressionError.class, () -> evaluate("formatString", "value", "${nope()}"));
+  }
+
+  @Test
   void aFunctionThatTheSdkDoesNotImplementFailsWhenItRuns() {
     A2uiExpressionError error =
         assertThrows(
