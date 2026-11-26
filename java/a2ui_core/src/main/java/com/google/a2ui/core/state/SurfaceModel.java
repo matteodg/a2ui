@@ -25,6 +25,7 @@ import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.AgentRequests;
 import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.ExtensionKeys;
 import java.time.Instant;
@@ -59,6 +60,14 @@ public final class SurfaceModel<C extends ComponentApi> {
   private final EventNotifier<RendererAction> actions = new EventNotifier<>();
   private final EventNotifier<A2uiError> errors = new EventNotifier<>();
   private final EventNotifier<SurfaceModel<C>> disposing = new EventNotifier<>();
+  private final AgentRequests agentRequests;
+  private boolean disposed;
+
+  static {
+    // The data context is in a different package. It gets the requests of a surface through
+    // this function, which is not part of the API.
+    AgentRequests.register(surface -> surface.agentRequests);
+  }
 
   /**
    * Makes a surface that has no data and no components.
@@ -82,6 +91,7 @@ public final class SurfaceModel<C extends ComponentApi> {
       boolean sendDataModel,
       A2uiMetadata metadata) {
     this.id = Objects.requireNonNull(id, "id");
+    this.agentRequests = new AgentRequests(id);
     this.protocolVersion = Objects.requireNonNull(protocolVersion, "protocolVersion");
     this.defaultCatalog = defaultCatalog;
     this.availableCatalogs =
@@ -250,6 +260,45 @@ public final class SurfaceModel<C extends ComponentApi> {
   }
 
   /**
+   * Gets the caller that sends a function call of this surface to the agent.
+   *
+   * @return the caller, or an empty result if the surface cannot send a call to the agent
+   */
+  public Optional<AgentFunctionCaller> agentFunctionCaller() {
+    return Optional.ofNullable(agentRequests.caller());
+  }
+
+  /**
+   * Sets the caller that sends a function call of this surface to the agent.
+   *
+   * <p>With a caller, the surface sends each function call that its catalog does not implement to
+   * the agent. This applies to the bindings, the checks and the actions of the components. The
+   * value of such a call is null until the agent answers. Then the node resolver resolves the node
+   * of the binding again. Without a caller, such a call fails.
+   *
+   * <p>The surface shares one request between the identical calls that bindings make while the
+   * request waits. It keeps the last 256 answers, and a binding that makes an identical call uses
+   * the answer. A call of an action is always a new request.
+   *
+   * <p>A different caller removes the shared requests and the answers that the surface keeps. A
+   * disposed surface ignores this method.
+   *
+   * @param caller the caller, or null if the surface cannot send a call to the agent
+   */
+  public void setAgentFunctionCaller(AgentFunctionCaller caller) {
+    agentRequests.caller(caller);
+  }
+
+  /**
+   * Tells if the surface is disposed.
+   *
+   * @return true after {@link #dispose()}
+   */
+  public boolean isDisposed() {
+    return disposed;
+  }
+
+  /**
    * Gets the source of the action events. An event occurs when a component of this surface reports
    * an action for the agent.
    *
@@ -370,9 +419,12 @@ public final class SurfaceModel<C extends ComponentApi> {
 
   /**
    * Notifies the listeners of {@link #onDisposing()}. Then removes each component and each listener
-   * of the surface.
+   * of the surface. The surface also removes its agent function caller. Thus a subsequent call
+   * sends nothing to the agent.
    */
   public void dispose() {
+    disposed = true;
+    agentRequests.dispose();
     disposing.emit(this);
     disposing.dispose();
     componentsModel.dispose();

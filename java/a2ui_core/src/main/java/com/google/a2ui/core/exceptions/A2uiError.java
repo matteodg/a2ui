@@ -76,6 +76,16 @@ public sealed class A2uiError extends RuntimeException
           public boolean isRaisedByFunction(A2uiError error) {
             return error.raisedByFunction;
           }
+
+          @Override
+          public void failedByAgent(A2uiError error) {
+            error.failedByAgent = true;
+          }
+
+          @Override
+          public boolean isFailedByAgent(A2uiError error) {
+            return error.failedByAgent;
+          }
         });
   }
 
@@ -101,6 +111,12 @@ public sealed class A2uiError extends RuntimeException
    * the function ran.
    */
   private boolean raisedByFunction;
+
+  /**
+   * True if the agent failed a call that the renderer sent to it, or did not answer the call in
+   * time.
+   */
+  private boolean failedByAgent;
 
   /**
    * Makes an error with a message.

@@ -25,7 +25,8 @@ import java.util.Objects;
  * Writes the context of an {@link A2uiError}: the surface, the function call, the path, the
  * protocol error code and the details.
  *
- * <p>The class also keeps one fact that is not public: the code of a function caused the error.
+ * <p>The class also keeps two facts that are not public: the code of a function caused the error,
+ * and the agent failed a call that the renderer sent to it.
  *
  * <p>Only the core writes the context of an error. The public API of the error can only read it.
  * The error class gives its writer to this class, because this package is not exported. Thus code
@@ -91,6 +92,21 @@ public final class ErrorFields {
      * @return true if the code of a function caused the error
      */
     boolean isRaisedByFunction(A2uiError error);
+
+    /**
+     * Records that the agent failed a call of the renderer, or did not answer it in time.
+     *
+     * @param error the error to change
+     */
+    void failedByAgent(A2uiError error);
+
+    /**
+     * Tells if the agent failed a call of the renderer, or did not answer it in time.
+     *
+     * @param error the error to examine
+     * @return true if the agent caused the error
+     */
+    boolean isFailedByAgent(A2uiError error);
   }
 
   /** The writer of the error class. The initialization of that class sets it. */
@@ -198,5 +214,29 @@ public final class ErrorFields {
    */
   public static boolean isRaisedByFunction(A2uiError error) {
     return writer.isRaisedByFunction(error);
+  }
+
+  /**
+   * Records that the agent failed a call that the renderer sent to it, or did not answer the call
+   * in time.
+   *
+   * @param <E> the type of the error
+   * @param error the error to change
+   * @return the same error
+   */
+  public static <E extends A2uiError> E failedByAgent(E error) {
+    writer.failedByAgent(error);
+    return error;
+  }
+
+  /**
+   * Tells if the agent failed a call that the renderer sent to it, or did not answer the call in
+   * time.
+   *
+   * @param error the error to examine
+   * @return true if the agent caused the failure
+   */
+  public static boolean isFailedByAgent(A2uiError error) {
+    return writer.isFailedByAgent(error);
   }
 }

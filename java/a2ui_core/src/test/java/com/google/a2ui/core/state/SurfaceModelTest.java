@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 class SurfaceModelTest {
@@ -165,6 +166,26 @@ class SurfaceModelTest {
     surface.dispose();
 
     assertEquals(List.of(1), counts);
+  }
+
+  @Test
+  void aSurfaceHasNoAgentFunctionCallerUntilOneIsSetAndNoneAfterItsDisposal() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+    AgentFunctionCaller caller = call -> new CompletableFuture<>();
+
+    assertEquals(Optional.empty(), surface.agentFunctionCaller());
+    assertFalse(surface.isDisposed());
+    surface.setAgentFunctionCaller(caller);
+    assertEquals(Optional.of(caller), surface.agentFunctionCaller());
+    surface.setAgentFunctionCaller(null);
+    assertEquals(Optional.empty(), surface.agentFunctionCaller());
+
+    surface.setAgentFunctionCaller(caller);
+    surface.dispose();
+    assertTrue(surface.isDisposed());
+    assertEquals(Optional.empty(), surface.agentFunctionCaller());
+    surface.setAgentFunctionCaller(caller);
+    assertEquals(Optional.empty(), surface.agentFunctionCaller());
   }
 
   @Test
