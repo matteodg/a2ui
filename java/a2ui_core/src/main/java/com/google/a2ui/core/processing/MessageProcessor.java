@@ -60,7 +60,9 @@ import java.util.stream.Collectors;
  * #model()}.
  *
  * <p>The processor examines a full message before it changes a surface. Thus a message that it
- * rejects changes nothing. In a batch, the messages before the rejected message stay applied.
+ * rejects changes nothing. In a batch, the messages before the rejected message stay applied. For a
+ * rejected message, the processor sends the {@code error} message of the protocol to its {@link
+ * OutboundMessageListener}, and then it throws the error.
  *
  * <p>The processor handles {@code createSurface}, {@code updateComponents}, {@code updateDataModel}
  * and {@code deleteSurface}. It does not yet handle {@code callRendererFunction} and {@code
@@ -83,6 +85,12 @@ public final class MessageProcessor<C extends ComponentApi> {
   private static final Set<String> SURFACE_ACTIONS =
       Set.of("createSurface", "updateComponents", "updateDataModel", "deleteSurface");
 
+  /** The error codes whose {@code error} message tells the location of the problem. */
+  private static final Set<String> LOCATED_CODES =
+      Set.of("VALIDATION_FAILED", "UNALLOWED_PARENT", "UNALLOWED_CHILD");
+
+  private static final String CALL_RENDERER_FUNCTION = "callRendererFunction";
+
   /** The keys whose text value is a JSON Pointer. */
   private static final List<String> PATH_KEYS = List.of("path", "@path");
 
@@ -90,6 +98,7 @@ public final class MessageProcessor<C extends ComponentApi> {
   private final Map<String, Catalog<C, ?>> catalogs = new LinkedHashMap<>();
   private final Map<String, Catalog<C, ?>> catalogsView = Collections.unmodifiableMap(catalogs);
   private final ValidationConfig validationConfig;
+  private final OutboundMessageListener outboundListener;
   private final Map<Catalog<?, ?>, CatalogChecks> checks = new IdentityHashMap<>();
   private final Map<Catalog<?, ?>, CatalogSchemaIndex> indexes = new IdentityHashMap<>();
 
@@ -114,8 +123,28 @@ public final class MessageProcessor<C extends ComponentApi> {
    */
   public MessageProcessor(
       Collection<? extends Catalog<C, ?>> catalogs, ValidationConfig validationConfig) {
+    this(catalogs, validationConfig, null);
+  }
+
+  /**
+   * Makes a processor that sends messages to the agent.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @param validationConfig the problems to accept. A null value stops the catalog checks and the
+   *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
+   *     message envelope and to resolve each catalog.
+   * @param outboundListener receives the messages for the agent, or null. At this time, the
+   *     processor sends only the {@code error} message for each message that it rejects. It sends
+   *     the message before it throws the error.
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   */
+  public MessageProcessor(
+      Collection<? extends Catalog<C, ?>> catalogs,
+      ValidationConfig validationConfig,
+      OutboundMessageListener outboundListener) {
     Objects.requireNonNull(catalogs, "catalogs");
     this.validationConfig = validationConfig;
+    this.outboundListener = outboundListener;
     for (Catalog<C, ?> catalog : catalogs) {
       if (this.catalogs.put(catalog.id(), catalog) != null) {
         throw new A2uiCatalogError("Two catalogs have the id '" + catalog.id() + "'.");
@@ -182,6 +211,10 @@ public final class MessageProcessor<C extends ComponentApi> {
    * list can contain lists and wrappers. A null payload and an empty list contain no message. The
    * processor ignores the other keys of a wrapper, but it examines their depth and their paths.
    *
+   * <p>The error of a rejected message tells its surface or its function call, and the location and
+   * the details of its problems if it knows them. Before the processor throws the error, it sends
+   * the {@code error} message of the protocol to the outbound listener.
+   *
    * @param payload the payload, as plain JSON values
    * @param validationConfig the problems to accept. It replaces the configuration of the processor
    *     for this call only. A null value stops the catalog checks and the graph checks.
@@ -206,7 +239,11 @@ public final class MessageProcessor<C extends ComponentApi> {
       try {
         process(index, message, validationConfig);
       } catch (A2uiError e) {
-        throw withMessageContext(e, message);
+        withMessageContext(e, message);
+        if (outboundListener != null) {
+          outboundListener.onMessage(errorMessage(e, actionOf(message)));
+        }
+        throw e;
       }
     }
   }
@@ -249,10 +286,8 @@ public final class MessageProcessor<C extends ComponentApi> {
   /**
    * Writes the function call and the surface of a rejected message to its error, unless the error
    * already has them.
-   *
-   * @return the same error
    */
-  private static A2uiError withMessageContext(A2uiError error, Map<String, Object> message) {
+  private static void withMessageContext(A2uiError error, Map<String, Object> message) {
     String action = actionOf(message);
     Map<String, Object> body = action == null ? null : Json.asObject(message.get(action));
     if (error.functionCallId().isEmpty()
@@ -268,7 +303,50 @@ public final class MessageProcessor<C extends ComponentApi> {
         ErrorFields.surfaceId(error, "");
       }
     }
-    return error;
+  }
+
+  /**
+   * Makes the {@code error} message that tells the agent about a rejected message.
+   *
+   * @param action the action of the rejected message, or null
+   */
+  private static Map<String, Object> errorMessage(A2uiError error, String action) {
+    boolean isCall = CALL_RENDERER_FUNCTION.equals(action);
+    String code = error.errorCode().orElseGet(() -> defaultCode(error, isCall));
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("code", code);
+    // An error is about a function call or about a surface, not about the two.
+    if (isCall && error.functionCallId().isPresent()) {
+      body.put("functionCallId", error.functionCallId().get());
+    } else {
+      body.put("surfaceId", error.surfaceId().orElse(""));
+    }
+    if (LOCATED_CODES.contains(code)) {
+      body.put("path", error.path().orElse("/"));
+    }
+    body.put("message", error.getMessage() == null ? "" : error.getMessage());
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("version", ProtocolVersion.V1_0.wireValue());
+    message.put("error", Collections.unmodifiableMap(body));
+    return Collections.unmodifiableMap(message);
+  }
+
+  /** Gets the protocol error code of an error that has no code of its own. */
+  private static String defaultCode(A2uiError error, boolean isCall) {
+    if (isCall) {
+      return "INVALID_FUNCTION_CALL";
+    }
+    return switch (error) {
+      case A2uiCatalogError _ -> "CATALOG_NOT_FOUND";
+      case A2uiRecursionError _ -> "RECURSION_LIMIT_EXCEEDED";
+      case A2uiIntegrityError _ -> "INTEGRITY_ERROR";
+      case A2uiStateError _ -> "STATE_ERROR";
+      // The code VALIDATION_FAILED needs a path.
+      case A2uiValidationError invalid ->
+          invalid.path().isPresent() ? "VALIDATION_FAILED" : "SCHEMA_VALIDATION_FAILED";
+      case A2uiDataError _ -> "DATA_ERROR";
+      default -> "INTERNAL_ERROR";
+    };
   }
 
   /** Gets the first action key of a message, or null if the message has no action. */
