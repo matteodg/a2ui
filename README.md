@@ -157,6 +157,16 @@ The Swift libraries are distributed via Swift Package Manager from
 | [A2UISwiftCore, BasicCatalog](swift/core/)         | Message processor, data model, expression evaluation, and basic catalog definitions. |
 | [A2UISwiftUI, BasicCatalogSwiftUI](swift/swiftui/) | SwiftUI renderer and basic catalog views.                                            |
 
+### Java
+
+The Java libraries implement protocol v1.0 and are built with Maven from
+[java/](java/). They are not published yet.
+
+| Package                             | Description                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| [a2ui-java-core](java/a2ui_core/)   | Message processor, data model, expression evaluation, and basic catalog definitions. |
+| [a2ui-java-swing](java/a2ui_swing/) | Swing renderer and basic catalog views.                                              |
+
 ## Roadmap
 
 The [A2UI roadmap](https://a2ui.org/roadmap/) tracks the five-stage workflow for
