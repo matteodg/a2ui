@@ -26,6 +26,7 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiErrorDetail;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.exceptions.A2uiIntegrityError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
 import com.google.a2ui.core.exceptions.A2uiStateError;
@@ -37,6 +38,7 @@ import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.state.ComponentModel;
+import com.google.a2ui.core.state.RendererAction;
 import com.google.a2ui.core.state.SurfaceComponentsModel;
 import com.google.a2ui.core.state.SurfaceGroupModel;
 import com.google.a2ui.core.state.SurfaceModel;
@@ -64,6 +66,12 @@ import java.util.stream.Collectors;
  * rejects changes nothing. In a batch, the messages before the rejected message stay applied. For a
  * rejected message, the processor sends the {@code error} message of the protocol to its {@link
  * OutboundMessageListener}, and then it throws the error.
+ *
+ * <p>A processor with a unified outbound listener also sends the listener each message that a
+ * surface has for the agent. It sends an {@code action} message for each event action that a
+ * surface reports to its {@code onAction}. It sends an {@code error} message for each failure that
+ * a surface reports to its {@code onError}, for example a binding that the core cannot evaluate.
+ * The listeners of the surfaces continue to receive their events.
  *
  * <p>The processor handles {@code createSurface}, {@code updateComponents}, {@code updateDataModel}
  * and {@code deleteSurface}. It does not yet handle {@code callRendererFunction} and {@code
@@ -134,22 +142,72 @@ public final class MessageProcessor<C extends ComponentApi> {
    * @param validationConfig the problems to accept. A null value stops the catalog checks and the
    *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
    *     message envelope and to resolve each catalog.
-   * @param outboundListener receives the messages for the agent, or null. At this time, the
-   *     processor sends only the {@code error} message for each message that it rejects. It sends
-   *     the message before it throws the error.
+   * @param outboundListener receives the messages for the agent, or null. The processor sends the
+   *     {@code error} message for each message that it rejects. It sends the message before it
+   *     throws the error. The processor does not send the actions and the failures of the surfaces.
    * @throws A2uiCatalogError if two catalogs have the same ID
    */
   public MessageProcessor(
       Collection<? extends Catalog<C, ?>> catalogs,
       ValidationConfig validationConfig,
       OutboundMessageListener outboundListener) {
+    this(catalogs, validationConfig, outboundListener, false);
+  }
+
+  /**
+   * Makes a processor that sends messages to the agent, and that can send all of them to one
+   * listener.
+   *
+   * <p>With {@code unifiedOutbound}, the listener also receives an {@code action} message for each
+   * event action that a surface reports, and an {@code error} message for each failure that a
+   * surface reports after the processor accepted its messages. Each message is a read-only map of
+   * plain JSON values with the structure of the schema {@code renderer_to_agent.json}. Thus a
+   * transport needs only this listener. The listeners of {@code onAction} and of {@code onError}
+   * continue to receive their events.
+   *
+   * <p>The listener runs in the call that reports the action or the failure. An exception of the
+   * listener goes to the caller of that call.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @param validationConfig the problems to accept. A null value stops the catalog checks and the
+   *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
+   *     message envelope and to resolve each catalog.
+   * @param outboundListener receives the messages for the agent, or null. The processor sends the
+   *     {@code error} message for each message that it rejects. It sends the message before it
+   *     throws the error.
+   * @param unifiedOutbound true to also send the actions and the failures of the surfaces to the
+   *     listener
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   * @throws IllegalArgumentException if {@code unifiedOutbound} is true and there is no listener
+   */
+  public MessageProcessor(
+      Collection<? extends Catalog<C, ?>> catalogs,
+      ValidationConfig validationConfig,
+      OutboundMessageListener outboundListener,
+      boolean unifiedOutbound) {
     Objects.requireNonNull(catalogs, "catalogs");
+    if (unifiedOutbound && outboundListener == null) {
+      throw new IllegalArgumentException("unifiedOutbound needs an outboundListener.");
+    }
     this.validationConfig = validationConfig;
     this.outboundListener = outboundListener;
     for (Catalog<C, ?> catalog : catalogs) {
       if (this.catalogs.put(catalog.id(), catalog) != null) {
         throw new A2uiCatalogError("Two catalogs have the id '" + catalog.id() + "'.");
       }
+    }
+    if (unifiedOutbound) {
+      // Each surface of the model sends its messages, also a surface that the application adds.
+      model
+          .onSurfaceCreated()
+          .subscribe(surface -> {
+            surface
+                .onAction()
+                .subscribe(action -> outboundListener.onMessage(actionMessage(action)));
+            surface
+                .onError()
+                .subscribe(error -> outboundListener.onMessage(errorMessage(error, null)));
+          });
     }
   }
 
@@ -392,8 +450,17 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
   }
 
+  /** Makes the {@code action} message that tells the agent about an action of the user. */
+  private static Map<String, Object> actionMessage(RendererAction action) {
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("version", ProtocolVersion.V1_0.wireValue());
+    message.put("action", action.toJson());
+    return Collections.unmodifiableMap(message);
+  }
+
   /**
-   * Makes the {@code error} message that tells the agent about a rejected message.
+   * Makes the {@code error} message that tells the agent about a rejected message, or about a
+   * failure that a surface reports.
    *
    * @param action the action of the rejected message, or null
    */
@@ -432,6 +499,7 @@ public final class MessageProcessor<C extends ComponentApi> {
       case A2uiValidationError invalid ->
           invalid.path().isPresent() ? "VALIDATION_FAILED" : "SCHEMA_VALIDATION_FAILED";
       case A2uiDataError _ -> "DATA_ERROR";
+      case A2uiExpressionError _ -> "EXPRESSION_ERROR";
       default -> "INTERNAL_ERROR";
     };
   }

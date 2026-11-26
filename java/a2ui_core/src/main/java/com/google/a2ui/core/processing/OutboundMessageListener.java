@@ -18,7 +18,13 @@ package com.google.a2ui.core.processing;
 
 import java.util.Map;
 
-/** Receives the messages that the renderer sends to the agent. */
+/**
+ * Receives the messages that the renderer sends to the agent.
+ *
+ * <p>A {@link MessageProcessor} sends the {@code error} message of each message that it rejects. A
+ * processor with {@code unifiedOutbound} also sends the {@code action} message of each event action
+ * and the {@code error} message of each failure that a surface reports.
+ */
 @FunctionalInterface
 public interface OutboundMessageListener {
   /**
