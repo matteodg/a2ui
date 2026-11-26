@@ -240,7 +240,7 @@ public final class MessageProcessor<C extends ComponentApi> {
       try {
         process(index, message, validationConfig);
       } catch (A2uiError e) {
-        withMessageContext(e, message);
+        writeMessageContext(e, message);
         if (outboundListener != null) {
           outboundListener.onMessage(errorMessage(e, actionOf(message)));
         }
@@ -374,7 +374,7 @@ public final class MessageProcessor<C extends ComponentApi> {
    * Writes the function call and the surface of a rejected message to its error, unless the error
    * already has them.
    */
-  private static void withMessageContext(A2uiError error, Map<String, Object> message) {
+  private static void writeMessageContext(A2uiError error, Map<String, Object> message) {
     String action = actionOf(message);
     Map<String, Object> body = action == null ? null : Json.asObject(message.get(action));
     if (error.functionCallId().isEmpty()
