@@ -66,6 +66,40 @@ class MessageProcessorTest {
   }
 
   @Test
+  void aLiteralLimitOfADateTimeInputIsIsoText() {
+    processor.processMessages(create());
+    for (String limit : List.of("2025-01-01", "18:30:00", "2025-01-01T08:00:00Z")) {
+      processor.processMessages(update(dateTimeInput(limit, limit)));
+      assertEquals(limit, component("root").properties().get("min"));
+      assertEquals(limit, component("root").properties().get("max"));
+    }
+    processor.processMessages(update(dateTimeInput(Map.of("@path", "/min"), "2025-12-31")));
+
+    assertThrows(
+        A2uiValidationError.class,
+        () -> processor.processMessages(update(dateTimeInput("2025-01-01", "next week"))));
+    assertThrows(
+        A2uiValidationError.class,
+        () -> processor.processMessages(update(dateTimeInput("", "2025-12-31"))));
+  }
+
+  private static Map<String, Object> dateTimeInput(Object min, Object max) {
+    return map(
+        "id",
+        "root",
+        "component",
+        "DateTimeInput",
+        "value",
+        "",
+        "enableDate",
+        true,
+        "min",
+        min,
+        "max",
+        max);
+  }
+
+  @Test
   void theOtherKeysOfAWrapperAreIgnoredButTheirPathsAreExamined() {
     processor.processMessages(map("messages", List.of(create()), "note", Map.of("@path", "/a~0b")));
 

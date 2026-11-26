@@ -403,8 +403,6 @@ class DateTimeInputViewTest {
   @Test
   void theFieldRefusesATypedValueThatIsNotBetweenTheLimits() {
     Edt.run(() -> {
-      // The limits come from the data model. The schema validator of the core refuses a literal
-      // date as a limit: each literal string matches more than one format of the catalog.
       show(
           Map.of("when", "2025-06-15", "min", "2025-06-01", "max", "2025-06-30T12:00:00"),
           "enableDate",
@@ -422,6 +420,29 @@ class DateTimeInputViewTest {
 
       model().setUnit(ChronoUnit.DAYS);
       assertNull(spinner().getNextValue());
+    });
+  }
+
+  @Test
+  void theLimitsCanBeLiteralIsoText() {
+    Edt.run(() -> {
+      show(
+          Map.of("when", "2025-06-15"),
+          "enableDate",
+          true,
+          "min",
+          "2025-06-01",
+          "max",
+          "2025-06-30T12:00:00Z");
+
+      field().setText("2025-05-31");
+      assertEquals("2025-06-15", fixture.data("/when"));
+
+      field().setText("2025-06-01");
+      assertEquals("2025-06-01", fixture.data("/when"));
+
+      model().setUnit(ChronoUnit.DAYS);
+      assertNull(spinner().getPreviousValue());
     });
   }
 

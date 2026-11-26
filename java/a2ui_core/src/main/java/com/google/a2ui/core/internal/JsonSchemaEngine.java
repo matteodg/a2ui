@@ -41,6 +41,13 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Each {@code $ref} in the document must be local ({@code #/...}). The engine reads nothing from
  * the disk or from the network.
  *
+ * <p>JSON Schema 2020-12 does not assert the {@code format} keyword. Then each string agrees with
+ * each {@code format}, and a {@code oneOf} of formats, as the {@code min} of the {@code
+ * DateTimeInput} component has, agrees with no string. Thus the engine asserts the formats {@code
+ * date}, {@code time} and {@code date-time}: it adds a {@code pattern} for ISO 8601 text to each
+ * schema that has one of them. The offset from UTC is optional, because a date and a time of the
+ * user frequently have none. The engine does not assert other formats.
+ *
  * <p>Only this class and {@link UnicodeRegularExpressions} use the JSON Schema library. Thus the
  * library is not visible in the public API.
  *
@@ -66,6 +73,22 @@ public final class JsonSchemaEngine {
   private static final Map<String, String> CODES =
       Map.of("required", Problem.MISSING_FIELD, "type", Problem.TYPE_MISMATCH);
 
+  private static final String DATE = "[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])";
+
+  private static final String TIME =
+      "([01][0-9]|2[0-3]):[0-5][0-9](:([0-5][0-9]|60)([.,][0-9]+)?)?"
+          + "([Zz]|[+-]([01][0-9]|2[0-3])(:?[0-5][0-9])?)?";
+
+  /** The pattern of each format that the engine asserts. No text agrees with two of them. */
+  private static final Map<String, String> FORMAT_PATTERNS =
+      Map.of(
+          "date", "^" + DATE + "$",
+          "time", "^" + TIME + "$",
+          "date-time", "^" + DATE + "[Tt ]" + TIME + "$");
+
+  /** The keywords whose content is data, not a schema. */
+  private static final Set<String> DATA_KEYWORDS = Set.of("const", "enum", "default", "examples");
+
   private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
   private final SchemaRegistry registry;
@@ -78,7 +101,7 @@ public final class JsonSchemaEngine {
    */
   public JsonSchemaEngine(Map<String, Object> document) {
     // The engine uses its own name for the document. Thus the `$id` of the document has no effect.
-    Map<String, Object> unnamed = new LinkedHashMap<>(document);
+    Map<String, Object> unnamed = assertFormats(document);
     unnamed.remove("$id");
     Map<String, String> texts = Map.of(DOCUMENT_IRI, Json.write(unnamed));
     registry =
@@ -142,6 +165,41 @@ public final class JsonSchemaEngine {
               UNEVALUATED_PROPERTIES.equals(keyword)));
     }
     return problems;
+  }
+
+  /**
+   * Copies a schema and adds the pattern of a format to each schema that has a format that the
+   * engine asserts.
+   *
+   * <p>A {@code pattern} applies only to a string, as a {@code format} does. A schema that already
+   * has a {@code pattern} gets the pattern of the format in its {@code allOf}.
+   */
+  private static Map<String, Object> assertFormats(Map<?, ?> schema) {
+    Map<String, Object> copy = new LinkedHashMap<>();
+    schema.forEach((key, value) ->
+        copy.put((String) key, DATA_KEYWORDS.contains(key) ? value : assertFormatsIn(value)));
+    if (copy.get("format") instanceof String format && FORMAT_PATTERNS.containsKey(format)) {
+      String pattern = FORMAT_PATTERNS.get(format);
+      if (!copy.containsKey("pattern")) {
+        copy.put("pattern", pattern);
+      } else {
+        List<Object> all = new ArrayList<>();
+        if (copy.get("allOf") instanceof List<?> present) {
+          all.addAll(present);
+        }
+        all.add(Map.of("pattern", pattern));
+        copy.put("allOf", all);
+      }
+    }
+    return copy;
+  }
+
+  private static Object assertFormatsIn(Object value) {
+    return switch (value) {
+      case Map<?, ?> map -> assertFormats(map);
+      case List<?> list -> list.stream().map(JsonSchemaEngine::assertFormatsIn).toList();
+      case null, default -> value;
+    };
   }
 
   /** Converts a plain JSON value to the tree that the JSON Schema library reads. */

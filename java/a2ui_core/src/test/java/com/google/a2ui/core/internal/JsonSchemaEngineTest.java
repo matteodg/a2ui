@@ -55,7 +55,25 @@ class JsonSchemaEngineTest {
                         "type": "string",
                         "pattern": "^[\\\\p{XID_Start}_][\\\\p{XID_Continue}]*$"
                       },
-                      "Hex": {"type": "string", "pattern": "[0-9a-f]{2}"}
+                      "Hex": {"type": "string", "pattern": "[0-9a-f]{2}"},
+                      "Date": {"format": "date"},
+                      "Time": {"format": "time"},
+                      "DateTime": {"format": "date-time"},
+                      "Limit": {
+                        "if": {"type": "string"},
+                        "then": {
+                          "oneOf": [
+                            {"format": "date"}, {"format": "time"}, {"format": "date-time"}
+                          ]
+                        }
+                      },
+                      "MorningDate": {"format": "date", "pattern": "^2025"},
+                      "Link": {"type": "string", "format": "uri"},
+                      "FormatAsData": {"const": {"format": "date"}},
+                      "FormatAsName": {
+                        "type": "object",
+                        "properties": {"format": {"type": "string"}}
+                      }
                     }
                   }
                   """)));
@@ -148,6 +166,61 @@ class JsonSchemaEngineTest {
   void aPatternMatchesAPartOfTheValue() {
     assertEquals(List.of(), engine.errors("/$defs/Hex", "xx7fxx"));
     assertEquals(1, engine.errors("/$defs/Hex", "xyz").size());
+  }
+
+  @Test
+  void theFormatsOfADateAndOfATimeAreAsserted() {
+    assertEquals(List.of(), engine.errors("/$defs/Date", "2025-01-31"));
+    assertEquals(1, engine.errors("/$defs/Date", "2025-13-01").size());
+    assertEquals(1, engine.errors("/$defs/Date", "2025-01-01T08:00:00Z").size());
+    assertEquals(1, engine.errors("/$defs/Date", "1 January").size());
+
+    for (String time :
+        List.of("18:30", "18:30:00", "18:30:00.250", "18:30:00Z", "08:00:00+01:00")) {
+      assertEquals(List.of(), engine.errors("/$defs/Time", time), time);
+    }
+    assertEquals(1, engine.errors("/$defs/Time", "24:00:00").size());
+    assertEquals(1, engine.errors("/$defs/Time", "2025-01-31").size());
+
+    for (String dateTime :
+        List.of(
+            "2025-01-01T08:00:00Z",
+            "2025-01-01T08:00:00",
+            "2025-01-01T08:00",
+            "2025-01-01 08:00:00.5-05:00")) {
+      assertEquals(List.of(), engine.errors("/$defs/DateTime", dateTime), dateTime);
+    }
+    assertEquals(1, engine.errors("/$defs/DateTime", "2025-01-01").size());
+    assertEquals(1, engine.errors("/$defs/DateTime", "2025-01-01T25:00:00Z").size());
+  }
+
+  @Test
+  void aFormatAppliesOnlyToAString() {
+    assertEquals(List.of(), engine.errors("/$defs/Date", 5L));
+    assertEquals(List.of(), engine.errors("/$defs/Limit", Map.of("@path", "/min")));
+  }
+
+  @Test
+  void aTextAgreesWithOneFormatOfAChoiceOfFormats() {
+    for (String limit : List.of("2025-01-01", "18:30:00", "2025-01-01T08:00:00Z")) {
+      assertEquals(List.of(), engine.errors("/$defs/Limit", limit), limit);
+    }
+    assertFalse(engine.errors("/$defs/Limit", "tomorrow").isEmpty());
+    assertFalse(engine.errors("/$defs/Limit", "").isEmpty());
+  }
+
+  @Test
+  void aFormatKeepsThePatternThatItsSchemaHas() {
+    assertEquals(List.of(), engine.errors("/$defs/MorningDate", "2025-06-01"));
+    assertEquals(1, engine.errors("/$defs/MorningDate", "2024-06-01").size());
+    assertEquals(1, engine.errors("/$defs/MorningDate", "2025").size());
+  }
+
+  @Test
+  void theOtherFormatsAndTheWordFormatInDataAreNotAsserted() {
+    assertEquals(List.of(), engine.errors("/$defs/Link", "not a link"));
+    assertEquals(List.of(), engine.errors("/$defs/FormatAsData", Map.of("format", "date")));
+    assertEquals(List.of(), engine.errors("/$defs/FormatAsName", Map.of("format", "long")));
   }
 
   @Test
