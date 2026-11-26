@@ -28,6 +28,7 @@ module com.google.a2ui.core {
   exports com.google.a2ui.core.expressions;
   exports com.google.a2ui.core.schema.v1_0;
   exports com.google.a2ui.core.state;
+  exports com.google.a2ui.core.validation;
 
   requires com.ibm.icu;
   requires com.networknt.schema;

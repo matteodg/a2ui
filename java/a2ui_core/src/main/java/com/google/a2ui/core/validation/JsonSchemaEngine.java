@@ -26,10 +26,10 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -44,7 +44,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Only this class and {@link UnicodeRegularExpressions} use the JSON Schema library. Thus the
  * library is not visible in the public API.
  *
- * <p>An engine is not thread-safe.
+ * <p>An engine is safe to use from more than one thread, because {@link CommonTypeValidator} has
+ * one engine for all its callers.
  */
 final class JsonSchemaEngine {
   /** The name that the engine gives to its document. The name is not an address. */
@@ -58,7 +59,7 @@ final class JsonSchemaEngine {
   private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
   private final SchemaRegistry registry;
-  private final Map<String, Schema> schemas = new HashMap<>();
+  private final Map<String, Schema> schemas = new ConcurrentHashMap<>();
 
   /**
    * Makes an engine for one document.
