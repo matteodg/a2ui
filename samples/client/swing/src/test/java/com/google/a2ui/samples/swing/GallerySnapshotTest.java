@@ -31,7 +31,10 @@ import org.junit.jupiter.api.Test;
  * of the gallery or of a view. The build does not compare them.
  */
 class GallerySnapshotTest {
-  /** Three complete examples, and two examples that have components with no Swing view. */
+  /**
+   * Three complete examples, and examples that have components with no Swing view. The root of the
+   * last two examples has a view. Thus their placeholders are in a layout.
+   */
   private static final List<String> EXAMPLES =
       List.of(
           "scaffold-simple-login-form",
@@ -40,7 +43,9 @@ class GallerySnapshotTest {
           "login-form",
           "markdown-text",
           "contact-card",
-          "flight-status");
+          "flight-status",
+          "modal",
+          "live-invitation-builder");
 
   private GalleryPanel gallery;
 
