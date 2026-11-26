@@ -32,7 +32,6 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiDataError;
 import com.google.a2ui.core.exceptions.A2uiIntegrityError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
-import com.google.a2ui.core.exceptions.A2uiStateError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.state.ComponentModel;
 import com.google.a2ui.core.state.SurfaceComponentsModel;
@@ -502,18 +501,6 @@ class MessageProcessorTest {
         "The processor already has a catalog with the id 'urn:custom'.", error.getMessage());
     assertThrows(
         UnsupportedOperationException.class, () -> processor.catalogs().remove("urn:custom"));
-  }
-
-  @Test
-  void theRpcMessagesAreNotHandledYet() {
-    Map<String, Object> call =
-        Map.of("@call", "openUrl", "catalogId", BasicCatalog.ID, "args", Map.of("url", "u"));
-
-    assertThrows(
-        A2uiStateError.class,
-        () ->
-            processor.processMessages(
-                message("callRendererFunction", "functionCallId", "c1", "callFunction", call)));
   }
 
   @Test

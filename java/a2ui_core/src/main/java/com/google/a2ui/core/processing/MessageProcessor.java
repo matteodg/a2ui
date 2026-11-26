@@ -37,6 +37,9 @@ import com.google.a2ui.core.internal.ComponentGraph;
 import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.Problem;
+import com.google.a2ui.core.resolution.DataContext;
+import com.google.a2ui.core.rpc.CallOptions;
+import com.google.a2ui.core.rpc.RpcHandler;
 import com.google.a2ui.core.state.ComponentModel;
 import com.google.a2ui.core.state.RendererAction;
 import com.google.a2ui.core.state.SurfaceComponentsModel;
@@ -56,6 +59,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -73,9 +77,13 @@ import java.util.stream.Collectors;
  * a surface reports to its {@code onError}, for example a binding that the core cannot evaluate.
  * The listeners of the surfaces continue to receive their events.
  *
- * <p>The processor handles {@code createSurface}, {@code updateComponents}, {@code updateDataModel}
- * and {@code deleteSurface}. It does not yet handle {@code callRendererFunction} and {@code
- * agentFunctionResponse}.
+ * <p>The processor gives the {@code callRendererFunction} and the {@code agentFunctionResponse}
+ * messages to its {@link RpcHandler}, after it examined them. The handler runs the function that
+ * the agent calls and sends a {@code rendererFunctionResponse} message to the outbound listener.
+ * {@link #callAgentFunction(String, Map)} sends a {@code callAgentFunction} message to the same
+ * listener. These two messages always go to the outbound listener, with or without a unified
+ * outbound listener. Without a listener, a function that the agent calls runs and the processor
+ * sends no response, and a call to the agent fails.
  *
  * <p>A processor is not thread-safe. Use a processor and its models from one thread.
  *
@@ -108,6 +116,7 @@ public final class MessageProcessor<C extends ComponentApi> {
   private final Map<String, Catalog<C, ?>> catalogsView = Collections.unmodifiableMap(catalogs);
   private final ValidationConfig validationConfig;
   private final OutboundMessageListener outboundListener;
+  private final RpcHandler rpc;
   private final Map<Catalog<?, ?>, CatalogChecks> checks = new IdentityHashMap<>();
   private final Map<Catalog<?, ?>, CatalogSchemaIndex> indexes = new IdentityHashMap<>();
 
@@ -144,7 +153,9 @@ public final class MessageProcessor<C extends ComponentApi> {
    *     message envelope and to resolve each catalog.
    * @param outboundListener receives the messages for the agent, or null. The processor sends the
    *     {@code error} message for each message that it rejects. It sends the message before it
-   *     throws the error. The processor does not send the actions and the failures of the surfaces.
+   *     throws the error. The listener also receives the messages of the function calls: {@code
+   *     rendererFunctionResponse} and {@code callAgentFunction}. The processor does not send the
+   *     actions and the failures of the surfaces.
    * @throws A2uiCatalogError if two catalogs have the same ID
    */
   public MessageProcessor(
@@ -174,7 +185,8 @@ public final class MessageProcessor<C extends ComponentApi> {
    *     message envelope and to resolve each catalog.
    * @param outboundListener receives the messages for the agent, or null. The processor sends the
    *     {@code error} message for each message that it rejects. It sends the message before it
-   *     throws the error.
+   *     throws the error. The listener also receives the messages of the function calls: {@code
+   *     rendererFunctionResponse} and {@code callAgentFunction}.
    * @param unifiedOutbound true to also send the actions and the failures of the surfaces to the
    *     listener
    * @throws A2uiCatalogError if two catalogs have the same ID
@@ -196,6 +208,11 @@ public final class MessageProcessor<C extends ComponentApi> {
         throw new A2uiCatalogError("Two catalogs have the id '" + catalog.id() + "'.");
       }
     }
+    // The handler reads the catalogs through the view. Thus it gets each catalog that the
+    // processor adds subsequently.
+    this.rpc = new RpcHandler(catalogsView, outboundListener);
+    // This is also correct for a surface that the application deletes from the model.
+    model.onSurfaceDeleted().subscribe(rpc::cancelSurfaceCalls);
     if (unifiedOutbound) {
       // Each surface of the model sends its messages, also a surface that the application adds.
       model
@@ -221,6 +238,47 @@ public final class MessageProcessor<C extends ComponentApi> {
   }
 
   /**
+   * Gets the handler of the function calls between this renderer and its agent.
+   *
+   * <p>The processor gives the {@code callRendererFunction} and the {@code agentFunctionResponse}
+   * messages to the handler. Use the handler to set the timeout, the scheduler of the timeouts and
+   * the test of the user activation, and to cancel the calls of a surface.
+   *
+   * @return the handler
+   */
+  public RpcHandler rpc() {
+    return rpc;
+  }
+
+  /**
+   * Calls a function of the agent with the default options. See {@link #callAgentFunction(String,
+   * Map, CallOptions)}.
+   *
+   * @param surfaceId the ID of the surface that makes the call
+   * @param call the call as the protocol writes it
+   * @return the future of the result
+   */
+  public CompletableFuture<Object> callAgentFunction(String surfaceId, Map<String, ?> call) {
+    return rpc.callAgentFunction(surfaceId, call);
+  }
+
+  /**
+   * Calls a function of the agent. This method is the same as {@link
+   * RpcHandler#callAgentFunction(String, Map, CallOptions)} of {@link #rpc()}. That method tells
+   * how the future ends and on which thread.
+   *
+   * @param surfaceId the ID of the surface that makes the call
+   * @param call the call as the protocol writes it: <code>{"@call": name, "catalogId": id, "args":
+   *     {...}}</code>. The arguments are resolved values.
+   * @param options the timeout and the ID of the call
+   * @return the future of the result. It fails with an {@code A2uiRpcError}.
+   */
+  public CompletableFuture<Object> callAgentFunction(
+      String surfaceId, Map<String, ?> call, CallOptions options) {
+    return rpc.callAgentFunction(surfaceId, call, options);
+  }
+
+  /**
    * Gets the catalogs that this processor supports.
    *
    * @return the catalogs by ID. The map is a read-only view, and it shows each catalog that {@link
@@ -234,7 +292,8 @@ public final class MessageProcessor<C extends ComponentApi> {
    * Adds a catalog to the catalogs that this processor supports.
    *
    * <p>A surface that a subsequent {@code createSurface} message makes can use the catalog. Each
-   * surface that exists keeps the catalogs that it had at its creation.
+   * surface that exists keeps the catalogs that it had at its creation. The agent can call the
+   * functions of the catalog with a {@code callRendererFunction} message.
    *
    * @param catalog the catalog to add
    * @throws A2uiCatalogError if the processor already has a catalog with the same ID
@@ -287,8 +346,6 @@ public final class MessageProcessor<C extends ComponentApi> {
    * @throws A2uiCatalogError if a message needs a catalog that the processor or the surface does
    *     not have
    * @throws A2uiDataError if an {@code updateDataModel} message cannot write its path
-   * @throws A2uiStateError for a {@code callRendererFunction} or an {@code agentFunctionResponse}
-   *     message, which this SDK does not handle yet
    */
   public void processMessages(Object payload, ValidationConfig validationConfig) {
     List<Map<String, Object>> messages = new ArrayList<>();
@@ -393,8 +450,12 @@ public final class MessageProcessor<C extends ComponentApi> {
     return Optional.of(Collections.unmodifiableMap(result));
   }
 
-  /** Deletes each surface and removes each listener. */
+  /**
+   * Disposes the function calls, deletes each surface and removes each listener. Each call to the
+   * agent that waits for a response fails. See {@link RpcHandler#dispose()}.
+   */
   public void dispose() {
+    rpc.dispose();
     model.dispose();
   }
 
@@ -643,10 +704,47 @@ public final class MessageProcessor<C extends ComponentApi> {
       case "createSurface" -> createSurface(body, config);
       case "updateComponents" -> updateComponents(body, config);
       case "updateDataModel" -> updateDataModel(body);
+      // The deletion also cancels the calls of the surface to the agent.
       case "deleteSurface" -> model.deleteSurface((String) body.get("surfaceId"));
-      default ->
-          throw new A2uiStateError("This SDK does not handle '" + action + "' messages yet.");
+      case CALL_RENDERER_FUNCTION -> callRendererFunction(message, body);
+      case "agentFunctionResponse" -> rpc.handleAgentFunctionResponse(message);
+      default -> throw new A2uiStateError("This SDK does not handle '" + action + "' messages.");
     }
+  }
+
+  /** Gives a function call of the agent to the RPC handler, with the context of its surface. */
+  private void callRendererFunction(Map<String, Object> message, Map<String, Object> body) {
+    DataContext context;
+    if (body.get("surfaceId") instanceof String surfaceId) {
+      // The handler refuses the call if the surface does not exist.
+      context = model.getSurface(surfaceId).map(DataContext::new).orElse(null);
+    } else {
+      // A call that names no surface runs in an empty surface. Thus it reads the data of no
+      // surface. The catalog that the call names is the default catalog of that surface.
+      Map<String, Catalog<C, ?>> available = v1Catalogs();
+      Map<String, Object> call = Json.asObject(body.get("callFunction"));
+      SurfaceModel<C> empty =
+          new SurfaceModel<>(
+              "",
+              ProtocolVersion.V1_0,
+              call == null ? null : available.get(call.get("catalogId")),
+              available,
+              false,
+              null);
+      context = new DataContext(empty);
+    }
+    rpc.handleCallRendererFunction(message, context);
+  }
+
+  /** Gets the catalogs that a v1.0 surface can use, by ID. */
+  private Map<String, Catalog<C, ?>> v1Catalogs() {
+    Map<String, Catalog<C, ?>> available = new LinkedHashMap<>();
+    catalogs.forEach((catalogId, catalog) -> {
+      if (catalog.protocolVersion().orElse(null) == ProtocolVersion.V1_0) {
+        available.put(catalogId, catalog);
+      }
+    });
+    return available;
   }
 
   private static boolean acceptsUnknown(ValidationConfig config) {
@@ -659,12 +757,7 @@ public final class MessageProcessor<C extends ComponentApi> {
       throw new A2uiIntegrityError("Surface already exists: " + id);
     }
 
-    Map<String, Catalog<C, ?>> available = new LinkedHashMap<>();
-    catalogs.forEach((catalogId, catalog) -> {
-      if (catalog.protocolVersion().orElse(null) == ProtocolVersion.V1_0) {
-        available.put(catalogId, catalog);
-      }
-    });
+    Map<String, Catalog<C, ?>> available = v1Catalogs();
     String catalogId = (String) body.get("catalogId");
     Catalog<C, ?> defaultCatalog = catalogId == null ? null : available.get(catalogId);
     if (catalogId != null && defaultCatalog == null) {
