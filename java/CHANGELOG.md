@@ -68,6 +68,8 @@
   `WITHOUT_USER_ACTIVATION` and the method `withUserActivation`. A `NodeAction` that code calls with
   no user gesture does not run a function that requires one. The constructor with one argument
   stays.
+- A `MessageProcessor` with `unifiedOutbound` now sends the failure of a call to the agent with the
+  `functionCallId` of the call. Before, the `error` message had the `surfaceId`.
 - Add `a2ui-java-swing`, the Swing adapter of the SDK, with its foundations. `A2uiSurface` shows one
   `SurfaceModel`. `A2uiFallbacks`, `A2uiServices` and `A2uiSwing` are in
   `com.google.a2ui.swing.surface`. `SwingComponentImplementation`, `SwingComponentView`,

@@ -217,6 +217,34 @@ class AgentFunctionRoutingTest {
   }
 
   @Test
+  void aUnifiedProcessorSendsTheFailureOfAnAgentCallWithTheIdOfTheCall() {
+    List<Map<String, Object>> all = new ArrayList<>();
+    MessageProcessor<ComponentApi> unified =
+        new MessageProcessor<>(List.of(catalog), null, all::add, true);
+    unified.rpc().setScheduler(scheduler);
+    NodeResolver<ComponentApi> resolver = mount(unified, "u", text(call("fetchTitle", 1)));
+
+    assertNull(textOf(resolver));
+    Object id = ((Map<?, ?>) all.getFirst().get("callAgentFunction")).get("functionCallId");
+    unified.processMessages(
+        message(
+            "agentFunctionResponse",
+            "functionCallId",
+            id,
+            "error",
+            Map.of("code", "EXECUTION_ERROR", "message", "The lookup failed.")));
+
+    // The failure is about the call. Thus the message names the call and not the surface.
+    assertEquals(2, all.size());
+    Map<?, ?> error = (Map<?, ?>) all.getLast().get("error");
+    assertEquals("EXPRESSION_ERROR", error.get("code"));
+    assertEquals(id, error.get("functionCallId"));
+    assertFalse(error.containsKey("surfaceId"));
+    assertEquals(1, errors.size());
+    assertEquals(Optional.of("u"), errors.getFirst().surfaceId());
+  }
+
+  @Test
   void aTimeoutOnTheThreadOfTheProcessorIsReportedImmediately() {
     NodeResolver<ComponentApi> resolver = mount(call("fetchTitle", 1));
 

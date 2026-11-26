@@ -600,8 +600,9 @@ public final class MessageProcessor<C extends ComponentApi> {
     String code = error.errorCode().orElseGet(() -> defaultCode(error, isCall));
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("code", code);
-    // An error is about a function call or about a surface, not about the two.
-    if (isCall && error.functionCallId().isPresent()) {
+    // An error is about a function call or about a surface, not about the two. A failure that a
+    // surface reports is about a function call if the agent failed that call.
+    if ((isCall || action == null) && error.functionCallId().isPresent()) {
       body.put("functionCallId", error.functionCallId().get());
     } else {
       body.put("surfaceId", error.surfaceId().orElse(""));
