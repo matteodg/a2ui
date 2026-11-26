@@ -557,6 +557,26 @@ class MessageProcessorTest {
         processor.getRendererCapabilities(List.of(ProtocolVersion.V1_0)));
   }
 
+  @Test
+  void theRendererDataModelHasOnlyTheSurfacesThatAskedForIt() {
+    assertEquals(Optional.empty(), processor.getRendererDataModel());
+    processor.processMessages(
+        List.of(
+            message("createSurface", "surfaceId", "quiet", "catalogId", BasicCatalog.ID),
+            create("sendDataModel", true)));
+
+    assertEquals(
+        Optional.of(Map.of("version", "1.0", "surfaces", Map.of("s", Map.of()))),
+        processor.getRendererDataModel());
+
+    processor.processMessages(dataUpdate("/n", 1L));
+
+    assertEquals(
+        Optional.of(Map.of("version", "1.0", "surfaces", Map.of("s", Map.of("n", 1L)))),
+        processor.getRendererDataModel(ProtocolVersion.V1_0));
+    assertEquals(Optional.empty(), processor.getRendererDataModel(ProtocolVersion.V0_9));
+  }
+
   private String failure(Object payload) {
     return assertThrows(A2uiValidationError.class, () -> processor.processMessages(payload))
         .getMessage();

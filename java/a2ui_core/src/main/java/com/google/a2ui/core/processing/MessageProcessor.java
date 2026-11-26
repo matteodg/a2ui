@@ -297,6 +297,44 @@ public final class MessageProcessor<C extends ComponentApi> {
     return Collections.unmodifiableMap(capabilities);
   }
 
+  /**
+   * Gets the data of each v1.0 surface that asked for its data model. See {@link
+   * #getRendererDataModel(ProtocolVersion)}.
+   *
+   * @return the data, or an empty result if no v1.0 surface asked for its data model
+   */
+  public Optional<Map<String, Object>> getRendererDataModel() {
+    return getRendererDataModel(ProtocolVersion.V1_0);
+  }
+
+  /**
+   * Gets the data of each surface that asked for its data model with {@code sendDataModel}. A
+   * transport attaches the result to the messages that it sends to the agent.
+   *
+   * <p>The result has the structure {@code {"version": ..., "surfaces": {id: data}}}. The data of a
+   * surface is its data model at the time of the call.
+   *
+   * @param version the protocol version of the surfaces to give
+   * @return the data as read-only plain JSON values, or an empty result if no surface of that
+   *     version asked for its data model
+   */
+  public Optional<Map<String, Object>> getRendererDataModel(ProtocolVersion version) {
+    Objects.requireNonNull(version, "version");
+    Map<String, Object> surfaces = new LinkedHashMap<>();
+    for (SurfaceModel<C> surface : model.all().values()) {
+      if (surface.sendDataModel() && surface.protocolVersion() == version) {
+        surfaces.put(surface.id(), surface.dataModel().get("/"));
+      }
+    }
+    if (surfaces.isEmpty()) {
+      return Optional.empty();
+    }
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("version", version.wireValue());
+    result.put("surfaces", Collections.unmodifiableMap(surfaces));
+    return Optional.of(Collections.unmodifiableMap(result));
+  }
+
   /** Deletes each surface and removes each listener. */
   public void dispose() {
     model.dispose();
