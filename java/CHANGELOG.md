@@ -46,3 +46,9 @@
   now runs with user activation, and a `userMessage` that is not text is an error.
   `DataContext.resolveDynamicValue` and `DataContext.evaluate` now throw an `A2uiExpressionError`
   when the code of a function throws an exception that is not an `A2uiError`.
+- Add `RpcHandler`, `RpcScheduler` and `CallOptions` in the new package `com.google.a2ui.core.rpc`,
+  and add `MessageProcessor.rpc()` and `MessageProcessor.callAgentFunction`. `MessageProcessor` now
+  handles `callRendererFunction` and `agentFunctionResponse`. Before, these messages caused an
+  `A2uiStateError`. Add `DataContext.evaluateTemplate`. A function whose schema describes no
+  arguments now accepts all arguments. The `SurfaceModel` constructor now throws an
+  `A2uiCatalogError` for a catalog that is not for the protocol version of the surface.

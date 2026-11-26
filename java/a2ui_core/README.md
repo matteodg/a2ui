@@ -21,18 +21,21 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | `com.google.a2ui.core.resolution`         | `NodeResolver` makes the live tree of `ComponentNode` objects of a surface. `NodeProps`, `ResolvedBinding`, `WritableBinding`, `NodeAction` and `ValidationResult` are the resolved values of a node. `DataContext` resolves the data bindings and the function calls. |
 | `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                                                                                                |
 | `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts.                                                                          |
-| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent: actions and errors.                                                                                         |
+| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent: actions, errors and function calls.                                                                         |
+| `com.google.a2ui.core.rpc`                | `RpcHandler`, the function calls between the renderer and the agent. `RpcScheduler` runs the timeout of a call to the agent. `CallOptions` are the options of one call.                                                                                                |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain the function-call messages (`callRendererFunction`,
-`agentFunctionResponse`).
+The core does not yet send a function call from a binding or from an action to the agent.
 
 ## Threads
 
 The core is not thread-safe. Use one thread for all the calls to one model. A Swing application uses
 the event dispatch thread.
+
+The timeout of a call to the agent is the only work that can run on a different thread. See
+[Function calls](#function-calls).
 
 ## Signals
 
@@ -128,7 +131,8 @@ surface.dataModel().get("/"); // The data of the surface.
 ```
 
 The processor handles `createSurface`, `updateComponents`, `updateDataModel` and `deleteSurface`. It
-does not yet handle `callRendererFunction` and `agentFunctionResponse`.
+gives `callRendererFunction` and `agentFunctionResponse` to its `RpcHandler`. See
+[Function calls](#function-calls).
 
 `ValidationConfig.STRICT` is the default. It rejects a surface that is not complete: a surface with
 no root component, a reference to a component that does not exist, or a component that the root
@@ -219,6 +223,87 @@ processor.getRendererCapabilities(List.of(ProtocolVersion.V1_0));
 
 processor.getRendererDataModel(); // Optional[{version=1.0, surfaces={main={...}}}]
 ```
+
+## Function calls
+
+The agent and the renderer can call the functions of each other. `processor.rpc()` gives the
+`RpcHandler` that does this work. The messages of the two directions go to the
+`OutboundMessageListener` of the processor, with or without `unifiedOutbound`.
+
+### The agent calls the renderer
+
+A `callRendererFunction` message runs a function of a catalog of the renderer. The processor always
+sends a `rendererFunctionResponse` message: the value of the function, or an error.
+
+- The function runs in the catalog that the call names. The function must permit agent callers:
+  its `allowedCallers` is `rendererOrAgent` or `agentOnly`.
+- A function that requires user activation runs only when the application tells that a user gesture
+  is present. Set the test with `setUserActivation`. Without a test, the handler refuses each such
+  function.
+- These two rules also apply to each call in the arguments and to each call in a `${...}` template
+  that the function evaluates.
+- A message that names a surface reads the data of that surface. A message that names no surface
+  reads no data.
+
+```java
+processor.rpc().setUserActivation(() -> userClickedInTheLastSecond());
+processor.processMessages(callRendererFunctionMessage);
+// The listener gets {version=1.0, rendererFunctionResponse={functionCallId=..., value=...}}.
+```
+
+The error of a response has the code `INVALID_FUNCTION_CALL` if the handler refuses the call, and
+`EXECUTION_ERROR` if an argument or the function fails.
+
+### The renderer calls the agent
+
+`callAgentFunction` sends a `callAgentFunction` message and returns a `CompletableFuture`. The
+`agentFunctionResponse` message with the same `functionCallId` completes the future.
+
+```java
+CompletableFuture<Object> stock =
+    processor.callAgentFunction(
+        "main",
+        Map.of("@call", "queryInventory", "catalogId", "urn:store", "args", Map.of("sku", "A-1")),
+        CallOptions.withTimeout(Duration.ofSeconds(5)));
+stock.whenComplete((value, error) -> {
+  if (error instanceof A2uiRpcError failure) {
+    System.out.println(failure.code()); // For example TIMEOUT.
+  }
+});
+```
+
+The future fails with an `A2uiRpcError`. Its `code()` is an `RpcErrorCode`:
+
+| Code                    | Cause                                                                              |
+| :---------------------- | :--------------------------------------------------------------------------------- |
+| the code of the agent   | The response of the agent has an `error`.                                          |
+| `TIMEOUT`               | No response came in the permitted time. The default is 30 seconds.                 |
+| `CANCELLED`             | The surface was deleted, `cancelSurfaceCalls` cancelled its calls, or `dispose()`. |
+| `DISPOSED`              | The call started after `dispose()`.                                                |
+| `NO_LISTENER`           | The processor has no outbound listener.                                            |
+| `DUPLICATE`             | A call with the same `functionCallId` waits for a response.                        |
+| `INVALID_FUNCTION_CALL` | The call names no function, or it is not JSON.                                     |
+
+The handler ignores a response that comes after its call ended.
+
+### Threads and timeouts
+
+Call the processor and the handler on one thread. The future of a call completes on the thread that
+ends the call. For a response, a cancellation or a disposal, that is your thread. For a timeout,
+that is the thread of the `RpcScheduler` of the handler.
+
+- `RpcScheduler.timerThread()` is the default. It ends a timeout on a daemon thread of the SDK with
+  the name `a2ui-rpc-timeouts`. Use it only if the code that you attach to a future does not use the
+  core or the UI.
+- `RpcScheduler.onExecutor(executor)` measures the time on the same thread and then gives the work
+  to your executor. A Swing application sets this scheduler:
+
+  ```java
+  processor.rpc().setScheduler(RpcScheduler.onExecutor(SwingUtilities::invokeLater));
+  ```
+
+- A UI adapter can implement `RpcScheduler` with the timer of its toolkit. A test can implement it
+  with a list of tasks, thus the test does not wait.
 
 ## Functions and bindings
 
