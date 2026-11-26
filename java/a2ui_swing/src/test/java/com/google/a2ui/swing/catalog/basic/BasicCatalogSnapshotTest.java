@@ -31,12 +31,17 @@ import com.google.a2ui.core.state.SurfaceModel;
 import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.catalog.HeightForWidth;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
+import com.google.a2ui.swing.surface.A2uiFallbacks;
+import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.Snapshots;
+import com.google.a2ui.swing.testing.TestModalPresenter;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.Rectangle;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
@@ -74,13 +80,25 @@ class BasicCatalogSnapshotTest {
           "scaffold-interactive-button",
           "scaffold-simple-login-form",
           "scaffold-complex-layout",
-          "scaffold-incremental");
+          "scaffold-incremental",
+          "login-form",
+          "markdown-text",
+          "child-list-template",
+          "incremental-dashboard",
+          "calendar-day",
+          "email-compose",
+          "countdown-timer",
+          "weather-current");
+
+  private static final String LONG_TEXT =
+      "This text is long. It does not fit in one line of the surface, and thus it breaks at the"
+          + " width that its container gives it.";
 
   private static Map<String, Object> check(Object condition, String message) {
     return Map.of("condition", condition, "message", message);
   }
 
-  private static Object text(String id, String text, Object... properties) {
+  private static Object text(String id, Object text, Object... properties) {
     List<Object> all = new ArrayList<>(List.of("text", text));
     all.addAll(List.of(properties));
     return component(id, "Text", all.toArray());
@@ -240,6 +258,150 @@ class BasicCatalogSnapshotTest {
         text("skip_text", "Skip"));
   }
 
+  private static List<Object> cards() {
+    return List.of(
+        component("root", "Column", "children", List.of("intro", "main", "pair", "outer")),
+        text("intro", "Text before the cards", "variant", "caption"),
+        component("main", "Card", "child", "main_column"),
+        component(
+            "main_column", "Column", "children", List.of("main_title", "main_text", "main_row")),
+        text("main_title", "### A card"),
+        text("main_text", LONG_TEXT),
+        component("main_row", "Row", "children", List.of("accept", "refuse"), "justify", "end"),
+        button("accept", "accept_text", "variant", "primary"),
+        text("accept_text", "Accept"),
+        button("refuse", "refuse_text"),
+        text("refuse_text", "Refuse"),
+        component("pair", "Row", "children", List.of("left", "right")),
+        component("left", "Card", "child", "left_text", "weight", 1),
+        text("left_text", "A short card"),
+        component("right", "Card", "child", "right_text", "weight", 1),
+        text("right_text", "A card with more text has more lines, and the two cards are equal."),
+        component("outer", "Card", "child", "inner"),
+        component("inner", "Card", "child", "inner_text"),
+        text("inner_text", "A card in a card"));
+  }
+
+  private static List<Object> dividers() {
+    return List.of(
+        component(
+            "root", "Column", "children", List.of("above", "flat", "row", "flat2", "centered")),
+        text("above", "A horizontal divider is below this text."),
+        component("flat", "Divider"),
+        component("row", "Row", "children", List.of("one", "up1", "two", "up2", "three")),
+        text("one", "## One"),
+        component("up1", "Divider", "axis", "vertical"),
+        text("two", "Two has a vertical divider on its two sides."),
+        component("up2", "Divider", "axis", "vertical"),
+        text("three", "Three"),
+        component("flat2", "Divider", "axis", "horizontal"),
+        component(
+            "centered",
+            "Column",
+            "align",
+            "center",
+            "children",
+            List.of("centered_text", "flat3", "centered_row")),
+        text("centered_text", "A column that puts its children in the center"),
+        component("flat3", "Divider"),
+        component(
+            "centered_row", "Row", "align", "center", "children", List.of("high", "up3", "low")),
+        text("high", "# High"),
+        component("up3", "Divider", "axis", "vertical"),
+        text("low", "low", "variant", "caption"));
+  }
+
+  private static List<Object> lists() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of("vertical_title", "vertical", "horizontal_title", "horizontal", "end")),
+        text("vertical_title", "**A vertical list from a template**", "variant", "caption"),
+        component("vertical", "List", "children", Map.of("componentId", "row", "path", "/people")),
+        component("row", "Row", "children", List.of("name", "role"), "justify", "spaceBetween"),
+        text("name", path("name")),
+        text("role", path("role"), "variant", "caption"),
+        text(
+            "horizontal_title",
+            "**A horizontal list that is wider than the surface**",
+            "variant",
+            "caption"),
+        component(
+            "horizontal",
+            "List",
+            "direction",
+            "horizontal",
+            "children",
+            Map.of("componentId", "chip", "path", "/tags")),
+        component("chip", "Card", "child", "chip_text"),
+        text("chip_text", path("label")),
+        text("end", "Text after the lists"));
+  }
+
+  private static Map<String, Object> listsData() {
+    List<Object> tags = new ArrayList<>();
+    for (String tag :
+        List.of("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta")) {
+      tags.add(Map.of("label", tag));
+    }
+    return object(
+        "people",
+        List.of(
+            Map.of("name", "Ada Lovelace", "role", "Mathematics"),
+            Map.of("name", "Grace Hopper", "role", "Compilers"),
+            Map.of("name", "Alan Turing", "role", "Computation"),
+            Map.of("name", "Edsger Dijkstra", "role", "Algorithms")),
+        "tags",
+        tags);
+  }
+
+  private static List<Object> tabs() {
+    return List.of(
+        component("root", "Column", "children", List.of("before", "tabs", "after")),
+        text("before", "Text before the tabs"),
+        component(
+            "tabs",
+            "Tabs",
+            "tabs",
+            List.of(
+                object("title", "Summary", "child", "summary"),
+                object("title", path("/second"), "child", "details"),
+                object("title", "History", "child", "history"))),
+        component("summary", "Column", "children", List.of("summary_text", "summary_button")),
+        text("summary_text", LONG_TEXT),
+        button("summary_button", "summary_button_text"),
+        text("summary_button_text", "Continue"),
+        text("details", "The details"),
+        text("history", "The history"),
+        text("after", "Text after the tabs"));
+  }
+
+  private static List<Object> modal() {
+    return List.of(
+        component("root", "Column", "children", List.of("before", "modal", "link_modal")),
+        text("before", "A button and a text open a modal."),
+        component("modal", "Modal", "trigger", "open", "content", "dialog"),
+        button("open", "open_text"),
+        text("open_text", "Open the details"),
+        component("dialog", "Card", "child", "dialog_column"),
+        component(
+            "dialog_column",
+            "Column",
+            "children",
+            List.of("dialog_title", "dialog_line", "dialog_text", "dialog_row")),
+        text("dialog_title", "### Details"),
+        component("dialog_line", "Divider"),
+        text("dialog_text", LONG_TEXT),
+        component("dialog_row", "Row", "children", List.of("confirm"), "justify", "end"),
+        button("confirm", "confirm_text", "variant", "primary"),
+        text("confirm_text", "Confirm"),
+        component("link_modal", "Modal", "trigger", "link", "content", "link_content"),
+        text("link", "*More information*"),
+        text("link_content", "The information"));
+  }
+
   private static Map<String, Object> validationData() {
     return object(
         "email", "not-an-email",
@@ -256,7 +418,8 @@ class BasicCatalogSnapshotTest {
    * Makes a surface from messages, mounts it and gives it the height of its content. The processor
    * accepts a reference to a component that arrives in a later message, as an example can have.
    */
-  private static A2uiSurface mount(List<Object> messages, List<A2uiError> errors) {
+  private static A2uiSurface mount(
+      List<Object> messages, List<A2uiError> errors, A2uiServices services) {
     MessageProcessor<SwingComponentImplementation> processor =
         new MessageProcessor<>(List.of(SwingBasicCatalog.create()), ValidationConfig.RELAXED);
     processor
@@ -268,7 +431,8 @@ class BasicCatalogSnapshotTest {
     processor.processMessages(messages);
     SurfaceModel<SwingComponentImplementation> surface =
         processor.model().getSurface(surfaceId[0]).orElseThrow();
-    A2uiSurface view = Headless.mount(new A2uiSurface(surface), WIDTH, 2000);
+    A2uiSurface view =
+        Headless.mount(new A2uiSurface(surface, A2uiFallbacks.NONE, services), WIDTH, 2000);
     JComponent root = view.viewTree().orElseThrow().component().orElseThrow();
     int height =
         root instanceof HeightForWidth wrapping
@@ -355,16 +519,61 @@ class BasicCatalogSnapshotTest {
     }
   }
 
-  /** Mounts a surface, makes sure of its layout and writes its image. */
+  /**
+   * Mounts a surface, makes sure of its layout and writes its image. Then the method opens each
+   * modal of the surface and writes an image of the content of each one. The surface has no window.
+   * Thus a test presenter keeps the content, and the image of the content is a different file.
+   */
   private static void snapshot(String name, List<Object> messages) {
+    TestModalPresenter presenter = new TestModalPresenter();
     List<A2uiError> errors = new ArrayList<>();
-    A2uiSurface view = mount(messages, errors);
+    A2uiSurface view = mount(messages, errors, A2uiServices.DEFAULT.withModalPresenter(presenter));
     assertEquals(List.of(), errors, name);
     assertTrue(view.getHeight() > 20, name + " has the height " + view.getHeight());
     assertLayout(view, view.viewTree().orElseThrow(), name);
     Path file = Snapshots.write(view, name);
     assertTrue(Files.exists(file), file.toString());
+    openModals(view.viewTree().orElseThrow());
+    List<TestModalPresenter.Presentation> modals = presenter.open();
+    for (int i = 0; i < modals.size(); i++) {
+      JComponent content = modals.get(i).layout(WIDTH - 80);
+      String modalName = name + "-modal-content" + (modals.size() == 1 ? "" : "-" + (i + 1));
+      assertTrue(content.getHeight() > 20, modalName + " has the height " + content.getHeight());
+      assertTrue(Files.exists(Snapshots.write(content, modalName)), modalName);
+    }
+    assertEquals(List.of(), errors, name);
     view.removeNotify();
+    assertEquals(List.of(), presenter.open(), name + ": a modal is open after the unmount");
+  }
+
+  /** Operates the trigger of each modal of a tree, as the user does. */
+  private static void openModals(MountedNode node) {
+    if (node.node().type().equals("Modal") && node.view().isPresent()) {
+      JComponent trigger = node.view().get().accessibleComponent();
+      AbstractButton button = buttonIn(trigger);
+      if (button != null) {
+        button.doClick(0);
+      } else {
+        trigger.getAccessibleContext().getAccessibleAction().doAccessibleAction(0);
+      }
+      return;
+    }
+    node.children().forEach(BasicCatalogSnapshotTest::openModals);
+  }
+
+  private static AbstractButton buttonIn(Component component) {
+    if (component instanceof AbstractButton button) {
+      return button;
+    }
+    if (component instanceof Container container) {
+      for (Component child : container.getComponents()) {
+        AbstractButton found = buttonIn(child);
+        if (found != null) {
+          return found;
+        }
+      }
+    }
+    return null;
   }
 
   private static void snapshots(String lookAndFeel) throws IOException {
@@ -374,6 +583,12 @@ class BasicCatalogSnapshotTest {
     snapshot(lookAndFeel + "-rows", surfaceOf(Map.of(), rows()));
     snapshot(lookAndFeel + "-markdown", surfaceOf(Map.of(), markdown()));
     snapshot(lookAndFeel + "-validation", surfaceOf(validationData(), validation()));
+    snapshot(lookAndFeel + "-cards", surfaceOf(Map.of(), cards()));
+    snapshot(lookAndFeel + "-dividers", surfaceOf(Map.of(), dividers()));
+    snapshot(lookAndFeel + "-lists", surfaceOf(listsData(), lists()));
+    snapshot(lookAndFeel + "-tabs", surfaceOf(Map.of("second", "Details"), tabs()));
+    snapshot(lookAndFeel + "-modal", surfaceOf(Map.of(), modal()));
+    snapshot(lookAndFeel + "-example-modal", example("modal"));
     for (String example : EXAMPLES) {
       snapshot(lookAndFeel + "-example-" + example, example(example));
     }
