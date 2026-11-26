@@ -599,7 +599,9 @@ renderer, in turns. The harness does the renderer part: for each turn, it gives 
 of `expectWire` to a `MessageProcessor`, compares the mounted `A2uiSurface` with `expectViewTree`,
 does each operation of `uiOps` through the Swing controls, and compares the data model, the errors
 and the messages for the agent. The text of the model and the list `formats` belong to the harness
-of an agent SDK.
+of an agent SDK. The list `harnesses` of the `e2e` corpus in `conformance/manifest_corpora.json`
+does not name the harness `swing`. The harness runs the scenarios, and the command below examines
+its manifest.
 
 Each case runs on the event dispatch thread, against a surface with no window. A case uses no
 network.
