@@ -106,7 +106,8 @@
   a control that is not a text component.
 - `SwingBasicCatalog` now has Swing views for `Icon`, `Image`, `Video` and `AudioPlayer`, and thus
   for each component of the basic catalog. `Icon` paints a shape of the module for each icon name
-  of the catalog, or the `svgPath` of the agent. `Image` loads with the `imageLoader` service and
+  of the catalog, or the `svgPath` of the agent. A name that the catalog does not have shows the
+  shape of `help`. `Image` loads with the `imageLoader` service and
   applies `variant` and `fit`. `Video` and `AudioPlayer` show the view of the `mediaPlayer` service,
   or a control that opens the URL with the `urlOpener` service. Add `MediaUrls` in
   `com.google.a2ui.swing.surface`: the safety rule for media URLs. Add

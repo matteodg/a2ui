@@ -160,10 +160,10 @@ These rules apply to the views:
   of the text of the button. A name of the catalog shows a shape of the module. See
   [the shapes of the icons](#the-shapes-of-the-icons). An object with `svgPath` shows the SVG path
   data of the agent, in a view box of 24 by 24 units and with the non-zero fill rule. The view
-  accepts at most 16 384 characters of path data. A name that the catalog does not have, and path
-  data that is not correct, show nothing, and the icon keeps its space. The accessible name of a
-  named icon is its name as words, for example `arrow back`. A button that shows only icons takes
-  its name from them.
+  accepts at most 16 384 characters of path data. A name that the catalog does not have shows the
+  shape of the name `help`, and the icon has no accessible name then. Path data that is not correct
+  shows nothing, and the icon keeps its space. The accessible name of a named icon is its name as
+  words, for example `arrow back`. A button that shows only icons takes its name from them.
 - **Image.** The view asks the `imageLoader` service for the image and shows a neutral area until
   the image arrives. The area gets a small mark when the loader gives no image. The view cancels
   the request when the URL changes and when the surface stops to show the component. The variants
