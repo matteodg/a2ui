@@ -157,6 +157,12 @@ final class HtmlMarkdownView implements MarkdownView {
     /** The width of the longest word, or -1 if the component must get it again. */
     private int narrowest = -1;
 
+    /**
+     * The width that the UI of a text component keeps free for the caret, or -1 if the component
+     * must get it again. The UI gives the text that much less than the width of the component.
+     */
+    private int caretSpace = -1;
+
     /** The last width that the component got a height for, or -1. */
     private int wrappedWidth = -1;
 
@@ -177,6 +183,7 @@ final class HtmlMarkdownView implements MarkdownView {
     /** Forgets the sizes of the text, after a change of the document or of the UI. */
     void contentChanged() {
       natural = null;
+      caretSpace = -1;
       narrowest = -1;
       wrappedWidth = -1;
     }
@@ -184,6 +191,9 @@ final class HtmlMarkdownView implements MarkdownView {
     @Override
     public void updateUI() {
       super.updateUI();
+      // Some look and feels paint the background of a text component that is not opaque. A
+      // background color with no opacity makes that paint show nothing.
+      setBackground(new Color(0, 0, 0, 0));
       contentChanged();
     }
 
@@ -209,7 +219,8 @@ final class HtmlMarkdownView implements MarkdownView {
       Insets insets = getInsets();
       Dimension text = naturalSize();
       return new Dimension(
-          text.width + insets.left + insets.right, text.height + insets.top + insets.bottom);
+          text.width + caretSpace + insets.left + insets.right,
+          text.height + insets.top + insets.bottom);
     }
 
     @Override
@@ -225,7 +236,7 @@ final class HtmlMarkdownView implements MarkdownView {
             empty ? 0 : (int) Math.ceil(getUI().getRootView(this).getMinimumSpan(View.X_AXIS));
       }
       return new Dimension(
-          Math.min(text.width, narrowest) + insets.left + insets.right,
+          Math.min(text.width, narrowest) + caretSpace + insets.left + insets.right,
           text.height + insets.top + insets.bottom);
     }
 
@@ -235,8 +246,8 @@ final class HtmlMarkdownView implements MarkdownView {
         return super.getPreferredSize().height;
       }
       Insets insets = getInsets();
-      int contentWidth = Math.max(1, width - insets.left - insets.right);
       Dimension text = naturalSize();
+      int contentWidth = Math.max(1, width - insets.left - insets.right - caretSpace);
       int height = text.height;
       if (contentWidth < text.width) {
         if (wrappedWidth != contentWidth) {
@@ -252,8 +263,23 @@ final class HtmlMarkdownView implements MarkdownView {
     private Dimension naturalSize() {
       if (natural == null) {
         natural = measure(Integer.MAX_VALUE);
+        caretSpace = empty ? 0 : caretSpace();
       }
       return natural;
+    }
+
+    /** Gets the width that the UI keeps free for the caret, from the preferred size of the UI. */
+    private int caretSpace() {
+      measuring = true;
+      try {
+        Insets insets = getInsets();
+        // The UI adds the space of the caret to the width of the text in the root view.
+        int withCaret = getUI().getPreferredSize(this).width - insets.left - insets.right;
+        int text = (int) getUI().getRootView(this).getPreferredSpan(View.X_AXIS);
+        return Math.max(0, Math.min(withCaret - text, 16));
+      } finally {
+        measuring = false;
+      }
     }
 
     /**

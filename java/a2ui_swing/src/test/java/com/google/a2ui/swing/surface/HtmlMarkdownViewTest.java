@@ -29,6 +29,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
@@ -207,6 +208,27 @@ class HtmlMarkdownViewTest {
       pane.setSize(50, 50);
       assertEquals(half, wrapping.preferredHeightFor(lineWidth / 2 + 20));
       assertEquals(new Dimension(lineWidth, oneLine), pane.getPreferredSize());
+    });
+  }
+
+  @Test
+  void aComponentWithItsPreferredSizePaintsItsTextInOneLine() {
+    Edt.run(() -> {
+      view.setMarkdown("Forgot the **password**?");
+      pane.setFont(new Font(Font.DIALOG, Font.BOLD, 12));
+      pane.setSize(pane.getPreferredSize());
+
+      // The UI of a text component gives the text less than the width of the component. If the
+      // preferred width does not have that space, the last word goes to a second line.
+      Snapshots.render(pane);
+
+      Rectangle2D first = pane.modelToView2D(1);
+      Rectangle2D last = pane.modelToView2D(pane.getDocument().getLength() - 1);
+      assertEquals(first.getY(), last.getY(), 0.01);
+      assertTrue(last.getMaxX() <= pane.getWidth(), last.toString());
+      assertEquals(
+          pane.getPreferredSize().height,
+          ((HeightForWidth) pane).preferredHeightFor(pane.getPreferredSize().width));
     });
   }
 
