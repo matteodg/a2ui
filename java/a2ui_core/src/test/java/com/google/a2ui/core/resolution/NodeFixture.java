@@ -17,7 +17,9 @@
 package com.google.a2ui.core.resolution;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
+import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.catalog.FunctionImplementation;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.processing.MessageProcessor;
 import com.google.a2ui.core.state.ComponentModel;
@@ -33,7 +35,7 @@ import java.util.Map;
 
 /**
  * A surface of the basic catalog with its resolver, for the tests of the node resolver. The
- * functions are the functions of the basic catalog with their code.
+ * functions are the functions of the basic catalog with their code, and the function {@code crash}.
  */
 final class NodeFixture {
   static final String SURFACE_ID = "s";
@@ -48,8 +50,25 @@ final class NodeFixture {
   final List<RendererAction> actions = new ArrayList<>();
 
   private final MessageProcessor<ComponentApi> processor =
-      new MessageProcessor<>(
-          List.of(BasicCatalog.withFunctions(Locale.US, opened::add)), ValidationConfig.RELAXED);
+      new MessageProcessor<>(List.of(catalog()), ValidationConfig.RELAXED);
+
+  /**
+   * Makes the basic catalog with one more function. The code of the function {@code crash} throws
+   * an exception that is not an {@code A2uiError}.
+   */
+  private Catalog<ComponentApi, FunctionImplementation> catalog() {
+    Catalog<ComponentApi, FunctionImplementation> basic =
+        BasicCatalog.withFunctions(Locale.US, opened::add);
+    List<FunctionImplementation> functions = new ArrayList<>(basic.functions().values());
+    functions.add(
+        new FunctionImplementation(
+            "crash",
+            Map.of("returnType", "string"),
+            (args, context) -> {
+              throw new IllegalStateException("The disk is full.");
+            }));
+    return basic.withFunctions(functions);
+  }
 
   /** Makes a component as a message writes it. */
   static Map<String, Object> component(String id, String type, Object... namesAndValues) {

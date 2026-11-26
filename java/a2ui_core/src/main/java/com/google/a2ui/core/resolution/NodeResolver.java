@@ -24,6 +24,7 @@ import com.google.a2ui.core.common.Reactive;
 import com.google.a2ui.core.common.ReadonlySignal;
 import com.google.a2ui.core.common.Signal;
 import com.google.a2ui.core.common.Subscription;
+import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiRecursionError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
@@ -451,6 +452,9 @@ public final class NodeResolver<C extends ComponentApi> {
    * Evaluates a dynamic value. If the evaluation fails, the result is null and the resolver reports
    * the failure to the surface. It reports the same failure of the same location again only after
    * an evaluation of the node without that failure.
+   *
+   * <p>The reported error has the code {@code EXPRESSION_ERROR}. If the surface cannot use the
+   * catalog of a call, the code is {@code CATALOG_ERROR}.
    */
   private Object evaluate(Pass pass, Object raw, String where) {
     try {
@@ -465,8 +469,21 @@ public final class NodeResolver<C extends ComponentApi> {
     String key = where + "\u0000" + error.getMessage();
     pass.errors.add(key);
     if (!pass.node.reportedErrors.contains(key)) {
+      if (error.errorCode().isEmpty()) {
+        ErrorFields.errorCode(error, bindingCode(error));
+      }
       surface.dispatchError(error);
     }
+  }
+
+  /**
+   * Gets the protocol error code of a failure in a binding or in a check.
+   *
+   * <p>The user asked for nothing in a binding. Thus a function that failed is not an execution
+   * error of an action. It is an expression that has no value.
+   */
+  static String bindingCode(A2uiError error) {
+    return error instanceof A2uiCatalogError ? "CATALOG_ERROR" : "EXPRESSION_ERROR";
   }
 
   private ComponentNode<C> child(Pass pass, String componentId, String dataPath, int index) {

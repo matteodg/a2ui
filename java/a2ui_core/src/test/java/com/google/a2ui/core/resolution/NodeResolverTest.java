@@ -23,6 +23,7 @@ import static com.google.a2ui.core.resolution.NodeFixture.object;
 import static com.google.a2ui.core.resolution.NodeFixture.path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -32,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
 import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.exceptions.A2uiCatalogError;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -418,10 +422,49 @@ class NodeResolverTest {
     assertEquals(1, fixture.errors.size());
     assertEquals(Optional.of("s"), fixture.errors.getFirst().surfaceId());
     assertTrue(fixture.errors.getFirst().getMessage().contains("NESTED_QUANTIFIER"));
+    assertEquals(Optional.of("EXPRESSION_ERROR"), fixture.errors.getFirst().errorCode());
 
     fixture.setData("/name", "Grace");
 
     assertEquals(1, fixture.errors.size());
     assertEquals("Grace", children.get(1).props().get().value("text"));
+  }
+
+  @Test
+  void aFunctionThatThrowsInABindingIsAnExpressionErrorAndTheOtherBindingsResolve() {
+    ComponentNode<ComponentApi> root =
+        fixture.root(
+            Map.of("name", "Ada"),
+            component("root", "Column", "children", List.of("broken", "fine")),
+            component("broken", "Text", "text", Map.of("@call", "crash")),
+            component("fine", "Text", "text", path("/name")));
+    List<ComponentNode<ComponentApi>> children = root.props().get().children("children");
+
+    assertNull(children.get(0).props().get().value("text"));
+    assertEquals("Ada", children.get(1).props().get().value("text"));
+    assertEquals(1, fixture.errors.size());
+    A2uiError error = fixture.errors.getFirst();
+    assertInstanceOf(A2uiExpressionError.class, error);
+    assertEquals("Function 'crash' failed: The disk is full.", error.getMessage());
+    assertEquals(Optional.of("EXPRESSION_ERROR"), error.errorCode());
+    assertEquals(Optional.of("s"), error.surfaceId());
+  }
+
+  @Test
+  void aCallInACatalogThatTheSurfaceCannotUseIsACatalogError() {
+    ComponentNode<ComponentApi> root =
+        fixture.root(Map.of(), component("root", "Text", "text", "Hello"));
+
+    // The message processor rejects such a call. Thus the test writes the component directly.
+    fixture.put(
+        "root",
+        "Text",
+        "text",
+        Map.of("@call", "formatString", "catalogId", "urn:missing", "args", Map.of()));
+
+    assertNull(root.props().get().value("text"));
+    assertEquals(1, fixture.errors.size());
+    assertInstanceOf(A2uiCatalogError.class, fixture.errors.getFirst());
+    assertEquals(Optional.of("CATALOG_ERROR"), fixture.errors.getFirst().errorCode());
   }
 }
