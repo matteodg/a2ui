@@ -29,6 +29,8 @@ import com.ibm.icu.text.PluralRules;
 import com.ibm.icu.util.Currency;
 import com.ibm.icu.util.ULocale;
 import java.math.RoundingMode;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -57,16 +59,19 @@ final class BasicFunctions {
   private final ULocale locale;
   private final DateFormatter dates;
   private final PluralRules plurals;
+  private final UrlOpener urlOpener;
 
   /**
-   * Makes the functions for a locale.
+   * Makes the functions.
    *
    * @param locale the locale of the text that the format functions write
+   * @param urlOpener the object that opens a URL for {@code openUrl}, or null if there is none
    */
-  BasicFunctions(Locale locale) {
+  BasicFunctions(Locale locale, UrlOpener urlOpener) {
     this.locale = ULocale.forLocale(locale);
     this.dates = new DateFormatter(this.locale);
     this.plurals = PluralRules.forLocale(this.locale);
+    this.urlOpener = urlOpener;
   }
 
   /**
@@ -95,7 +100,49 @@ final class BasicFunctions {
     bodies.put(
         "formatDate", (args, context) -> dates.format(args.get("value"), args.get("format")));
     bodies.put("pluralize", (args, context) -> pluralize(args));
+    bodies.put("openUrl", (args, context) -> openUrl(args.get("url")));
     return bodies;
+  }
+
+  /**
+   * Gives an absolute {@code http} or {@code https} URL to the {@link UrlOpener}. Each other scheme
+   * is an error, for example {@code javascript}. A URL that is absent or empty opens nothing.
+   *
+   * <p>The data context makes sure that the call is the result of a user gesture.
+   *
+   * @return null, because the function returns nothing
+   */
+  private Object openUrl(Object url) {
+    String text = url instanceof String written ? written.strip() : "";
+    if (text.isEmpty()) {
+      return null;
+    }
+    URI uri;
+    try {
+      uri = new URI(text);
+    } catch (URISyntaxException e) {
+      throw new A2uiExpressionError("openUrl: '" + text + "' is not a valid URL.", e);
+    }
+    if (uri.getScheme() == null) {
+      throw new A2uiExpressionError("openUrl: the URL must be absolute, but got '" + text + "'.");
+    }
+    String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+    if (!scheme.equals("http") && !scheme.equals("https")) {
+      throw new A2uiExpressionError(
+          "openUrl: the scheme '"
+              + scheme
+              + ":' is not allowed. Only http and https URLs are opened.");
+    }
+    if (uri.getRawAuthority() == null) {
+      throw new A2uiExpressionError("openUrl: the URL '" + text + "' has no host.");
+    }
+    if (urlOpener == null) {
+      throw new A2uiExpressionError(
+          "openUrl has nothing to open URLs with. Pass a UrlOpener when creating the basic"
+              + " catalog.");
+    }
+    urlOpener.open(uri);
+    return null;
   }
 
   /**

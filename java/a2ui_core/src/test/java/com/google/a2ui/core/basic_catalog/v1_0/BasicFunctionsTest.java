@@ -17,6 +17,7 @@
 package com.google.a2ui.core.basic_catalog.v1_0;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +28,8 @@ import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.resolution.DataContext;
 import com.google.a2ui.core.state.SurfaceModel;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -402,6 +405,72 @@ class BasicFunctionsTest {
     all[1] = value;
     System.arraycopy(namesAndValues, 0, all, 2, namesAndValues.length);
     return all;
+  }
+
+  @Test
+  void openUrlRunsOnlyAsTheResultOfAUserGesture() {
+    List<URI> opened = new ArrayList<>();
+    DataContext context = context(BasicCatalog.withFunctions(Locale.US, opened::add), Map.of());
+    Map<String, Object> open = call("openUrl", "url", " https://example.com/a?b=c ");
+
+    A2uiExpressionError error =
+        assertThrows(A2uiExpressionError.class, () -> context.resolveDynamicValue(open));
+    assertTrue(error.getMessage().contains("requires user activation"), error.getMessage());
+    assertEquals(List.of(), opened);
+
+    assertNull(context.withUserActivation().resolveDynamicValue(open));
+    assertEquals(List.of(URI.create("https://example.com/a?b=c")), opened);
+  }
+
+  @Test
+  void openUrlOpensOnlyAbsoluteHttpAndHttpsUrls() {
+    List<URI> opened = new ArrayList<>();
+    DataContext context =
+        context(BasicCatalog.withFunctions(Locale.US, opened::add), Map.of()).withUserActivation();
+
+    for (String url :
+        List.of(
+            "javascript:alert(1)",
+            "data:text/html,x",
+            "file:///etc/passwd",
+            "mailto:a@b.co",
+            "/relative",
+            "example.com",
+            "http:example.com",
+            "https:///path",
+            "ht tp://x")) {
+      assertThrows(
+          A2uiExpressionError.class,
+          () -> context.resolveDynamicValue(call("openUrl", "url", url)),
+          url);
+    }
+    assertNull(context.resolveDynamicValue(call("openUrl", "url", "HTTP://example.com")));
+    assertEquals(List.of(URI.create("HTTP://example.com")), opened);
+  }
+
+  @Test
+  void openUrlOpensNothingForAUrlThatIsAbsentOrEmpty() {
+    List<URI> opened = new ArrayList<>();
+    DataContext context =
+        context(BasicCatalog.withFunctions(Locale.US, opened::add), Map.of()).withUserActivation();
+
+    assertNull(context.resolveDynamicValue(call("openUrl", "url", "")));
+    assertNull(context.resolveDynamicValue(call("openUrl", "url", null)));
+    assertNull(context.resolveDynamicValue(call("openUrl", "url", 5)));
+    assertEquals(List.of(), opened);
+  }
+
+  @Test
+  void openUrlFailsIfTheCatalogHasNoUrlOpener() {
+    DataContext context = context().withUserActivation();
+
+    A2uiExpressionError error =
+        assertThrows(
+            A2uiExpressionError.class,
+            () -> context.resolveDynamicValue(call("openUrl", "url", "https://example.com")));
+
+    assertTrue(error.getMessage().contains("UrlOpener"), error.getMessage());
+    assertThrows(NullPointerException.class, () -> BasicCatalog.withFunctions(Locale.US, null));
   }
 
   @Test

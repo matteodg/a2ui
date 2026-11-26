@@ -50,13 +50,25 @@ public final class BasicCatalog {
 
   /**
    * Makes the catalog with the code of its functions, for a renderer. The functions write text for
-   * the locale {@link Locale#US}. Thus the text is the same on each computer. See {@link
-   * #withFunctions(Locale)}.
+   * the locale {@link Locale#US}. Thus the text is the same on each computer. A call of {@code
+   * openUrl} fails. See {@link #withFunctions(Locale, UrlOpener)}.
    *
    * @return the catalog
    */
   public static Catalog<ComponentApi, FunctionImplementation> withFunctions() {
     return withFunctions(Locale.US);
+  }
+
+  /**
+   * Makes the catalog with the code of its functions, for a renderer. A call of {@code openUrl}
+   * fails. See {@link #withFunctions(Locale, UrlOpener)}.
+   *
+   * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
+   *     formatDate} and {@code pluralize} write
+   * @return the catalog
+   */
+  public static Catalog<ComponentApi, FunctionImplementation> withFunctions(Locale locale) {
+    return implement(new BasicFunctions(Objects.requireNonNull(locale, "locale"), null).bodies());
   }
 
   /**
@@ -67,10 +79,16 @@ public final class BasicCatalog {
    *
    * @param locale the locale of the text that {@code formatNumber}, {@code formatCurrency}, {@code
    *     formatDate} and {@code pluralize} write
+   * @param urlOpener the object that opens a URL for {@code openUrl}
    * @return the catalog
    */
-  public static Catalog<ComponentApi, FunctionImplementation> withFunctions(Locale locale) {
-    return implement(new BasicFunctions(Objects.requireNonNull(locale, "locale")).bodies());
+  public static Catalog<ComponentApi, FunctionImplementation> withFunctions(
+      Locale locale, UrlOpener urlOpener) {
+    return implement(
+        new BasicFunctions(
+                Objects.requireNonNull(locale, "locale"),
+                Objects.requireNonNull(urlOpener, "urlOpener"))
+            .bodies());
   }
 
   private static Catalog<ComponentApi, FunctionImplementation> implement(
