@@ -32,8 +32,9 @@ import org.junit.jupiter.api.Test;
  */
 class GallerySnapshotTest {
   /**
-   * Three complete examples, and examples that have components with no Swing view. The root of the
-   * last two examples has a view. Thus their placeholders are in a layout.
+   * Complete examples, and then examples that have components with no Swing view. The placeholders
+   * of these components are in a layout: in a card, in the tabs of {@code recipe-card} and in the
+   * list of {@code financial-data-grid}.
    */
   private static final List<String> EXAMPLES =
       List.of(
@@ -42,9 +43,12 @@ class GallerySnapshotTest {
           "scaffold-incremental",
           "login-form",
           "markdown-text",
+          "modal",
+          "calendar-day",
           "contact-card",
           "flight-status",
-          "modal",
+          "recipe-card",
+          "financial-data-grid",
           "live-invitation-builder");
 
   private GalleryPanel gallery;

@@ -20,10 +20,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
 import java.awt.Component;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +64,36 @@ class GalleryExamplesTest {
         complete.stream().sorted((first, second) -> Boolean.compare(second, first)).toList(),
         complete);
     assertTrue(examples.stream().anyMatch(example -> example.id().equals("login-form")));
+  }
+
+  /**
+   * The README of the sample tells how many components have a view and how many examples show
+   * completely. This test fails when a new view makes these numbers different.
+   */
+  @Test
+  void theReadmeHasTheNumberOfTheViewsAndOfTheCompleteExamples() throws IOException {
+    List<Example> examples = Headless.examples();
+    long complete = examples.stream().filter(Example::complete).count();
+    String readme = Files.readString(Path.of("README.md")).replaceAll("\\s+", " ");
+
+    assertTrue(
+        readme.contains(
+            "views for "
+                + SwingBasicCatalog.viewNames().size()
+                + " of the "
+                + SwingBasicCatalog.components().size()
+                + " components of the basic catalog"),
+        "the number of the views");
+    assertTrue(
+        readme.contains(
+            "Thus " + complete + " of the " + examples.size() + " examples show completely"),
+        "the number of the complete examples");
+    assertTrue(
+        readme.contains("The other " + (examples.size() - complete) + " examples show a"),
+        "the number of the other examples");
+    for (String view : SwingBasicCatalog.viewNames()) {
+      assertTrue(readme.contains("`" + view + "`"), view);
+    }
   }
 
   @TestFactory

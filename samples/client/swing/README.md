@@ -70,18 +70,22 @@ The menu **View** changes the look and feel while the application runs.
 
 A component that the surface cannot show is visible as a label with a dashed border:
 
-- `No Swing view: Card 'root'` is a component of the catalog that has no Swing view.
+- `No Swing view: Icon 'star_icon'` is a component of the catalog that has no Swing view.
 - `Waiting for the component 'title'` is a component that did not arrive.
+
+The `Modal` component shows its content in a dialog above the window. Select the example `modal`
+and operate its button. Close the dialog with its close control or with the Escape key.
 
 ## Limits
 
-- The Swing adapter has views for 5 of the 18 components of the basic catalog at this time: `Text`,
-  `Row`, `Column`, `Button` and `TextField`. Thus 7 of the 43 examples show completely. These are
-  the examples whose name starts with `scaffold-`.
-- A component with no view does not show its children. The root of 33 of the other 36 examples is
-  a `Card`. Thus such an example shows only one placeholder, for its root. The examples
-  `incremental-dashboard`, `live-invitation-builder` and `modal` show placeholders between
-  components that have a view.
+- The Swing adapter has views for 10 of the 18 components of the basic catalog at this time: `Text`,
+  `Row`, `Column`, `List`, `Card`, `Tabs`, `Modal`, `Divider`, `Button` and `TextField`. Thus 16 of
+  the 43 examples show completely.
+- The other 27 examples show a placeholder for each component with no view. The components with no
+  view are `Icon` (in 20 examples), `Image` (13), `CheckBox`, `ChoicePicker` and `DateTimeInput` (2
+  each), and `Slider`, `Video` and `AudioPlayer` (1 each).
+- A placeholder is wider than an icon. Thus a row with placeholders can have less space for its
+  text than the same row with icons, and a long word in such a row can lose its end.
 - The gallery shows the first surface of an example.
 - The gallery has the examples of protocol v1.0 only, and it has no example with a custom catalog.
 - The function `openUrl` opens the browser of the system. The tests use a different URL opener.
