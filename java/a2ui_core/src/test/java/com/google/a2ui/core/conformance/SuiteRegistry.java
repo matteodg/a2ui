@@ -75,11 +75,23 @@ final class SuiteRegistry {
 
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
 
+  private static final String V0_9_ACTION =
+      "Names no protocolVersion and is written for v0.9; " + V1_ONLY;
+
   /** The cases that the harness skips, by name. Each case has its reason. */
   static final Map<String, String> SKIP_TEST_NAMES =
-      Map.of(
-          "test_v10_get_renderer_data_model_filters_by_surface_protocol_version",
-          "Creates a v0.9 surface; " + V1_ONLY);
+      Map.ofEntries(
+          Map.entry(
+              "test_v10_get_renderer_data_model_filters_by_surface_protocol_version",
+              "Creates a v0.9 surface; " + V1_ONLY),
+          // The cases of core/actions.yaml that name no protocol version.
+          Map.entry("test_action_event_basic", V0_9_ACTION),
+          Map.entry("test_action_event_with_literal_context", V0_9_ACTION),
+          Map.entry("test_action_event_context_literal_keys_path_and_call", V0_9_ACTION),
+          Map.entry("test_action_event_with_data_binding", V0_9_ACTION),
+          Map.entry("test_action_event_with_relative_scope", V0_9_ACTION),
+          Map.entry("test_action_event_with_user_message", V0_9_ACTION),
+          Map.entry("test_action_direct_name_shorthand", V0_9_ACTION));
 
   private static final String NOT_YET = "Not implemented in java-core yet";
 
@@ -229,7 +241,8 @@ final class SuiteRegistry {
   private static Map<String, SuiteSupport> coreSuites() {
     Map<String, SuiteSupport> suites = new LinkedHashMap<>();
     suites.put("core/accessibility.yaml", new Unsupported(ADAPTER));
-    suites.put("core/actions.yaml", new Unsupported(NOT_YET));
+    suites.put(
+        "core/actions.yaml", new Supported(Map.of("dispatch_action", new DispatchActionHandler())));
     suites.put("core/adapter_conformance.yaml", new Unsupported(ADAPTER));
     suites.put("core/add_catalog.yaml", processorSuite(List.of(PROCESS)));
     suites.put("core/agent_function_routing.yaml", new Unsupported(NOT_YET));
