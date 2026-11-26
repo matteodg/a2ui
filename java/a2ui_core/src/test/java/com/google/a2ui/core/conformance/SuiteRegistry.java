@@ -45,7 +45,7 @@ final class SuiteRegistry {
    *     action ({@code validate}), or an action and the path of a key ({@code
    *     from_json.expect.selfContained}). The second form applies only to the cases of the action
    *     that set that key. The path can end with a value ({@code
-   *     evaluate_function.function=regex}). Then it applies only to the cases that set the key to
+   *     evaluate_function.function=openUrl}). Then it applies only to the cases that set the key to
    *     that value. The harness records the cases as skipped. If two keys apply to one case, the
    *     first key in the sequence of the map gives the reason. Thus the reason is the same in each
    *     run. {@link SuiteRegistry#reasons(String...)} makes such a map.
@@ -90,9 +90,6 @@ final class SuiteRegistry {
 
   private static final String NOT_YET = "Not implemented in java-core yet";
 
-  private static final String NEEDS_REGEX =
-      "The regex function is not implemented in java-core yet. It needs the parser and the safety"
-          + " check of the A2UI regex dialect";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
   private static final String PROCESS = "process_messages";
@@ -179,7 +176,7 @@ final class SuiteRegistry {
    * remaining path.
    *
    * <p>The last key of the path can give a value, for example {@code
-   * evaluate_function.function=regex}. Then the key applies only if the case sets the key to that
+   * evaluate_function.function=openUrl}. Then the key applies only if the case sets the key to that
    * value. The comparison uses the text of the value.
    *
    * @param target the key, for example {@code from_json.expect.selfContained}
@@ -290,11 +287,7 @@ final class SuiteRegistry {
                 new EvaluateFunctionHandler(),
                 VALIDATE,
                 new ProcessMessagesHandler(true)),
-            reasons(
-                "validate.expect",
-                NEEDS_RESOLUTION,
-                "evaluate_function.function=regex",
-                NEEDS_REGEX),
+            reasons("validate.expect", NEEDS_RESOLUTION),
             Set.of()));
     suites.put("core/index_function.yaml", new Unsupported(NOT_YET));
     suites.put("core/message_processor_scaling.yaml", new Unsupported(NOT_YET));
