@@ -78,7 +78,7 @@ from the services. Give the same services to the `A2uiSurface`.
 | `DateTimeInput` | `JSpinner` with a text field for ISO 8601 text                      | Available |
 | `Image`         | A component that paints the image of the `imageLoader` service      | Available |
 | `Icon`          | A component that paints a shape of the module or SVG path data      | Available |
-| `Video`         | The view of the `mediaPlayer` service                               | Later     |
+| `Video`         | The view of the `mediaPlayer` service, or a button with the poster  | Available |
 | `AudioPlayer`   | The view of the `mediaPlayer` service                               | Later     |
 
 The Swing class of a component with the state "Later" is the plan, and it can change.

@@ -56,6 +56,8 @@ import java.util.function.Function;
  *       service</td></tr>
  *   <tr><td>{@code Icon}</td><td>A component that paints a shape of the module, or the SVG path
  *       data of the agent</td></tr>
+ *   <tr><td>{@code Video}</td><td>The view of the {@code mediaPlayer} service. The default is a
+ *       button with the poster image that opens the URL in an external application.</td></tr>
  *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
  *   <tr><td>{@code List}</td><td>{@link FlexPanel} in a {@code JScrollPane}</td></tr>
  *   <tr><td>{@code Card}</td><td>A panel that paints a rounded outline</td></tr>
@@ -118,6 +120,7 @@ public final class SwingBasicCatalog {
     views.put("Text", TextView::new);
     views.put("Image", ImageView::new);
     views.put("Icon", IconView::new);
+    views.put("Video", VideoView::new);
     views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
     views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
     views.put("List", ListView::new);
