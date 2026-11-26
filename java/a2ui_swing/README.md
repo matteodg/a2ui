@@ -47,7 +47,7 @@ The Java module name is `com.google.a2ui.swing`. It exports these packages:
 | :------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `com.google.a2ui.swing.surface`       | `A2uiSurface`, the Swing component that shows one surface. `A2uiFallbacks` and `A2uiServices` are its options. `A2uiSwing` has the helpers for the event dispatch thread. `MountedNode` and `A2uiAccessibility` let a test or a tool examine what a surface shows. |
 | `com.google.a2ui.swing.catalog`       | `SwingComponentImplementation`, a component definition that makes a view. `SwingComponentView` is the view of one component. `ViewContext` and `ChildViews` are the objects that the adapter gives to a view.                                                      |
-| `com.google.a2ui.swing.binding`       | `TextBinding` connects a Swing text component to a property in the two directions.                                                                                                                                                                                 |
+| `com.google.a2ui.swing.binding`       | `TextBinding` connects a Swing text component to a property in the two directions. `ValueBinding` does the same for a control that is not text, for example a check box.                                                                                           |
 | `com.google.a2ui.swing.catalog.basic` | `SwingBasicCatalog` makes the basic catalog with its Swing views. `FlexLayout` and `FlexPanel` are the layout of the `Row`, `Column` and `List` components. A custom container can also use them.                                                                  |
 
 The package `com.google.a2ui.swing.nodes` has the node dispatcher and the child reconciliation. It
@@ -72,10 +72,10 @@ from the services. Give the same services to the `A2uiSurface`.
 | `Divider`       | `JSeparator`                                                        | Available |
 | `Button`        | `JButton` with the view of the child in it                          | Available |
 | `TextField`     | `JTextField`, `JTextArea` in a `JScrollPane`, or `JPasswordField`   | Available |
-| `CheckBox`      | `JCheckBox`                                                         | Later     |
-| `ChoicePicker`  | `JCheckBox`, `JRadioButton` or `JToggleButton` for each option      | Later     |
-| `Slider`        | `JSlider`                                                           | Later     |
-| `DateTimeInput` | `JSpinner` with a date model                                        | Later     |
+| `CheckBox`      | `JCheckBox` with a label that wraps                                 | Available |
+| `ChoicePicker`  | `JRadioButton`, `JCheckBox` or `JToggleButton` for each option      | Available |
+| `Slider`        | `JSlider` with the value next to it                                 | Available |
+| `DateTimeInput` | `JSpinner` with a text field for ISO 8601 text                      | Available |
 | `Image`         | A component that paints the image of the `imageLoader` service      | Later     |
 | `Icon`          | A component that paints an icon                                     | Later     |
 | `Video`         | The view of the `mediaPlayer` service                               | Later     |
@@ -99,8 +99,8 @@ These rules apply to the views:
   Thus `surface.setFont(font)` and `surface.setForeground(color)` on the `A2uiSurface` set the text
   style of the full surface. A button gives its text color to its content in the same way.
 - **Spacing.** A `Row`, a `Column` and a `List` have no padding, no gap and no background. Each
-  `Text`, `Divider`, `Card`, `Tabs`, `Button` and `TextField` has a margin of 8 pixels on its four
-  sides. Text in a button has no margin. This is the leaf margin strategy of the implementation
+  `Text`, `Divider`, `Card`, `Tabs`, `Button`, `TextField`, `CheckBox`, `ChoicePicker`, `Slider` and
+  `DateTimeInput` has a margin of 8 pixels on its four sides. Text in a button has no margin. This is the leaf margin strategy of the implementation
   guide.
 - **Row and Column.** `justify`, `align` and the `weight` of each child go to the `FlexLayout`.
   With the default `align`, `stretch`, a child fills the cross axis. Thus a button in a column is as
@@ -134,6 +134,31 @@ These rules apply to the views:
   move the caret. The variant `number` accepts only the text of a decimal number. The messages of
   the failed checks show below the control. A warning and an information are hints that do not stop
   the user.
+- **Input components.** `CheckBox`, `ChoicePicker`, `Slider` and `DateTimeInput` write the change of
+  the user to the data model immediately. When the value comes back, the view does not touch the
+  control. A value with no data path is a value that only the control has, until the next update.
+  The messages of the failed checks show below the control, as for `TextField`, and the user can
+  always operate the control. The label is the accessible name of the control.
+- **CheckBox.** The label is next to the check box, and it breaks into lines. A click on the label
+  operates the check box. The view writes `true` or `false`.
+- **ChoicePicker.** The view writes a list of strings, also for one selection, in the sequence of
+  the options. The style `checkbox` has radio buttons for `mutuallyExclusive` and check boxes for
+  `multipleSelection`. More than six options go in columns when the width permits. The style
+  `chips` has toggle buttons that go to the next line when the width is not sufficient. A
+  `filterable` picker has a text field that hides the options whose label does not contain its
+  text. A selected option that the filter hides stays selected. The panel of the options has the
+  accessible role of a group box.
+- **Slider.** The current value shows next to the slider. With `steps`, the slider moves in equal
+  steps and shows tick marks. With no `steps`, a whole range from 2 to 1000 moves in steps of 1, and
+  each other range moves in steps of one percent. The view writes a whole number as a `Long` and
+  each other number as a `Double`, also while the user drags. The accessible value of the slider is
+  the number.
+- **DateTimeInput.** Plain Swing has no date picker. The field is a `JSpinner` with the text
+  `yyyy-mm-dd`, `hh:mm` or `yyyy-mm-dd hh:mm`. The user types the value, or moves the part at the
+  caret with the arrows, and removes the value with the removal of the text. With no `enableDate`
+  and no `enableTime`, the field has a date. The view writes ISO 8601 text in the form of the
+  enabled parts, and it keeps the seconds and the zone of the value. It never changes a value to a
+  different zone. A value that is not ISO 8601 text shows as it is and is not written back.
 
 To replace the view of one component, make a catalog with a different list:
 
@@ -254,7 +279,7 @@ These rules apply to a view:
 - Read the properties only from the `props` of `update`. Do not use a `DataContext`.
 - Write the input of the user through the `WritableBinding` of a property while the user edits.
   When the properties come back with the value that the control shows, do not touch the control.
-  `TextBinding` does this for a text component.
+  `TextBinding` does this for a text component, and `ValueBinding` for each other control.
 - Call a `NodeAction` in the Swing listener of the gesture, and not later.
 - Take colors, fonts and borders from the look and feel (`UIManager`). Protocol v1.0 has no theme.
 - Do not make the views of children. Give the child nodes to the `ChildViews` helper.
@@ -454,8 +479,8 @@ second file, with `-modal-content` in its name.
 The conformance harness of this module has the name `swing`. It registers each suite of the
 `adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
 only if the adapter has a view for each basic catalog component that the case uses. The harness
-records each other case as skipped, with the names of the absent views. In this version, 31 cases
-run: the 7 cases of the Markdown subset, 19 cases of the surface suite and 5 cases of the
+records each other case as skipped, with the names of the absent views. In this version, 34 cases
+run: the 7 cases of the Markdown subset, 21 cases of the surface suite and 6 cases of the
 accessibility suite. The harness does not run the `axeCore` rules, which need a DOM. See
 [the conformance section](../README.md#conformance) for the commands.
 

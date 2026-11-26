@@ -99,3 +99,8 @@
   `com.google.a2ui.swing.catalog.basic`: a component with this client property fills the cross
   axis with each `align`. The default Markdown component now has the correct width on a screen with
   a scale when it gave its size before it came to a window.
+- `SwingBasicCatalog` now has Swing views for `CheckBox`, `ChoicePicker`, `Slider` and
+  `DateTimeInput`. `ChoicePicker` writes a list of strings, `Slider` writes a `Long` for a whole
+  number and a `Double` for each other number, and `DateTimeInput` writes ISO 8601 text in the form
+  of its enabled parts. Add `ValueBinding` in `com.google.a2ui.swing.binding`: the two-way binding of
+  a control that is not a text component.
