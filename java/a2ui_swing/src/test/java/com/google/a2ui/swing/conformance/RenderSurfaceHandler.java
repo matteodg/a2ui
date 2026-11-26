@@ -39,6 +39,8 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 import javax.swing.AbstractButton;
 import javax.swing.JComponent;
+import javax.swing.JSeparator;
+import javax.swing.SwingConstants;
 import javax.swing.text.JTextComponent;
 
 /**
@@ -357,6 +359,16 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       assertJsonEquals(expected.get("value"), AdapterSession.documentText(field), "value of " + at);
     }
     for (String property : List.of("url", "name", "axis", "badgeText")) {
+      if (property.equals("axis")
+          && expected.containsKey(property)
+          && session.control(actual) instanceof JSeparator line) {
+        // A divider shows its axis as the orientation of its line.
+        assertJsonEquals(
+            expected.get(property),
+            line.getOrientation() == SwingConstants.VERTICAL ? "vertical" : "horizontal",
+            "axis of " + at);
+        continue;
+      }
       if (expected.containsKey(property)) {
         NodeProps<?> props =
             AdapterSession.customProps(actual)

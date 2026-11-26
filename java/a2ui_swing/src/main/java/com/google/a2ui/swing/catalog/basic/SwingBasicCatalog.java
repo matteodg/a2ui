@@ -54,6 +54,7 @@ import java.util.function.Function;
  *       JEditorPane} that shows the Markdown subset.</td></tr>
  *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
  *   <tr><td>{@code Card}</td><td>A panel that paints a rounded outline</td></tr>
+ *   <tr><td>{@code Divider}</td><td>{@code JSeparator}</td></tr>
  *   <tr><td>{@code Button}</td><td>{@code JButton}</td></tr>
  *   <tr><td>{@code TextField}</td><td>{@code JTextField}, {@code JTextArea} or {@code
  *       JPasswordField}</td></tr>
@@ -87,6 +88,7 @@ public final class SwingBasicCatalog {
     views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
     views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
     views.put("Card", CardView::new);
+    views.put("Divider", DividerView::new);
     views.put("Button", ButtonView::new);
     views.put("TextField", TextFieldView::new);
     return Collections.unmodifiableMap(views);
