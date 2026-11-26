@@ -20,7 +20,8 @@
       "react",
       "angular",
       "flutter",
-      "swiftui"
+      "swiftui",
+      "swing"
     ]
   }
 }

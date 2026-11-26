@@ -24,6 +24,7 @@ import com.google.a2ui.swing.conformance.SuiteRegistry.Supported;
 import com.google.a2ui.swing.testing.Edt;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.TestFactory;
@@ -35,8 +36,17 @@ import org.junit.jupiter.api.TestFactory;
 class AdapterConformanceTest {
   @TestFactory
   List<DynamicNode> adapterSuites() {
+    return containers(SuiteRegistry.ADAPTER_SUITES);
+  }
+
+  /**
+   * Makes one container of tests for each suite, with one test for each case.
+   *
+   * @param suites the suites and the support that the harness gives to each
+   */
+  static List<DynamicNode> containers(Map<String, SuiteSupport> suites) {
     List<DynamicNode> containers = new ArrayList<>();
-    SuiteRegistry.ADAPTER_SUITES.forEach((suite, support) -> {
+    suites.forEach((suite, support) -> {
       List<DynamicNode> tests = new ArrayList<>();
       for (ConformanceCase testCase : ConformanceLoader.loadSuite(suite)) {
         tests.add(dynamicTest(testCase.name(), () -> run(testCase, support)));

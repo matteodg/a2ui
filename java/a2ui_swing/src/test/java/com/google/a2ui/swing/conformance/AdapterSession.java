@@ -39,6 +39,7 @@ import com.google.a2ui.swing.surface.A2uiFallbacks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.A2uiSwing;
+import com.google.a2ui.swing.surface.MarkdownView;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.TestImageLoader;
@@ -47,6 +48,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -119,6 +121,10 @@ final class AdapterSession {
 
   /** The mounted surface component, or null. */
   A2uiSurface view;
+
+  /** The surface component of each surface that the session mounted. */
+  private final Map<SurfaceModel<SwingComponentImplementation>, A2uiSurface> mounted =
+      new IdentityHashMap<>();
 
   /** The ID of the last call that the renderer sent to the agent, or null. */
   private String lastCallId;
@@ -236,9 +242,42 @@ final class AdapterSession {
   void process(Object messages) {
     processor.processMessages(resolveReferences(messages));
     if (view == null && surface != null && !surface.isDisposed()) {
-      view = Headless.mount(new A2uiSurface(surface, A2uiFallbacks.NONE, services), WIDTH, HEIGHT);
+      view = mount(surface);
     }
     settle();
+  }
+
+  private A2uiSurface mount(SurfaceModel<SwingComponentImplementation> model) {
+    return mounted.computeIfAbsent(
+        model,
+        key -> Headless.mount(new A2uiSurface(key, A2uiFallbacks.NONE, services), WIDTH, HEIGHT));
+  }
+
+  /**
+   * Makes a surface of the processor the surface of the session, and mounts it if it is not
+   * mounted. A scenario with more than one surface uses this before it reads or operates a surface.
+   *
+   * @param surfaceId the ID of the surface
+   * @param where the location of the step, for the failure message
+   */
+  void select(String surfaceId, String where) {
+    surface =
+        processor
+            .model()
+            .getSurface(surfaceId)
+            .orElseThrow(
+                () -> new AssertionError(where + ": there is no surface '" + surfaceId + "'."));
+    view = mount(surface);
+    settle();
+  }
+
+  /** Unmounts each surface component that the session mounted and that is mounted. */
+  void unmountAll() {
+    for (A2uiSurface component : mounted.values()) {
+      if (component.isMounted()) {
+        component.removeNotify();
+      }
+    }
   }
 
   /** Does the layout of the surface again, as a window does after a change. */
@@ -349,6 +388,20 @@ final class AdapterSession {
       for (Component child : container.getComponents()) {
         collectText(child, text);
       }
+    }
+  }
+
+  /**
+   * Gets the text that the Markdown view of the adapter shows for a Markdown text, with each
+   * sequence of white space as one space.
+   */
+  static String markdownText(String markdown) {
+    MarkdownView view = A2uiServices.DEFAULT.markdown().createView();
+    try {
+      view.setMarkdown(markdown);
+      return visibleText(view.component());
+    } finally {
+      view.dispose();
     }
   }
 

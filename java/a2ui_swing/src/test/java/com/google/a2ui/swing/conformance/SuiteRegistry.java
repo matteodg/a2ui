@@ -18,6 +18,12 @@ package com.google.a2ui.swing.conformance;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,8 +32,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * The list of the suites of the {@code adapter} corpus and the support that this harness gives to
- * each suite.
+ * The lists of the suites of the corpora {@code adapter} and {@code e2e}, and the support that this
+ * harness gives to each suite.
  */
 final class SuiteRegistry {
   /** Runs one case. Throws if the adapter does not behave as the case expects. */
@@ -80,7 +86,53 @@ final class SuiteRegistry {
    */
   static final Map<String, SuiteSupport> ADAPTER_SUITES = adapterSuites();
 
+  /** The directory of the scenarios of protocol v1.0, relative to {@code conformance/}. */
+  static final String E2E_DIRECTORY = "e2e";
+
+  /** The directory of the scenarios of protocol v0.9.1, relative to {@code conformance/}. */
+  static final String E2E_V0_9_1_DIRECTORY = "e2e/v0_9_1";
+
+  /**
+   * Each suite of the {@code e2e} corpus of {@code conformance/manifest_corpora.json}: each YAML
+   * file of the two directories of the scenarios. The harness runs the renderer part of each
+   * scenario of protocol v1.0, and it records each scenario of protocol v0.9.1 as skipped.
+   *
+   * <p>{@code SuiteRegistryTest} fails if the corpus and this map are different. Thus a new
+   * directory of scenarios cannot stay hidden.
+   */
+  static final Map<String, SuiteSupport> E2E_SUITES = e2eSuites();
+
   private SuiteRegistry() {}
+
+  private static Map<String, SuiteSupport> e2eSuites() {
+    Map<String, SuiteSupport> suites = new LinkedHashMap<>();
+    SuiteSupport scenarios =
+        new Supported(Set.of("e2e_scenario"), Map.of("e2e_scenario", new E2eScenarioHandler()));
+    yamlFilesOf(E2E_DIRECTORY).forEach(suite -> suites.put(suite, scenarios));
+    yamlFilesOf(E2E_V0_9_1_DIRECTORY).forEach(suite -> suites.put(suite, new Unsupported(V1_ONLY)));
+    return Collections.unmodifiableMap(suites);
+  }
+
+  /**
+   * Lists the YAML files of a directory of suites, not of the directories below it.
+   *
+   * @param directory the directory, relative to {@code conformance/}
+   * @return the paths of the files relative to {@code conformance/}, in alphabetical sequence
+   */
+  static List<String> yamlFilesOf(String directory) {
+    List<String> suites = new ArrayList<>();
+    try (DirectoryStream<Path> files =
+        Files.newDirectoryStream(ConformancePaths.conformancePath(directory), "*.yaml")) {
+      files.forEach(file -> suites.add(directory + "/" + file.getFileName()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    if (suites.isEmpty()) {
+      throw new IllegalStateException("conformance/" + directory + " has no suites.");
+    }
+    Collections.sort(suites);
+    return suites;
+  }
 
   private static Map<String, SuiteSupport> adapterSuites() {
     Map<String, SuiteSupport> suites = new LinkedHashMap<>();
@@ -164,6 +216,18 @@ final class SuiteRegistry {
     collectMessages(testCase.fields(), types);
     if (testCase.fields().get("steps") instanceof List<?> steps) {
       steps.forEach(step -> collectMessages(step, types));
+    }
+    // A scenario has its messages in the parts {@code a2ui} of each turn.
+    if (testCase.fields().get("turns") instanceof List<?> turns) {
+      for (Object turn : turns) {
+        if (turn instanceof Map<?, ?> map && map.get("expectWire") instanceof List<?> parts) {
+          for (Object part : parts) {
+            if (part instanceof Map<?, ?> wire && wire.get("a2ui") instanceof List<?> messages) {
+              collectMessages(Map.of("messages", messages), types);
+            }
+          }
+        }
+      }
     }
     types.retainAll(BasicCatalog.api().components().keySet());
     return types;

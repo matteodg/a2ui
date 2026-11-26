@@ -75,6 +75,61 @@ class SuiteRegistryTest {
   }
 
   @Test
+  void theRegistryListsEachSuiteOfTheE2eCorpus() throws IOException {
+    Object corpora =
+        ConformanceLoader.parse(
+            Files.readString(ConformancePaths.conformancePath("manifest_corpora.json")));
+    Object e2e = ((Map<?, ?>) corpora).get("e2e");
+    Set<String> suites = new TreeSet<>();
+    for (Object pattern : (List<?>) ((Map<?, ?>) e2e).get("include")) {
+      // Each pattern of the corpus is a directory and the name pattern of its YAML files.
+      String text = (String) pattern;
+      assertTrue(text.endsWith("/*.yaml"), text);
+      suites.addAll(
+          SuiteRegistry.yamlFilesOf(text.substring(0, text.length() - "/*.yaml".length())));
+    }
+
+    assertEquals(suites, new TreeSet<>(SuiteRegistry.E2E_SUITES.keySet()));
+    assertEquals(8, suites.size());
+  }
+
+  @Test
+  void theE2eCorpusNamesThisHarness() throws IOException {
+    Object corpora =
+        ConformanceLoader.parse(
+            Files.readString(ConformancePaths.conformancePath("manifest_corpora.json")));
+    Object e2e = ((Map<?, ?>) corpora).get("e2e");
+
+    assertTrue(
+        ((List<?>) ((Map<?, ?>) e2e).get("harnesses")).contains(ConformanceManifest.HARNESS));
+  }
+
+  @Test
+  void eachScenarioOfProtocolV1RunsAndEachOtherScenarioSkipsWithTheReason() {
+    SuiteRegistry.E2E_SUITES.forEach((suite, support) -> {
+      for (ConformanceCase testCase : ConformanceLoader.loadSuite(suite)) {
+        String reason = SuiteRegistry.skipReason(testCase, support);
+        if (suite.startsWith(SuiteRegistry.E2E_V0_9_1_DIRECTORY + "/")) {
+          assertEquals("the Swing adapter shows protocol v1.0 only", reason, testCase.location());
+        } else {
+          assertNull(reason, testCase.location());
+          assertNotNull(
+              SuiteRegistry.handlerFor(testCase, (Supported) support), testCase.location());
+        }
+      }
+    });
+  }
+
+  @Test
+  void theHarnessReadsTheComponentsOfTheTurnsOfAScenario() {
+    ConformanceCase scenario = ConformanceLoader.loadSuite("e2e/newsletter_signup.yaml").getFirst();
+
+    assertEquals(
+        Set.of("Button", "Card", "Column", "Icon", "Text", "TextField"),
+        SuiteRegistry.basicComponentsOf(scenario));
+  }
+
+  @Test
   void eachSuiteFileHasCases() {
     for (String suite : SuiteRegistry.ADAPTER_SUITES.keySet()) {
       assertTrue(ConformanceLoader.loadSuite(suite).size() > 0, suite);

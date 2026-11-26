@@ -122,10 +122,20 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
           "hints",
           "children");
 
+  /** The keys of a view node of a scenario. */
+  private static final Set<String> SCENARIO_VIEW_NODE_KEYS = scenarioViewNodeKeys();
+
   private static final Set<String> ACTION_KEYS =
       Set.of("name", "surfaceId", "sourceComponentId", "context");
 
   private static final Set<String> ERROR_KEYS = Set.of("code", "surfaceId", "message");
+
+  private static Set<String> scenarioViewNodeKeys() {
+    Set<String> keys = new TreeSet<>(VIEW_NODE_KEYS);
+    keys.add("label");
+    keys.add("disabled");
+    return Set.copyOf(keys);
+  }
 
   @Override
   public void run(ConformanceCase testCase) {
@@ -156,9 +166,7 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       KnownKeys.assertKnownKeys(step, STEP_KEYS, where);
       runStep(session, step, where);
     }
-    if (session.view != null && session.view.isMounted()) {
-      session.view.removeNotify();
-    }
+    session.unmountAll();
     // The view of a modal closes its content when the surface goes away.
     if (!session.modals.open().isEmpty()) {
       throw new AssertionError(location + ": a modal is open after the unmount of the surface.");
@@ -187,6 +195,21 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
 
     session.startStep();
+    operate(session, op, step, where);
+    session.settle();
+    expect(session, step, before, leaving, where);
+  }
+
+  /**
+   * Does the operation of a step: it processes messages, or it operates a Swing control as the user
+   * does, or it invokes an action, or it unmounts the surface.
+   *
+   * @param session the session of the case
+   * @param op the name of the operation
+   * @param step the step, with the keys of the operation
+   * @param where the location of the step
+   */
+  void operate(AdapterSession session, String op, Map<String, Object> step, String where) {
     switch (op) {
       case "process_messages" -> session.process(step.get("messages"));
       case "user_input" -> userInput(session, step, where);
@@ -232,8 +255,6 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       }
       default -> throw new AssertionError("Unknown op '" + op + "' in " + where);
     }
-    session.settle();
-    expect(session, step, before, leaving, where);
   }
 
   private static String target(Map<String, Object> step, String where) {
@@ -338,6 +359,7 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
           session,
           asObject(step.get("expectViewTree"), "expectViewTree of " + where),
           session.tree(),
+          TextSource.SHOWN,
           "expectViewTree of " + where);
     }
     if (step.containsKey("expectSameViewIdentity")) {
@@ -401,15 +423,23 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
           "expectActiveSubscriptions of " + where);
     }
     if (step.containsKey("expectOutbound")) {
-      List<Object> expected = asList(step.get("expectOutbound"), where);
-      if (expected.size() != session.outbound.size()) {
-        throw new AssertionError(
-            where + ": expected " + expected.size() + " messages, but got " + session.outbound);
-      }
-      for (int i = 0; i < expected.size(); i++) {
-        OutboundSchema.assertValid(session.outbound.get(i), "message " + i + " of " + where);
-        assertMatches(expected.get(i), session.outbound.get(i), "message " + i + " of " + where);
-      }
+      assertOutbound(asList(step.get("expectOutbound"), where), session.outbound, where);
+    }
+  }
+
+  /**
+   * Compares the messages for the agent with their expectations. Each message must also be valid
+   * for the schema of the protocol.
+   */
+  static void assertOutbound(
+      List<Object> expected, List<Map<String, Object>> outbound, String where) {
+    if (expected.size() != outbound.size()) {
+      throw new AssertionError(
+          where + ": expected " + expected.size() + " messages, but got " + outbound);
+    }
+    for (int i = 0; i < expected.size(); i++) {
+      OutboundSchema.assertValid(outbound.get(i), "message " + i + " of " + where);
+      assertMatches(expected.get(i), outbound.get(i), "message " + i + " of " + where);
     }
   }
 
@@ -429,10 +459,30 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     return node.component().orElse(null);
   }
 
+  /** What the key {@code text} of a view node is. */
+  enum TextSource {
+    /** The text that the view shows. The cases of the adapter suite have plain text. */
+    SHOWN,
+
+    /**
+     * The value of the property {@code text}, which can be Markdown. The view must show what the
+     * Markdown view of the adapter shows for this text. The scenarios use this, and they also have
+     * the keys {@code label} and {@code disabled}.
+     */
+    MARKDOWN
+  }
+
   /** Compares one position of the mounted tree, and the positions below it. */
-  private void assertViewNode(
-      AdapterSession session, Map<String, Object> expected, MountedNode actual, String where) {
-    KnownKeys.assertKnownKeys(expected, VIEW_NODE_KEYS, where);
+  void assertViewNode(
+      AdapterSession session,
+      Map<String, Object> expected,
+      MountedNode actual,
+      TextSource textSource,
+      String where) {
+    KnownKeys.assertKnownKeys(
+        expected,
+        textSource == TextSource.MARKDOWN ? SCENARIO_VIEW_NODE_KEYS : VIEW_NODE_KEYS,
+        where);
     ComponentNode<?> node = actual.node();
     String at = "'" + expected.get("id") + "' in " + where;
     assertJsonEquals(expected.get("id"), node.componentId(), "id of " + at);
@@ -448,7 +498,36 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
     if (expected.containsKey("text")) {
       String shown = AdapterSession.visibleText(session.control(actual));
-      assertJsonEquals(expected.get("text"), shown, "text of " + at);
+      if (textSource == TextSource.MARKDOWN) {
+        assertJsonEquals(expected.get("text"), node.props().get().value("text"), "text of " + at);
+        assertJsonEquals(
+            AdapterSession.markdownText(asString(expected.get("text"), "text of " + at)),
+            shown,
+            "the shown text of " + at);
+      } else {
+        assertJsonEquals(expected.get("text"), shown, "text of " + at);
+      }
+    }
+    if (expected.containsKey("label")) {
+      // The label is a property of the node, and the view shows it adjacent to the control.
+      assertJsonEquals(expected.get("label"), node.props().get().value("label"), "label of " + at);
+      if (!AdapterSession.visibleText(actual.component().orElseThrow())
+          .contains(String.valueOf(expected.get("label")))) {
+        throw new AssertionError("The view does not show 'label' of " + at);
+      }
+    }
+    if (expected.containsKey("disabled")) {
+      // A component with no value for the property is not disabled. The user cannot operate the
+      // control of a disabled component.
+      Object disabled = node.props().get().value("disabled");
+      assertJsonEquals(
+          expected.get("disabled"),
+          disabled == null ? Boolean.FALSE : disabled,
+          "disabled of " + at);
+      assertJsonEquals(
+          expected.get("disabled"),
+          !session.control(actual).isEnabled(),
+          "the shown disabled state of " + at);
     }
     if (expected.containsKey("value")) {
       assertJsonEquals(expected.get("value"), shownValue(session, actual, at), "value of " + at);
@@ -505,7 +584,11 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       }
       for (int i = 0; i < children.size(); i++) {
         assertViewNode(
-            session, asObject(children.get(i), "child of " + at), actual.children().get(i), where);
+            session,
+            asObject(children.get(i), "child of " + at),
+            actual.children().get(i),
+            textSource,
+            where);
       }
     }
   }
@@ -622,7 +705,7 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
   }
 
-  private static void assertErrors(AdapterSession session, List<Object> expected, String where) {
+  static void assertErrors(AdapterSession session, List<Object> expected, String where) {
     if (expected.size() != session.errors.size()) {
       throw new AssertionError(
           where + ": expected " + expected.size() + " errors, but got " + session.errors);
