@@ -595,27 +595,12 @@ public final class NodeResolver<C extends ComponentApi> {
         return;
       }
       // The action resolves its values at this time, not at the time of the node. Thus it reports
-      // the data as it is now.
-      DataContext context = DataContext.tracking(surface, node.dataPath(), node.index(), null);
-      try {
-        if (payload.get("event") instanceof Map<?, ?> event) {
-          Map<String, Object> resolved = new LinkedHashMap<>();
-          resolved.put("name", event.get("name"));
-          Object written = event.get("context");
-          resolved.put(
-              "context", context.resolveDynamicValue(written == null ? Map.of() : written));
-          if (event.get("userMessage") != null) {
-            resolved.put("userMessage", context.resolveDynamicValue(event.get("userMessage")));
-          }
-          surface.dispatchAction(
-              Map.of("event", resolved), node.componentId(), options.metadata().orElse(null));
-        } else if (payload.get("functionCall") != null) {
-          // The user operated the component. Thus the call can require a user gesture.
-          context.withUserActivation().resolveDynamicValue(payload.get("functionCall"));
-        }
-      } catch (A2uiError error) {
-        surface.dispatchError(error);
-      }
+      // the data as it is now. The user operated the component. Thus a call can require a user
+      // gesture.
+      DataContext context =
+          DataContext.tracking(surface, node.dataPath(), node.index(), null).withUserActivation();
+      ActionRunner.run(
+          surface, context, payload, node.componentId(), options.metadata().orElse(null));
     }
 
     private NodeResolver<C> owner() {

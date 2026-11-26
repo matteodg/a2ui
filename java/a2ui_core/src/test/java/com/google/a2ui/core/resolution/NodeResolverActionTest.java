@@ -26,9 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.state.RendererAction;
 import java.net.URI;
@@ -92,13 +96,18 @@ class NodeResolverActionTest {
     A2uiMetadata bad = new A2uiMetadata(Optional.of(Map.of("not an identifier", 1L)));
 
     action(root).invoke(ActionDispatchOptions.withMetadata(metadata));
-    action(root).invoke(ActionDispatchOptions.withMetadata(bad));
 
     assertEquals(1, fixture.actions.size());
     assertEquals(Optional.of(metadata), fixture.actions.getFirst().metadata());
     assertEquals(Map.of(), fixture.actions.getFirst().context());
-    assertEquals(1, fixture.errors.size());
-    assertInstanceOf(A2uiValidationError.class, fixture.errors.getFirst());
+
+    // Metadata that is not correct is an error of the caller. Thus the surface reports nothing.
+    assertThrows(
+        A2uiValidationError.class,
+        () -> action(root).invoke(ActionDispatchOptions.withMetadata(bad)));
+
+    assertEquals(1, fixture.actions.size());
+    assertEquals(List.of(), fixture.errors);
   }
 
   @Test
@@ -146,6 +155,94 @@ class NodeResolverActionTest {
     assertEquals(List.of(), fixture.opened);
     assertEquals(1, fixture.errors.size());
     assertEquals(Optional.of("s"), fixture.errors.getFirst().surfaceId());
+    assertEquals(Optional.of("EXECUTION_ERROR"), fixture.errors.getFirst().errorCode());
+  }
+
+  @Test
+  void aFunctionThatThrowsInAnActionIsAnExecutionError() {
+    Map<String, Object> event =
+        object("name", "save", "context", object("first", Map.of("@call", "crash"), "second", 1L));
+
+    ComponentNode<ComponentApi> root =
+        button(Map.of(), Map.of("functionCall", Map.of("@call", "crash")));
+
+    action(root).invoke();
+    fixture.update(component("root", "Button", "child", "label", "action", Map.of("event", event)));
+    action(root).invoke();
+
+    assertEquals(List.of(), fixture.actions);
+    assertEquals(2, fixture.errors.size());
+    for (A2uiError error : fixture.errors) {
+      assertInstanceOf(A2uiExpressionError.class, error);
+      assertEquals("Function 'crash' failed: The disk is full.", error.getMessage());
+      assertEquals(Optional.of("EXECUTION_ERROR"), error.errorCode());
+      assertEquals(Optional.of("s"), error.surfaceId());
+    }
+  }
+
+  @Test
+  void aCallThatTheContextRefusesInAnActionIsAnExpressionError() {
+    // The function @index has no value outside a list template. Thus no function runs.
+    action(button(Map.of(), Map.of("functionCall", call("@index")))).invoke();
+
+    assertEquals(1, fixture.errors.size());
+    assertEquals(Optional.of("EXPRESSION_ERROR"), fixture.errors.getFirst().errorCode());
+  }
+
+  @Test
+  void aContextEntryThatCannotBeResolvedStopsTheEvent() {
+    Map<String, Object> event =
+        object("name", "save", "context", object("row", call("@index"), "fixed", 1L));
+
+    action(button(Map.of(), Map.of("event", event))).invoke();
+
+    assertEquals(List.of(), fixture.actions);
+    assertEquals(1, fixture.errors.size());
+    A2uiError error = fixture.errors.getFirst();
+    assertTrue(
+        error.getMessage().startsWith("Action event context entry 'row' is invalid: "),
+        error.getMessage());
+    assertEquals(Optional.of("EXPRESSION_ERROR"), error.errorCode());
+  }
+
+  @Test
+  void aUserMessageThatIsNotTextIsAnInvalidAction() {
+    Map<String, Object> event = object("name", "save", "userMessage", path("/note"));
+    ComponentNode<ComponentApi> root = button(Map.of("note", "Saved"), Map.of("event", event));
+
+    action(root).invoke();
+    fixture.setData("/note", null);
+    action(root).invoke();
+
+    // A user message with no value is absent, and the surface reports the action.
+    assertEquals(
+        List.of(Optional.of("Saved"), Optional.empty()),
+        fixture.actions.stream().map(RendererAction::userMessage).toList());
+    assertEquals(List.of(), fixture.errors);
+
+    fixture.setData("/note", 7L);
+    action(root).invoke();
+
+    assertEquals(2, fixture.actions.size());
+    assertEquals(1, fixture.errors.size());
+    assertInstanceOf(A2uiValidationError.class, fixture.errors.getFirst());
+    assertEquals(Optional.of("INVALID_ACTION"), fixture.errors.getFirst().errorCode());
+  }
+
+  @Test
+  void anEventWithNoNameAndAnActionWithNoContentAreInvalidActions() {
+    ComponentNode<ComponentApi> root = button(Map.of(), Map.of("event", Map.of("name", "save")));
+
+    // The message processor rejects these actions. Thus the test writes the component directly.
+    fixture.put("root", "Button", "child", "label", "action", Map.of("event", Map.of()));
+    action(root).invoke();
+    fixture.put("root", "Button", "child", "label", "action", Map.of());
+    action(root).invoke();
+
+    assertEquals(List.of(), fixture.actions);
+    assertEquals(
+        List.of(Optional.of("INVALID_ACTION"), Optional.of("INVALID_ACTION")),
+        fixture.errors.stream().map(A2uiError::errorCode).toList());
   }
 
   @Test

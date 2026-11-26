@@ -16,8 +16,12 @@
 
 package com.google.a2ui.core.resolution;
 
+import com.google.a2ui.core.catalog.A2uiMetadata;
 import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.common.EventListener;
+import com.google.a2ui.core.state.SurfaceModel;
+import java.util.Map;
+import java.util.OptionalInt;
 
 /** Gives the test code of other packages the hooks of the node resolver that are not public API. */
 public final class ResolverHooks {
@@ -34,5 +38,34 @@ public final class ResolverHooks {
   public static <C extends ComponentApi> void onNodeCreated(
       NodeResolver<C> resolver, EventListener<ComponentNode<C>> listener) {
     resolver.onNodeCreated(listener);
+  }
+
+  /**
+   * Does an action as the action of a node does it. See {@link ActionRunner}.
+   *
+   * @param surface the surface of the component
+   * @param scope the absolute data path at which the action resolves its values
+   * @param index the position of the list item of the scope, or an empty value outside a list
+   *     template
+   * @param userActivated true if the action is the result of a user gesture
+   * @param payload the action as a component declares it
+   * @param sourceComponentId the ID of the component that the user operated
+   * @param metadata the {@code action.metadata} to send with an event, or null
+   */
+  public static void runAction(
+      SurfaceModel<?> surface,
+      String scope,
+      OptionalInt index,
+      boolean userActivated,
+      Map<String, ?> payload,
+      String sourceComponentId,
+      A2uiMetadata metadata) {
+    DataContext context = DataContext.tracking(surface, scope, index, null);
+    ActionRunner.run(
+        surface,
+        userActivated ? context.withUserActivation() : context,
+        payload,
+        sourceComponentId,
+        metadata);
   }
 }

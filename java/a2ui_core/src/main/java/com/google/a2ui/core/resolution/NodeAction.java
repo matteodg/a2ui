@@ -16,6 +16,8 @@
 
 package com.google.a2ui.core.resolution;
 
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+
 /**
  * A resolved action property of a node. A view calls it when the user operates the component, for
  * example from the click listener of a button.
@@ -25,7 +27,18 @@ package com.google.a2ui.core.resolution;
  * node. For a function call action, the action runs the function and the surface reports no action.
  *
  * <p>An action does not throw the failure of the event or of the function. It reports the failure
- * to the listeners of the {@code onError} of the surface.
+ * to the listeners of the {@code onError} of the surface, and the surface reports no action. The
+ * error has a protocol error code:
+ *
+ * <ul>
+ *   <li>{@code INVALID_ACTION}: the event has no name, or its {@code userMessage} is not text.
+ *   <li>{@code EXECUTION_ERROR}: a function ran and failed.
+ *   <li>{@code EXPRESSION_ERROR}: the core refused a call before the function ran, for example a
+ *       call of a function that the catalog does not have.
+ *   <li>{@code CATALOG_ERROR}: the surface cannot use the catalog of a call.
+ * </ul>
+ *
+ * <p>Metadata that is not correct is an error of the caller. Thus the action throws it.
  */
 @FunctionalInterface
 public interface NodeAction {
@@ -33,6 +46,8 @@ public interface NodeAction {
    * Does the action.
    *
    * @param options the options of this call
+   * @throws A2uiValidationError if a key of the extensions of the metadata of the options is not a
+   *     UAX #31 identifier
    */
   void invoke(ActionDispatchOptions options);
 

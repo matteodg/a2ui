@@ -23,11 +23,11 @@ import com.google.a2ui.core.common.Coercion;
 import com.google.a2ui.core.common.EventNotifier;
 import com.google.a2ui.core.common.EventSource;
 import com.google.a2ui.core.common.ProtocolVersion;
-import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.ErrorFields;
+import com.google.a2ui.core.internal.ExtensionKeys;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -282,13 +282,9 @@ public final class SurfaceModel<C extends ComponentApi> {
     if (!(event.get("name") instanceof String name)) {
       throw new A2uiValidationError("An event action needs a name.");
     }
+    ExtensionKeys.check(metadata);
     Optional<Map<String, Object>> extensions =
         metadata == null ? Optional.empty() : metadata.extensions();
-    for (String key : extensions.orElse(Map.of()).keySet()) {
-      if (!Uax31.isIdentifier(key)) {
-        throw new A2uiValidationError("Extension key '" + key + "' is not a UAX #31 identifier.");
-      }
-    }
     Map<String, Object> context = new LinkedHashMap<>();
     if (event.get("context") instanceof Map<?, ?> written) {
       written.forEach((key, value) -> context.put(String.valueOf(key), value));
