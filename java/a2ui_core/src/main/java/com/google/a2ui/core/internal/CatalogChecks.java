@@ -16,6 +16,7 @@
 
 package com.google.a2ui.core.internal;
 
+import com.google.a2ui.core.catalog.AllowedCallers;
 import com.google.a2ui.core.catalog.Catalog;
 import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
@@ -247,6 +248,11 @@ public final class CatalogChecks {
                 path, "Unrecognized function '" + name + "' in catalog '" + catalog.id() + "'"));
       }
       return;
+    }
+    if (catalog.functions().get(name).allowedCallers() == AllowedCallers.AGENT_ONLY) {
+      // Each call in a component is a call of the renderer: a binding, a check or an action.
+      errors.add(
+          invalid(path, "Function '" + name + "' is agentOnly, so the renderer cannot call it"));
     }
     // A problem of an argument makes each argument look unused. Only the cause is reported.
     List<Problem> found = engine.problems("/" + CALLS + "/" + Json.escapePointer(name), call);

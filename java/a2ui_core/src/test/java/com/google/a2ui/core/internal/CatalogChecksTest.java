@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
+import com.google.a2ui.core.catalog.Catalog;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,34 @@ class CatalogChecksTest {
     assertTrue(
         problems.stream().allMatch(problem -> problem.path().equals("/label/args/format")),
         problems.toString());
+  }
+
+  @Test
+  void aComponentCannotCallAFunctionThatOnlyTheAgentCanCall() {
+    CatalogChecks custom =
+        new CatalogChecks(
+            Catalog.fromJson(
+                Json.asObject(
+                    Json.parse(
+                        """
+                        {
+                          "catalogId": "urn:custom",
+                          "protocolVersion": "1.0",
+                          "functions": {
+                            "audit": {
+                              "returnType": "string",
+                              "allowedCallers": "agentOnly",
+                              "properties": {"@call": {"const": "audit"}},
+                              "required": ["@call"]
+                            }
+                          }
+                        }
+                        """))));
+    Object value = Json.freeze(Map.of("label", Map.of("@call", "audit")));
+
+    assertEquals(
+        List.of("/label: Function 'audit' is agentOnly, so the renderer cannot call it"),
+        texts(custom.nestedCallProblems(value, true, false)));
   }
 
   private static List<String> texts(List<Problem> problems) {
