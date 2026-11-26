@@ -119,6 +119,8 @@
 - The schema validation now asserts the formats `date`, `time` and `date-time` as ISO 8601 text.
   Thus a literal `min` or `max` of `DateTimeInput`, for example `2025-01-01`, is correct, and a
   literal that is not a date or a time is not correct. Before, the processor rejected each literal.
+  The schema validation also asserts the format `uri`: a literal `url` argument of `openUrl` must be
+  an absolute URI with a scheme, as in the Python SDK and the Dart SDK.
 - A component of a `FlexLayout` that has a weight is now not smaller than its minimum size. Thus a
   weighted column of a `Row` does not cut a word.
 - The keyboard focus does not go into a part of a surface that the `@accessibility` attribute
