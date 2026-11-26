@@ -354,7 +354,7 @@ public final class NodeResolver<C extends ComponentApi> {
       case PropertyBehavior.Action _ -> raw;
       case PropertyBehavior.Child _ ->
           raw instanceof String id ? child(pass, id, pass.node.dataPath(), pass.node.index) : raw;
-      case PropertyBehavior.ChildList _ -> childList(pass, raw);
+      case PropertyBehavior.ChildList _ -> childList(pass, raw, where);
       case PropertyBehavior.Structure structure -> {
         if (!(raw instanceof Map<?, ?> object)) {
           yield raw;
@@ -422,7 +422,7 @@ public final class NodeResolver<C extends ComponentApi> {
     return node;
   }
 
-  private Object childList(Pass pass, Object raw) {
+  private Object childList(Pass pass, Object raw, String where) {
     ComponentNode<C> node = pass.node;
     if (raw instanceof List<?> ids) {
       List<Object> children = new ArrayList<>(ids.size());
@@ -432,7 +432,30 @@ public final class NodeResolver<C extends ComponentApi> {
       }
       return Collections.unmodifiableList(children);
     }
-    return raw;
+    if (!(raw instanceof Map<?, ?> template
+        && template.get("componentId") instanceof String componentId
+        && template.get("path") instanceof String path)) {
+      return raw;
+    }
+    // The template makes one node for each item of the list, at the data scope of the item.
+    String listPath;
+    Object items;
+    try {
+      listPath = pass.context.resolvePath(path);
+      items = pass.context.get(listPath);
+    } catch (A2uiError error) {
+      report(pass, where, error);
+      return List.of();
+    }
+    if (!(items instanceof List<?> list)) {
+      return List.of();
+    }
+    String prefix = listPath.equals(ROOT_PATH) ? ROOT_PATH : listPath + "/";
+    List<Object> children = new ArrayList<>(list.size());
+    for (int position = 0; position < list.size(); position++) {
+      children.add(child(pass, componentId, prefix + position, position));
+    }
+    return Collections.unmodifiableList(children);
   }
 
   // Instance IDs.
