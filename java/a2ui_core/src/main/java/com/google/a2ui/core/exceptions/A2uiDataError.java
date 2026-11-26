@@ -17,14 +17,10 @@
 package com.google.a2ui.core.exceptions;
 
 import java.io.Serial;
-import java.util.Optional;
 
 /** The data model cannot read or write a value. */
 public final class A2uiDataError extends A2uiError {
   @Serial private static final long serialVersionUID = 1L;
-
-  /** The data model path that the failure is about, or null. */
-  private final String path;
 
   /**
    * Makes an error with a message.
@@ -63,16 +59,6 @@ public final class A2uiDataError extends A2uiError {
    * @param cause the exception that caused this failure, or null
    */
   public A2uiDataError(String message, String path, Throwable cause) {
-    super(message, cause);
-    this.path = path;
-  }
-
-  /**
-   * Gets the data model path that the failure is about.
-   *
-   * @return the path, or an empty result if the failure is not about one path
-   */
-  public Optional<String> path() {
-    return Optional.ofNullable(path);
+    super(message, path, cause);
   }
 }
