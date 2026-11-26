@@ -140,6 +140,25 @@ class CardViewTest {
   }
 
   @Test
+  void theOutlineDoesNotUseAColorThatTheUserCannotSeeOnTheBackground() {
+    Edt.run(() -> {
+      show("Inside");
+      Color background = BasicStyle.backgroundOf(body());
+      Object before = UIManager.get("Component.borderColor");
+      try {
+        UIManager.put("Component.borderColor", background);
+
+        Color outline = BasicStyle.outline(body());
+
+        assertNotEquals(background, outline);
+        assertTrue(BasicStyle.contrast(outline, background) >= 1.3, outline.toString());
+      } finally {
+        UIManager.put("Component.borderColor", before);
+      }
+    });
+  }
+
+  @Test
   void theTextInANarrowCardGetsMoreLines() {
     Edt.run(() -> {
       fixture.create(

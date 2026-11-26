@@ -54,6 +54,9 @@ final class BasicStyle {
   /** The least contrast between a text and its background that the views accept. */
   private static final double TEXT_CONTRAST = 4.5;
 
+  /** The least contrast between a thin line and its background that the views accept. */
+  private static final double LINE_CONTRAST = 1.3;
+
   private BasicStyle() {}
 
   /**
@@ -123,18 +126,23 @@ final class BasicStyle {
   }
 
   /**
-   * Gets the color of a thin line that groups or divides content, for example the outline of a
-   * card. It is the border color of the look and feel. If the look and feel has none, it is a color
-   * between the text color and the background color of the component.
+   * Gets the color of a thin line that groups content, for example the outline of a card. It is the
+   * first border color of the look and feel that the user can see on the background of the
+   * component. If the look and feel has none, it is a color between the text color and the
+   * background color of the component.
    *
    * @param component the component that paints the line
    * @return the color
    */
   static Color outline(Component component) {
-    return lookAndFeelColor(
-        mix(foregroundOf(component), backgroundOf(component), 0.7),
-        "Component.borderColor",
-        "controlShadow");
+    Color background = backgroundOf(component);
+    for (String key : List.of("Component.borderColor", "controlShadow", "controlDkShadow")) {
+      Color color = UIManager.getColor(key);
+      if (color != null && contrast(color, background) >= LINE_CONTRAST) {
+        return new Color(color.getRGB(), false);
+      }
+    }
+    return mix(foregroundOf(component), background, 0.7);
   }
 
   /**
