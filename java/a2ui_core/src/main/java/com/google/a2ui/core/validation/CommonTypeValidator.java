@@ -20,8 +20,6 @@ import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.JsonSchemaEngine;
 import com.google.a2ui.core.internal.SchemaReferences;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,48 +72,9 @@ public final class CommonTypeValidator {
     }
   }
 
-  /**
-   * Gets the common types as schemas that have only local references.
-   *
-   * <p>{@code FunctionCall} is the envelope of a call only. See {@link #CALL_ENVELOPE}.
-   *
-   * @return the schemas by name. The map is read-only.
-   */
-  static Map<String, Object> definitions() {
-    return Schemas.DEFINITIONS;
-  }
-
-  /**
-   * The schema of a function call when the catalog of the call is not known: the envelope only.
-   *
-   * <p>The function that a call names and the arguments that the function accepts are in the
-   * catalog in which the call runs. One surface can use more than one catalog. Thus a schema cannot
-   * make this decision, and {@link PayloadValidator} makes it for each call.
-   */
-  private static final Map<String, Object> CALL_ENVELOPE =
-      Json.freezeObject(
-          Map.of(
-              "type",
-              "object",
-              "properties",
-              Map.of(
-                  "@call", Map.of("type", "string"),
-                  "catalogId", Map.of("type", "string"),
-                  "args", Map.of("type", "object")),
-              "required",
-              List.of("@call"),
-              "additionalProperties",
-              false));
-
   /** Makes the schemas and the engine when the JVM initializes the class, at the first use. */
   private static final class Schemas {
-    static final Map<String, Object> DEFINITIONS = definitions();
+    static final Map<String, Object> DEFINITIONS = SchemaReferences.validationTypes();
     static final JsonSchemaEngine ENGINE = new JsonSchemaEngine(Map.of("$defs", DEFINITIONS));
-
-    private static Map<String, Object> definitions() {
-      Map<String, Object> definitions = new LinkedHashMap<>(SchemaReferences.commonTypes());
-      definitions.put("FunctionCall", CALL_ENVELOPE);
-      return Collections.unmodifiableMap(definitions);
-    }
   }
 }

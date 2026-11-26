@@ -110,4 +110,17 @@ class SchemaReferencesTest {
     assertTrue(!Json.write(commonTypes).contains(".json#"));
     assertThrows(UnsupportedOperationException.class, () -> commonTypes.put("Extra", Map.of()));
   }
+
+  @Test
+  void theValidationTypesHaveOnlyTheEnvelopeOfAFunctionCall() {
+    Map<String, Object> types = SchemaReferences.validationTypes();
+    Map<String, Object> call = Json.asObject(types.get("FunctionCall"));
+
+    assertEquals(SchemaReferences.commonTypes().keySet(), types.keySet());
+    assertEquals(SchemaReferences.commonTypes().get("Action"), types.get("Action"));
+    assertEquals(List.of("@call"), call.get("required"));
+    assertEquals(
+        Set.of("@call", "catalogId", "args"), Json.asObject(call.get("properties")).keySet());
+    assertThrows(UnsupportedOperationException.class, () -> types.put("Extra", Map.of()));
+  }
 }

@@ -22,6 +22,7 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.JsonSchemaEngine;
+import com.google.a2ui.core.internal.SchemaReferences;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -222,11 +223,11 @@ public final class PayloadValidator {
     // The validation schema has only the common types that the catalog uses. The envelopes also
     // need ComponentCommon, FunctionCommon and IndexSystemFunction. The catalog cannot define one
     // of these names, thus the two sets of definitions agree.
-    Map<String, Object> definitions = new LinkedHashMap<>(CommonTypeValidator.definitions());
+    Map<String, Object> definitions = new LinkedHashMap<>(SchemaReferences.validationTypes());
     definitions.putAll(Json.asObject(document.get("$defs")));
     // The schema examines the envelope of a nested call. `checkCall` examines the function and the
     // arguments, because they are in the catalog in which the call runs.
-    definitions.put("FunctionCall", CommonTypeValidator.definitions().get("FunctionCall"));
+    definitions.put("FunctionCall", SchemaReferences.validationTypes().get("FunctionCall"));
     document.put("$defs", definitions);
 
     Map<String, Object> components = new LinkedHashMap<>();

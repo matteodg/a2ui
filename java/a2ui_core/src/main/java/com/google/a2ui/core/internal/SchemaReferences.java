@@ -19,6 +19,7 @@ package com.google.a2ui.core.internal;
 import com.google.a2ui.core.schema.v1_0.SchemaDocuments;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,21 @@ public final class SchemaReferences {
    */
   public static Map<String, Object> commonTypes() {
     return CommonTypes.DEFINITIONS;
+  }
+
+  /**
+   * Gets the common types of protocol v1.0 as the validators use them. Each reference is local, and
+   * {@code FunctionCall} is the envelope of a call only: {@code @call}, and optionally {@code
+   * catalogId} and {@code args}.
+   *
+   * <p>The function that a call names and the arguments that the function accepts are in the
+   * catalog in which the call runs. One surface can use more than one catalog. Thus a schema cannot
+   * make this decision, and the validator of a catalog makes it for each call.
+   *
+   * @return the schemas by name. The map is read-only.
+   */
+  public static Map<String, Object> validationTypes() {
+    return ValidationTypes.DEFINITIONS;
   }
 
   /**
@@ -128,6 +144,31 @@ public final class SchemaReferences {
       return local;
     }
     return file.equals(CATALOG_FILE) ? local : ref;
+  }
+
+  /** Makes the types of the validators when the JVM initializes the class, at the first use. */
+  private static final class ValidationTypes {
+    static final Map<String, Object> DEFINITIONS = load();
+
+    private static Map<String, Object> load() {
+      Map<String, Object> definitions = new LinkedHashMap<>(commonTypes());
+      definitions.put(
+          "FunctionCall",
+          Json.freeze(
+              Map.of(
+                  "type",
+                  "object",
+                  "properties",
+                  Map.of(
+                      "@call", Map.of("type", "string"),
+                      "catalogId", Map.of("type", "string"),
+                      "args", Map.of("type", "object")),
+                  "required",
+                  List.of("@call"),
+                  "additionalProperties",
+                  false)));
+      return Collections.unmodifiableMap(definitions);
+    }
   }
 
   /** Reads the common types when the JVM initializes the class. That is at the first use. */
