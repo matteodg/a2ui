@@ -22,6 +22,7 @@ import com.google.a2ui.swing.surface.A2uiFallbacks;
 import com.google.a2ui.swing.surface.A2uiPendingInfo;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
@@ -36,6 +37,9 @@ import javax.swing.UIManager;
 final class Placeholders {
   /** The name of the Swing component of each placeholder. A test finds the placeholders by it. */
   static final String COMPONENT_NAME = "gallery.placeholder";
+
+  /** The least width of a placeholder, in pixels. A narrower label shows no useful text. */
+  static final int MINIMUM_WIDTH = 48;
 
   private static final float[] DASH = {4f, 3f};
 
@@ -70,7 +74,7 @@ final class Placeholders {
   }
 
   private static JLabel label(String text, boolean pending) {
-    JLabel label = new JLabel(text);
+    JLabel label = new PlaceholderLabel(text);
     label.setName(COMPONENT_NAME);
     // A placeholder for the root fills the surface. Its text stays at the top.
     label.setVerticalAlignment(SwingConstants.TOP);
@@ -91,5 +95,26 @@ final class Placeholders {
                     color),
                 BorderFactory.createEmptyBorder(4, 8, 4, 8))));
     return label;
+  }
+
+  /**
+   * The label of a placeholder. It can be narrower than its text. Then it shows the start of the
+   * text, and the tool tip has the full text. Thus a row of placeholders does not make the surface
+   * wider than its window.
+   */
+  private static final class PlaceholderLabel extends JLabel {
+    private static final long serialVersionUID = 1L;
+
+    PlaceholderLabel(String text) {
+      super(text);
+    }
+
+    @Override
+    public Dimension getMinimumSize() {
+      Dimension preferred = getPreferredSize();
+      return isMinimumSizeSet()
+          ? super.getMinimumSize()
+          : new Dimension(Math.min(preferred.width, MINIMUM_WIDTH), preferred.height);
+    }
   }
 }
