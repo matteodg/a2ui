@@ -58,8 +58,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -85,7 +87,20 @@ import java.util.stream.Collectors;
  * outbound listener. Without a listener, a function that the agent calls runs and the processor
  * sends no response, and a call to the agent fails.
  *
- * <p>A processor is not thread-safe. Use a processor and its models from one thread.
+ * <p>A processor that has an outbound listener sets an agent function caller on each surface that
+ * it makes. Thus a binding, a check or an action of such a surface can call a function that its
+ * catalog does not implement. The surface sends the call to the agent through the RPC handler, with
+ * the default timeout of the handler. Without an outbound listener, such a call fails on the
+ * surface.
+ *
+ * <p>A processor is not thread-safe. Use a processor and its models from one thread. The answer to
+ * a call of a surface changes the nodes of the surface. Thus the processor gives the answer to the
+ * surface only on the thread that made the call. If the future of the call completes on a different
+ * thread, the processor keeps the answer and gives it at the start or at the end of the subsequent
+ * {@link #processMessages(Object)} call. Only a timeout of the default scheduler completes on a
+ * different thread. To get a timeout immediately, give the RPC handler a scheduler that runs its
+ * tasks on the thread of the processor: {@code
+ * rpc().setScheduler(RpcScheduler.onExecutor(executor))}.
  *
  * @param <C> the type of the components of the catalogs
  */
@@ -116,6 +131,13 @@ public final class MessageProcessor<C extends ComponentApi> {
   private final Map<String, Catalog<C, ?>> catalogsView = Collections.unmodifiableMap(catalogs);
   private final ValidationConfig validationConfig;
   private final OutboundMessageListener outboundListener;
+
+  /**
+   * The answers to the calls of the surfaces that arrived on a thread that did not make the call.
+   * The queue is thread-safe, because a timeout can add an answer from the thread of a scheduler.
+   */
+  private final Queue<Runnable> heldAnswers = new ConcurrentLinkedQueue<>();
+
   private final RpcHandler rpc;
   private final Map<Catalog<?, ?>, CatalogChecks> checks = new IdentityHashMap<>();
   private final Map<Catalog<?, ?>, CatalogSchemaIndex> indexes = new IdentityHashMap<>();
@@ -348,19 +370,59 @@ public final class MessageProcessor<C extends ComponentApi> {
    * @throws A2uiDataError if an {@code updateDataModel} message cannot write its path
    */
   public void processMessages(Object payload, ValidationConfig validationConfig) {
-    List<Map<String, Object>> messages = new ArrayList<>();
-    unwrap(payload, 0, messages);
-    for (int index = 0; index < messages.size(); index++) {
-      Map<String, Object> message = messages.get(index);
-      try {
-        process(index, message, validationConfig);
-      } catch (A2uiError e) {
-        writeMessageContext(e, message);
-        if (outboundListener != null) {
-          outboundListener.onMessage(errorMessage(e, actionOf(message)));
+    deliverHeldAnswers();
+    try {
+      List<Map<String, Object>> messages = new ArrayList<>();
+      unwrap(payload, 0, messages);
+      for (int index = 0; index < messages.size(); index++) {
+        Map<String, Object> message = messages.get(index);
+        try {
+          process(index, message, validationConfig);
+        } catch (A2uiError e) {
+          writeMessageContext(e, message);
+          if (outboundListener != null) {
+            outboundListener.onMessage(errorMessage(e, actionOf(message)));
+          }
+          throw e;
         }
-        throw e;
       }
+    } finally {
+      deliverHeldAnswers();
+    }
+  }
+
+  /**
+   * Makes a future that completes as a call to the agent completes, but only on the thread that
+   * made the call. The surface changes its nodes on the thread that completes this future.
+   *
+   * <p>If the call completes on a different thread, the processor holds the result. See {@link
+   * #deliverHeldAnswers()}.
+   */
+  private CompletableFuture<Object> onCallingThread(CompletableFuture<Object> call) {
+    Thread caller = Thread.currentThread();
+    CompletableFuture<Object> delivered = new CompletableFuture<>();
+    call.whenComplete((value, error) -> {
+      Runnable delivery =
+          () -> {
+            if (error != null) {
+              delivered.completeExceptionally(error);
+            } else {
+              delivered.complete(value);
+            }
+          };
+      if (Thread.currentThread() == caller) {
+        delivery.run();
+      } else {
+        heldAnswers.add(delivery);
+      }
+    });
+    return delivered;
+  }
+
+  /** Gives the surfaces each answer that arrived on a thread that did not make its call. */
+  private void deliverHeldAnswers() {
+    for (Runnable delivery = heldAnswers.poll(); delivery != null; delivery = heldAnswers.poll()) {
+      delivery.run();
     }
   }
 
@@ -789,6 +851,10 @@ public final class MessageProcessor<C extends ComponentApi> {
         body.get("components") instanceof List<?> components
             ? plan(surface, components, config)
             : List.of();
+    if (outboundListener != null) {
+      // Only a processor that can send a message can send a call of the surface to the agent.
+      surface.setAgentFunctionCaller(call -> onCallingThread(rpc.callAgentFunction(id, call)));
+    }
     // All the checks are complete. Thus the surface becomes visible fully or not at all.
     model.addSurface(surface);
     apply(surface, planned);
