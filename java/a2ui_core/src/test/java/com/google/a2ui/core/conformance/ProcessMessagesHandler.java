@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * The actions {@code process_messages} and {@code validate}: one {@link MessageProcessor} gets the
@@ -113,20 +114,30 @@ final class ProcessMessagesHandler implements CaseHandler {
     String location = testCase.location();
     Map<String, Object> fields = testCase.fields();
     KnownKeys.assertKnownKeys(fields, CASE_KEYS, location);
-    boolean strict = alwaysStrict || Boolean.TRUE.equals(fields.get("strictMode"));
+    // A `validate` case is strict unless the case tells that it is not.
+    boolean strict =
+        Boolean.TRUE.equals(fields.get("strictMode"))
+            || (alwaysStrict && !Boolean.FALSE.equals(fields.get("strictMode")));
     ValidationConfig config =
         fields.get("validationConfig") != null
             ? flags(fields.get("validationConfig"), location)
             : strict ? ValidationConfig.STRICT : ValidationConfig.RELAXED;
+    // The messages that the processor sent to the agent for the payload that it processes now.
+    List<Map<String, Object>> sent = new ArrayList<>();
+    Supplier<Map<String, Object>> lastSent = () -> sent.isEmpty() ? null : sent.getLast();
     MessageProcessor<ComponentApi> processor =
-        new MessageProcessor<>(catalogsFor(testCase), config);
+        new MessageProcessor<>(catalogsFor(testCase), config, sent::add);
 
     if (fields.get("steps") == null) {
       Object payload = payload(fields);
       Object expectError = ExpectedErrors.expectedError(fields);
       if (expectError != null) {
         ExpectedErrors.assertRaises(
-            expectError, location, PROCESSING_CATEGORIES, () -> processor.processMessages(payload));
+            expectError,
+            location,
+            PROCESSING_CATEGORIES,
+            lastSent,
+            () -> processor.processMessages(payload));
         return;
       }
       processor.processMessages(payload);
@@ -136,13 +147,17 @@ final class ProcessMessagesHandler implements CaseHandler {
         String where = "step " + index + " of " + location;
         Map<String, Object> step = asObject(steps.get(index), where);
         KnownKeys.assertKnownKeys(step, STEP_KEYS, where);
-        ExpectedErrors.Block process = () -> runStep(processor, step, where);
+        ExpectedErrors.Block process =
+            () -> {
+              sent.clear();
+              runStep(processor, step, where);
+            };
         Object expectError = ExpectedErrors.expectedError(step);
         if (expectError == null && index == steps.size() - 1) {
           expectError = ExpectedErrors.expectedError(fields);
         }
         if (expectError != null) {
-          ExpectedErrors.assertRaises(expectError, where, PROCESSING_CATEGORIES, process);
+          ExpectedErrors.assertRaises(expectError, where, PROCESSING_CATEGORIES, lastSent, process);
         } else {
           process.run();
           if (step.get("expect") != null) {
@@ -195,18 +210,20 @@ final class ProcessMessagesHandler implements CaseHandler {
    *
    * <ul>
    *   <li>One {@code catalogPaths} document and no inline catalog: that document, with each ID that
-   *       the {@code createSurface} messages of the case name. Many cases name a placeholder ID.
+   *       the {@code createSurface} messages of the case name. Many cases name a placeholder ID. A
+   *       case that only makes surfaces and expects a catalog error is about the ID or the version
+   *       that the surface names. Thus the document keeps its own ID and version.
    *   <li>More than one document, or inline {@code catalogs}: each catalog as it is, and the basic
    *       catalog with the ID {@code basic}.
-   *   <li>An inline {@code catalog} that has components or an ID: that catalog, with the first ID
-   *       that the messages name.
+   *   <li>An inline {@code catalog} that has components or an ID, or that has the document in its
+   *       {@code catalogSchema}: that catalog, with the first ID that the messages name.
    *   <li>None of these: the basic catalog with the first ID that the messages name. A case that
    *       expects a missing catalog gets the basic catalog with a different ID.
    * </ul>
    *
    * <p>A catalog never gets the ID of a catalog that a step adds with {@code addCatalogPaths}.
    */
-  private static List<Catalog<ComponentApi, FunctionApi>> catalogsFor(ConformanceCase testCase) {
+  static List<Catalog<ComponentApi, FunctionApi>> catalogsFor(ConformanceCase testCase) {
     Map<String, Object> fields = testCase.fields();
     ProtocolVersion declared = CatalogCases.version(testCase);
     ProtocolVersion version = declared != null ? declared : ProtocolVersion.V1_0;
@@ -225,9 +242,15 @@ final class ProcessMessagesHandler implements CaseHandler {
     Set<String> named = surfaceCatalogIds(testCase);
     named.removeAll(addedCatalogIds(testCase));
 
+    boolean expectsCatalogError =
+        ExpectedErrors.expectedError(fields) instanceof Map<?, ?> expected
+            && "CatalogError".equals(expected.get("category"));
     List<Catalog<ComponentApi, FunctionApi>> catalogs = new ArrayList<>();
     if (documents.size() == 1 && inline.isEmpty()) {
       Map<String, Object> document = documents.getFirst();
+      if (expectsCatalogError && onlyCreatesSurfaces(fields)) {
+        return List.of(Catalog.fromJson(document));
+      }
       Set<String> ids = named.isEmpty() ? Set.of((String) document.get("catalogId")) : named;
       for (String id : ids) {
         catalogs.add(Catalog.fromJson(document, id, version));
@@ -247,14 +270,24 @@ final class ProcessMessagesHandler implements CaseHandler {
       return catalogs;
     }
     String firstNamed = named.isEmpty() ? "test-catalog" : named.iterator().next();
-    if (fields.get("catalog") instanceof Map<?, ?> single
-        && (single.containsKey("components") || single.containsKey("catalogId"))) {
-      return List.of(Catalog.fromJson(asObject(single, "catalog"), firstNamed, version));
+    if (fields.get("catalog") instanceof Map<?, ?> single) {
+      if (single.get("catalogSchema") instanceof Map<?, ?> nested) {
+        return List.of(
+            Catalog.fromJson(asObject(nested, "catalog.catalogSchema"), firstNamed, version));
+      }
+      if (single.containsKey("components") || single.containsKey("catalogId")) {
+        return List.of(Catalog.fromJson(asObject(single, "catalog"), firstNamed, version));
+      }
     }
-    boolean expectsMissingCatalog =
-        ExpectedErrors.expectedError(fields) instanceof Map<?, ?> expected
-            && "CatalogError".equals(expected.get("category"));
-    return List.of(basicAs(expectsMissingCatalog ? "test-catalog" : firstNamed));
+    return List.of(basicAs(expectsCatalogError ? "test-catalog" : firstNamed));
+  }
+
+  /** Tells if the top-level payload of a case is a list of {@code createSurface} messages. */
+  private static boolean onlyCreatesSurfaces(Map<String, Object> fields) {
+    return payload(fields) instanceof List<?> messages
+        && messages.stream()
+            .allMatch(
+                message -> message instanceof Map<?, ?> map && map.containsKey("createSurface"));
   }
 
   private static Catalog<ComponentApi, FunctionApi> basicAs(String id) {
