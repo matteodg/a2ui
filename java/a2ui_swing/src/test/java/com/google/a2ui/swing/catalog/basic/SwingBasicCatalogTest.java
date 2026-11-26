@@ -53,6 +53,7 @@ class SwingBasicCatalogTest {
   private static final Set<String> VIEWS =
       Set.of(
           "Text",
+          "Icon",
           "Row",
           "Column",
           "List",

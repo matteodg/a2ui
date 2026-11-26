@@ -77,7 +77,7 @@ from the services. Give the same services to the `A2uiSurface`.
 | `Slider`        | `JSlider` with the value next to it                                 | Available |
 | `DateTimeInput` | `JSpinner` with a text field for ISO 8601 text                      | Available |
 | `Image`         | A component that paints the image of the `imageLoader` service      | Later     |
-| `Icon`          | A component that paints an icon                                     | Later     |
+| `Icon`          | A component that paints a shape of the module or SVG path data      | Available |
 | `Video`         | The view of the `mediaPlayer` service                               | Later     |
 | `AudioPlayer`   | The view of the `mediaPlayer` service                               | Later     |
 
@@ -479,8 +479,8 @@ second file, with `-modal-content` in its name.
 The conformance harness of this module has the name `swing`. It registers each suite of the
 `adapter` corpus of [`conformance/`](../../conformance). A case of the two rendering suites runs
 only if the adapter has a view for each basic catalog component that the case uses. The harness
-records each other case as skipped, with the names of the absent views. In this version, 34 cases
-run: the 7 cases of the Markdown subset, 21 cases of the surface suite and 6 cases of the
+records each other case as skipped, with the names of the absent views. In this version, 35 cases
+run: the 7 cases of the Markdown subset, 21 cases of the surface suite and the 7 cases of the
 accessibility suite. The harness does not run the `axeCore` rules, which need a DOM. See
 [the conformance section](../README.md#conformance) for the commands.
 

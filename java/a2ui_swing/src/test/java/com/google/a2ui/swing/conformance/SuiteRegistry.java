@@ -65,7 +65,7 @@ final class SuiteRegistry {
   static final Set<String> SUPPORTED_PROTOCOL_VERSIONS = Set.of("1.0");
 
   /**
-   * The components of the basic catalog that have a Swing view: 14 of the 18 components in this
+   * The components of the basic catalog that have a Swing view: 15 of the 18 components in this
    * version. The commit that adds the view of a component adds its name to the catalog.
    */
   static final Set<String> BASIC_VIEWS = SwingBasicCatalog.viewNames();
@@ -111,6 +111,17 @@ final class SuiteRegistry {
    * @throws AssertionError if the suite does not have the action of the case
    */
   static String skipReason(ConformanceCase testCase, SuiteSupport support) {
+    return skipReason(testCase, support, BASIC_VIEWS);
+  }
+
+  /**
+   * Gets the reason to skip a case, for an adapter that has a set of views.
+   *
+   * @param views the components of the basic catalog that have a view
+   * @return the reason, or null if the case must run
+   * @throws AssertionError if the suite does not have the action of the case
+   */
+  static String skipReason(ConformanceCase testCase, SuiteSupport support, Set<String> views) {
     if (support instanceof Unsupported unsupported) {
       return unsupported.reason();
     }
@@ -124,7 +135,7 @@ final class SuiteRegistry {
       return "Protocol version " + version + " is not supported; " + V1_ONLY;
     }
     Set<String> absent = new TreeSet<>(basicComponentsOf(testCase));
-    absent.removeAll(BASIC_VIEWS);
+    absent.removeAll(views);
     return absent.isEmpty() ? null : NEEDS_BASIC_VIEWS + ": " + String.join(", ", absent);
   }
 

@@ -105,6 +105,15 @@ class BasicCatalogSnapshotTest {
           "task-card",
           "music-player");
 
+  /** The width of the surfaces of {@link #WIDE_EXAMPLES}. */
+  private static final int WIDE = 480;
+
+  /**
+   * The examples whose content cannot become as narrow as the usual width in each look and feel.
+   * The row of {@code task-card} has a check box, a field for a date and a time, and an icon.
+   */
+  private static final List<String> WIDE_EXAMPLES = List.of("task-card");
+
   private static final String LONG_TEXT =
       "This text is long. It does not fit in one line of the surface, and thus it breaks at the"
           + " width that its container gives it.";
@@ -1026,7 +1035,11 @@ class BasicCatalogSnapshotTest {
         view -> {});
     snapshot(lookAndFeel + "-inputs-modal", surfaceOf(modalInputData(), modalInputs()));
     for (String example : INPUT_EXAMPLES) {
-      snapshot(lookAndFeel + "-example-" + example, example(example));
+      snapshot(
+          lookAndFeel + "-example-" + example,
+          example(example),
+          WIDE_EXAMPLES.contains(example) ? WIDE : WIDTH,
+          view -> {});
     }
     for (String example : EXAMPLES) {
       snapshot(lookAndFeel + "-example-" + example, example(example));

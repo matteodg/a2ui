@@ -28,6 +28,9 @@ import javax.swing.text.JTextComponent;
  * Reads the text that a Swing component and the components below it show to the user. A container
  * view uses it to infer its accessible name, for example a button from the text of its child.
  *
+ * <p>A component that shows no text, and that shows icons of the catalog, has the names of the
+ * icons as its text, for example {@code arrow back}. Thus a button with only an icon has a name.
+ *
  * <p>The text has no markup: the text of a component that shows HTML is the text of its document.
  * The value of a field that the user can edit is not a part of the text.
  */
@@ -44,7 +47,26 @@ final class VisibleText {
   static String of(Component component) {
     StringBuilder text = new StringBuilder();
     collect(component, text);
+    if (text.isEmpty()) {
+      // A component that shows only icons has the names of the icons as its text.
+      collectIcons(component, text);
+    }
     return text.toString().replaceAll("\\s+", " ").strip();
+  }
+
+  private static void collectIcons(Component component, StringBuilder text) {
+    if (!component.isVisible()) {
+      return;
+    }
+    if (component instanceof IconView.Glyph glyph) {
+      if (glyph.spokenName() != null) {
+        text.append(glyph.spokenName()).append(' ');
+      }
+    } else if (component instanceof Container container) {
+      for (Component child : container.getComponents()) {
+        collectIcons(child, text);
+      }
+    }
   }
 
   private static void collect(Component component, StringBuilder text) {

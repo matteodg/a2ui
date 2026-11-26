@@ -288,6 +288,22 @@ final class AdapterSession {
         .accessibleComponent();
   }
 
+  /**
+   * Gets the value of a property that a view of the basic catalog shows: the name of the shape of
+   * an {@code Icon}.
+   *
+   * @param control the Swing component that has the accessibility attributes of the view
+   * @param property the name of the property
+   * @return the value, or an empty result if the component does not tell this property
+   */
+  static Optional<Object> basicProperty(JComponent control, String property) {
+    return switch (property) {
+      case "name" ->
+          Optional.ofNullable(control.getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      default -> Optional.empty();
+    };
+  }
+
   /** Gets the properties that the view of a custom component got, or an empty result. */
   static Optional<NodeProps<?>> customProps(MountedNode node) {
     return node.component().orElse(null) instanceof JLabel label

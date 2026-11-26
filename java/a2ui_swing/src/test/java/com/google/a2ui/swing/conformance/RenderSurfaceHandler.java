@@ -458,6 +458,15 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
             "axis of " + at);
         continue;
       }
+      if (expected.containsKey(property)
+          && AdapterSession.basicProperty(session.control(actual), property).isPresent()) {
+        // A view of the basic catalog tells what it shows with a client property.
+        assertJsonEquals(
+            expected.get(property),
+            AdapterSession.basicProperty(session.control(actual), property).get(),
+            property + " of " + at);
+        continue;
+      }
       if (expected.containsKey(property)) {
         NodeProps<?> props =
             AdapterSession.customProps(actual)

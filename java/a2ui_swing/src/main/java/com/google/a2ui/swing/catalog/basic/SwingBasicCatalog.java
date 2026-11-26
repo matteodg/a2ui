@@ -52,6 +52,8 @@ import java.util.function.Function;
  *   <tr><th>Component</th><th>Swing component</th></tr>
  *   <tr><td>{@code Text}</td><td>The view of the {@code markdown} service. The default is a {@code
  *       JEditorPane} that shows the Markdown subset.</td></tr>
+ *   <tr><td>{@code Icon}</td><td>A component that paints a shape of the module, or the SVG path
+ *       data of the agent</td></tr>
  *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
  *   <tr><td>{@code List}</td><td>{@link FlexPanel} in a {@code JScrollPane}</td></tr>
  *   <tr><td>{@code Card}</td><td>A panel that paints a rounded outline</td></tr>
@@ -87,6 +89,14 @@ import java.util.function.Function;
  * }</pre>
  */
 public final class SwingBasicCatalog {
+  /**
+   * The key of the client property that has the name of the icon that the view of an {@code Icon}
+   * shows. The Swing component is the {@code accessibleComponent()} of the view. The value is a
+   * name of the catalog, for example {@code arrowBack}. The property is absent if the icon shows
+   * SVG path data or shows nothing.
+   */
+  public static final String ICON_NAME_PROPERTY = "a2ui.basic.iconName";
+
   /** The function that makes the view of each component that has one, in the catalog sequence. */
   private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS = views();
 
@@ -95,6 +105,7 @@ public final class SwingBasicCatalog {
   private static Map<String, Function<ViewContext, SwingComponentView>> views() {
     Map<String, Function<ViewContext, SwingComponentView>> views = new LinkedHashMap<>();
     views.put("Text", TextView::new);
+    views.put("Icon", IconView::new);
     views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
     views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
     views.put("List", ListView::new);

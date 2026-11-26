@@ -89,9 +89,13 @@ class SuiteRegistryTest {
 
   @Test
   void aCaseSkipsWithTheNamesOfTheBasicComponentsThatHaveNoView() {
+    // The set of the views is an argument. Thus the test does not depend on the views of this
+    // version.
     String reason =
         SuiteRegistry.skipReason(
-            surfaceCase("1.0", "Text", "Video", "Icon", "StatusBadge"), SURFACE_SUITE);
+            surfaceCase("1.0", "Text", "Video", "Icon", "StatusBadge"),
+            SURFACE_SUITE,
+            Set.of("Text", "Row"));
 
     assertEquals("needs the Swing views of the basic catalog: Icon, Video", reason);
   }
