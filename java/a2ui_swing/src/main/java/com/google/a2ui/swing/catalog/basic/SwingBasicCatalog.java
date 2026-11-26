@@ -56,6 +56,8 @@ import java.util.function.Function;
  *   <tr><td>{@code List}</td><td>{@link FlexPanel} in a {@code JScrollPane}</td></tr>
  *   <tr><td>{@code Card}</td><td>A panel that paints a rounded outline</td></tr>
  *   <tr><td>{@code Tabs}</td><td>{@code JTabbedPane}</td></tr>
+ *   <tr><td>{@code Modal}</td><td>A panel for the trigger. The {@code modalPresenter} service
+ *       shows the content. The default is a modal {@code JDialog}.</td></tr>
  *   <tr><td>{@code Divider}</td><td>{@code JSeparator}</td></tr>
  *   <tr><td>{@code Button}</td><td>{@code JButton}</td></tr>
  *   <tr><td>{@code TextField}</td><td>{@code JTextField}, {@code JTextArea} or {@code
@@ -92,6 +94,7 @@ public final class SwingBasicCatalog {
     views.put("List", ListView::new);
     views.put("Card", CardView::new);
     views.put("Tabs", TabsView::new);
+    views.put("Modal", ModalView::new);
     views.put("Divider", DividerView::new);
     views.put("Button", ButtonView::new);
     views.put("TextField", TextFieldView::new);

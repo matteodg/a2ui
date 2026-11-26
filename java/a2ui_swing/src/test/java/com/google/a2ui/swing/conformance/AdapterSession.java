@@ -35,11 +35,13 @@ import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
 import com.google.a2ui.swing.surface.A2uiAccessibility;
+import com.google.a2ui.swing.surface.A2uiFallbacks;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.A2uiSwing;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Headless;
+import com.google.a2ui.swing.testing.TestModalPresenter;
 import java.awt.Component;
 import java.awt.Container;
 import java.net.URI;
@@ -63,8 +65,9 @@ import javax.swing.text.JTextComponent;
  * records what the surface reports, and it reads the mounted Swing components for the handlers.
  *
  * <p>The basic catalog of the session is {@code SwingBasicCatalog} with a stub for {@code openUrl}
- * and with the test function {@code incrementCounter}. A custom component of a case gets a small
- * view: a label that shows the values of its properties.
+ * and with the test function {@code incrementCounter}. The modal presenter of the session keeps the
+ * content of a modal in a panel, because a case has no window for a dialog. A custom component of a
+ * case gets a small view: a label that shows the values of its properties.
  */
 final class AdapterSession {
   /** The catalog file of the cases. The session uses the catalog of the SDK for it. */
@@ -89,6 +92,13 @@ final class AdapterSession {
 
   /** The URLs that the function {@code openUrl} opened. */
   final List<URI> opened = new ArrayList<>();
+
+  /** The modals that the views of the surface opened. A case has no window for a dialog. */
+  final TestModalPresenter modals = new TestModalPresenter();
+
+  /** The services of the catalog and of the surface. */
+  private final A2uiServices services =
+      A2uiServices.DEFAULT.withUrlOpener(opened::add).withModalPresenter(modals);
 
   final MessageProcessor<SwingComponentImplementation> processor;
 
@@ -137,7 +147,7 @@ final class AdapterSession {
 
   private Catalog<SwingComponentImplementation, FunctionImplementation> basicCatalog() {
     Catalog<SwingComponentImplementation, FunctionImplementation> basic =
-        SwingBasicCatalog.create(Locale.US, A2uiServices.DEFAULT.withUrlOpener(opened::add));
+        SwingBasicCatalog.create(Locale.US, services);
     List<FunctionImplementation> functions = new ArrayList<>(basic.functions().values());
     functions.add(
         new FunctionImplementation(
@@ -217,7 +227,7 @@ final class AdapterSession {
   void process(Object messages) {
     processor.processMessages(resolveReferences(messages));
     if (view == null && surface != null && !surface.isDisposed()) {
-      view = Headless.mount(new A2uiSurface(surface), WIDTH, HEIGHT);
+      view = Headless.mount(new A2uiSurface(surface, A2uiFallbacks.NONE, services), WIDTH, HEIGHT);
     }
     settle();
   }

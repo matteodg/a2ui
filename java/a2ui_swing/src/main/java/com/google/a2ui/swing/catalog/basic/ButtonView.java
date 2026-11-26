@@ -67,6 +67,8 @@ import javax.swing.plaf.BorderUIResource;
  * each look and feel lets code set the background of a button. The colors come from the look and
  * feel. The three variants have the same size.
  *
+ * <p>A button in the trigger of a {@code Modal} does its action, and then it opens the modal.
+ *
  * <p>The mouse events on the content of the button go to the button. The accessible name of the
  * button is the visible text of its child, unless the agent gave a label.
  *
@@ -108,6 +110,8 @@ final class ButtonView implements SwingComponentView {
         if (action != null) {
           action.invoke();
         }
+        // A button in the trigger of a modal opens the modal after its own action.
+        ModalView.activated(panel);
       };
 
   /**

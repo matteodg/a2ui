@@ -51,7 +51,17 @@ import org.junit.jupiter.api.Test;
 
 class SwingBasicCatalogTest {
   private static final Set<String> VIEWS =
-      Set.of("Text", "Row", "Column", "List", "Card", "Tabs", "Divider", "Button", "TextField");
+      Set.of(
+          "Text",
+          "Row",
+          "Column",
+          "List",
+          "Card",
+          "Tabs",
+          "Modal",
+          "Divider",
+          "Button",
+          "TextField");
 
   /**
    * Makes the catalog with one component that only declares its type. Thus the tests of a component

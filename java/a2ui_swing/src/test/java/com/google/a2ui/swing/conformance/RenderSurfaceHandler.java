@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import javax.accessibility.AccessibleAction;
 import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
@@ -145,6 +146,10 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     if (session.view != null && session.view.isMounted()) {
       session.view.removeNotify();
     }
+    // The view of a modal closes its content when the surface goes away.
+    if (!session.modals.open().isEmpty()) {
+      throw new AssertionError(location + ": a modal is open after the unmount of the surface.");
+    }
   }
 
   private void runStep(AdapterSession session, Map<String, Object> step, String where) {
@@ -177,12 +182,22 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
           assertJsonEquals(true, step.get("userActivation"), "userActivation of " + where);
         }
         JComponent control = session.control(session.find(target(step, where)));
-        if (!(control instanceof AbstractButton button)) {
+        // A control that is not a button has an accessible action if the user can operate it, as
+        // the trigger of a modal that has no button.
+        AccessibleAction accessible =
+            control instanceof AbstractButton
+                ? null
+                : control.getAccessibleContext().getAccessibleAction();
+        if (!(control instanceof AbstractButton) && accessible == null) {
           throw new AssertionError(where + ": the harness cannot operate " + control.getClass());
         }
         session.gesture = true;
         try {
-          button.doClick(0);
+          if (control instanceof AbstractButton button) {
+            button.doClick(0);
+          } else if (!accessible.doAccessibleAction(0)) {
+            throw new AssertionError(where + ": the control did not do its action.");
+          }
         } finally {
           session.gesture = false;
         }
