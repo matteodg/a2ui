@@ -99,11 +99,6 @@ final class SuiteRegistry {
       "Starts a call to the agent from a binding or from an action. java-core does not send"
           + " such a call to the agent yet";
 
-  private static final String SELECT_CATALOG =
-      "One case expects a 'Protocol version mismatch' error for a surface that gets a v0.9"
-          + " catalog. In java-core only the MessageProcessor selects the catalogs of a surface,"
-          + " and it does not give a catalog of a different version to a surface";
-
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
   private static final String PROCESS = "process_messages";
@@ -322,9 +317,11 @@ final class SuiteRegistry {
     suites.put(
         "core/multi_catalog.yaml",
         new Supported(
-            Map.of(VALIDATE, new ProcessMessagesHandler(true)),
-            reasons("select_catalog", SELECT_CATALOG),
-            Set.of()));
+            Map.of(
+                VALIDATE,
+                new ProcessMessagesHandler(true),
+                "select_catalog",
+                new SelectCatalogHandler())));
     suites.put(
         "core/node_resolution.yaml",
         new Supported(Map.of("resolve_nodes", new ResolveNodesHandler())));
