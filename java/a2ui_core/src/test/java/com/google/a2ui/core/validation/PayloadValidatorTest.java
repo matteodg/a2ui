@@ -77,13 +77,13 @@ class PayloadValidatorTest {
             A2uiValidationError.class, () -> validator.validateComponent(Map.of("component", 7)));
 
     assertEquals(
-        "Component 'x' has an unknown component type 'Carousel' for catalog '"
+        "Component 'x' (Carousel) is invalid: Unrecognized component type 'Carousel' in catalog '"
             + BasicCatalog.ID
-            + "'.",
+            + "'",
         unknown.getMessage());
-    assertEquals("Component 'x' has no string 'component' naming its type.", absent.getMessage());
+    assertEquals("Component 'x' (?) is invalid: 'component' must name a type", absent.getMessage());
     assertEquals(
-        "Component '?' has no string 'component' naming its type.", notAString.getMessage());
+        "Component '?' (7) is invalid: 'component' must name a type", notAString.getMessage());
   }
 
   @Test
@@ -132,7 +132,7 @@ class PayloadValidatorTest {
     validator.validateComponent(text("text", call, "@catalogId", "urn:other"));
 
     assertTrue(
-        error.getMessage().contains("/text: unknown function 'notInThisCatalog' in catalog '"),
+        error.getMessage().contains("/text: Unrecognized function 'notInThisCatalog' in catalog '"),
         error.getMessage());
   }
 
@@ -157,9 +157,11 @@ class PayloadValidatorTest {
                             Map.of("a-b", 1)))));
 
     String message = error.getMessage();
-    assertTrue(message.contains("function name 'sh-out' is not a UAX #31 identifier"), message);
     assertTrue(
-        message.contains("argument name 'a-b' of 'sh-out' is not a UAX #31 identifier"), message);
+        message.contains("function name 'sh-out' is not a valid UAX #31 identifier"), message);
+    assertTrue(
+        message.contains("argument name 'a-b' of 'sh-out' is not a valid UAX #31 identifier"),
+        message);
   }
 
   @Test
@@ -213,11 +215,11 @@ class PayloadValidatorTest {
 
     assertTrue(noArgument.getMessage().startsWith("Call to 'openUrl' is invalid: "));
     assertEquals(
-        "Call to 'teleport' is invalid: unknown function 'teleport' in catalog '"
+        "Call to 'teleport' is invalid: Unrecognized function 'teleport' in catalog '"
             + BasicCatalog.ID
             + "'",
         unknown.getMessage());
-    assertTrue(nested.getMessage().contains("/args/url: unknown function 'teleport'"));
+    assertTrue(nested.getMessage().contains("/args/url: Unrecognized function 'teleport'"));
   }
 
   @Test

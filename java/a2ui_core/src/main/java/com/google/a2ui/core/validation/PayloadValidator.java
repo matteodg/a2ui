@@ -38,7 +38,6 @@ import java.util.Objects;
  * <p>A validator is not thread-safe.
  */
 public final class PayloadValidator {
-  private final Catalog<?, ?> catalog;
   private final CatalogChecks checks;
 
   /**
@@ -49,8 +48,7 @@ public final class PayloadValidator {
    *     schema. See {@link Catalog#validationSchema()}.
    */
   public PayloadValidator(Catalog<?, ?> catalog) {
-    this.catalog = Objects.requireNonNull(catalog, "catalog");
-    this.checks = new CatalogChecks(catalog);
+    this.checks = new CatalogChecks(Objects.requireNonNull(catalog, "catalog"));
   }
 
   /**
@@ -64,27 +62,18 @@ public final class PayloadValidator {
    */
   public void validateComponent(Map<String, ?> component) {
     Map<String, Object> value = frozen(component);
-    String label = "Component '" + (value.get("id") == null ? "?" : value.get("id")) + "'";
-    if (!(value.get("component") instanceof String type)) {
-      throw new A2uiValidationError(label + " has no string 'component' naming its type.");
-    }
-    if (!catalog.components().containsKey(type)) {
-      throw new A2uiValidationError(
-          label
-              + " has an unknown component type '"
-              + type
-              + "' for catalog '"
-              + catalog.id()
-              + "'.");
-    }
-
     // A component that names its catalog is possibly not in the default catalog of the surface.
     // A call that names no catalog runs in that default catalog. Thus this catalog cannot examine
     // such a call.
-    List<String> errors = checks.componentErrors(value, type, !value.containsKey("@catalogId"));
+    List<String> errors = checks.componentErrors(value, !value.containsKey("@catalogId"), false);
     if (!errors.isEmpty()) {
       throw new A2uiValidationError(
-          label + " (" + type + ") is invalid: " + String.join("; ", errors));
+          "Component '"
+              + (value.get("id") == null ? "?" : value.get("id"))
+              + "' ("
+              + (value.get("component") == null ? "?" : value.get("component"))
+              + ") is invalid: "
+              + String.join("; ", errors));
     }
   }
 
@@ -101,7 +90,7 @@ public final class PayloadValidator {
     Map<String, Object> call = new LinkedHashMap<>();
     call.put("@call", Objects.requireNonNull(name, "name"));
     call.put("args", Objects.requireNonNull(args, "args"));
-    List<String> errors = checks.nestedCallErrors(frozen(call), true);
+    List<String> errors = checks.nestedCallErrors(frozen(call), true, false);
     if (!errors.isEmpty()) {
       throw new A2uiValidationError(
           "Call to '" + name + "' is invalid: " + String.join("; ", errors));

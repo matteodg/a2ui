@@ -65,20 +65,44 @@ public final class CatalogChecks {
   }
 
   /**
-   * Finds the problems of a component of a type that the catalog defines.
+   * Finds the problems of a component of this catalog.
    *
    * @param component the component, as {@link Json#freeze(Object)} makes it
-   * @param type the type of the component. The catalog must define it.
    * @param unqualifiedCallsRunHere true if a nested call that names no catalog runs in this catalog
+   * @param allowUnknown true if a component type or a function that the catalog does not define is
+   *     not a problem. Such an item is not examined.
    * @return one message for each problem. The list is empty if the component is correct.
    * @throws A2uiCatalogError if the schema of the type has a reference that names nothing
    */
   public List<String> componentErrors(
-      Map<String, Object> component, String type, boolean unqualifiedCallsRunHere) {
-    List<String> errors =
-        new ArrayList<>(
-            engine.errors("/" + COMPONENTS + "/" + Json.escapePointer(type), component));
-    checkCalls(component, "", unqualifiedCallsRunHere, errors);
+      Map<String, Object> component, boolean unqualifiedCallsRunHere, boolean allowUnknown) {
+    List<String> errors = new ArrayList<>();
+    if (!(component.get("component") instanceof String type)) {
+      errors.add("'component' must name a type");
+      return errors;
+    }
+    if (catalog.components().containsKey(type)) {
+      errors.addAll(engine.errors("/" + COMPONENTS + "/" + Json.escapePointer(type), component));
+    } else if (!allowUnknown) {
+      errors.add("Unrecognized component type '" + type + "' in catalog '" + catalog.id() + "'");
+    }
+    checkCalls(component, "", unqualifiedCallsRunHere, allowUnknown, errors);
+    return errors;
+  }
+
+  /**
+   * Finds the problems of one function call that runs in this catalog. The method does not examine
+   * the calls in the arguments.
+   *
+   * @param call the call, as {@link Json#freeze(Object)} makes it
+   * @param path the JSON Pointer of the call, for the messages
+   * @param allowUnknown true if a function that the catalog does not define is not a problem
+   * @return one message for each problem. The list is empty if the call is correct.
+   * @throws A2uiCatalogError if the schema of the function has a reference that names nothing
+   */
+  public List<String> callErrors(Map<String, Object> call, String path, boolean allowUnknown) {
+    List<String> errors = new ArrayList<>();
+    checkCall(call, path, true, true, allowUnknown, errors);
     return errors;
   }
 
@@ -87,12 +111,14 @@ public final class CatalogChecks {
    *
    * @param node the value to examine, as {@link Json#freeze(Object)} makes it
    * @param unqualifiedCallsRunHere true if a call that names no catalog runs in this catalog
+   * @param allowUnknown true if a function that the catalog does not define is not a problem
    * @return one message for each problem. The list is empty if each call is correct.
    * @throws A2uiCatalogError if the schema of a function has a reference that names nothing
    */
-  public List<String> nestedCallErrors(Object node, boolean unqualifiedCallsRunHere) {
+  public List<String> nestedCallErrors(
+      Object node, boolean unqualifiedCallsRunHere, boolean allowUnknown) {
     List<String> errors = new ArrayList<>();
-    checkCalls(node, "", unqualifiedCallsRunHere, errors);
+    checkCalls(node, "", unqualifiedCallsRunHere, allowUnknown, errors);
     return errors;
   }
 
@@ -104,22 +130,39 @@ public final class CatalogChecks {
    * @param errors the list that receives the problems
    */
   private void checkCalls(
-      Object node, String path, boolean unqualifiedCallsRunHere, List<String> errors) {
+      Object node,
+      String path,
+      boolean unqualifiedCallsRunHere,
+      boolean allowUnknown,
+      List<String> errors) {
     if (node instanceof Map<?, ?> map) {
       if (map.containsKey("@call")) {
-        checkCall(Json.asObject(map), path, unqualifiedCallsRunHere, errors);
+        checkCall(Json.asObject(map), path, unqualifiedCallsRunHere, false, allowUnknown, errors);
       }
-      map.forEach(
-          (key, value) -> checkCalls(value, path + "/" + key, unqualifiedCallsRunHere, errors));
+      map.forEach((key, value) ->
+          checkCalls(value, path + "/" + key, unqualifiedCallsRunHere, allowUnknown, errors));
     } else if (node instanceof List<?> list) {
       for (int index = 0; index < list.size(); index++) {
-        checkCalls(list.get(index), path + "/" + index, unqualifiedCallsRunHere, errors);
+        checkCalls(
+            list.get(index), path + "/" + index, unqualifiedCallsRunHere, allowUnknown, errors);
       }
     }
   }
 
+  /**
+   * Examines one function call.
+   *
+   * @param alwaysRunsHere true if the caller knows that the call runs in this catalog. If it is
+   *     false, the {@code catalogId} of the call and {@code unqualifiedCallsRunHere} make the
+   *     decision.
+   */
   private void checkCall(
-      Map<String, Object> call, String path, boolean unqualifiedCallsRunHere, List<String> errors) {
+      Map<String, Object> call,
+      String path,
+      boolean unqualifiedCallsRunHere,
+      boolean alwaysRunsHere,
+      boolean allowUnknown,
+      List<String> errors) {
     String prefix = path.isEmpty() ? "" : path + ": ";
     if (!(call.get("@call") instanceof String name)) {
       errors.add(prefix + "'@call' must be a string");
@@ -140,7 +183,7 @@ public final class CatalogChecks {
     }
 
     if (!Uax31.isIdentifier(name)) {
-      errors.add(prefix + "function name '" + name + "' is not a UAX #31 identifier");
+      errors.add(prefix + "function name '" + name + "' is not a valid UAX #31 identifier");
     }
     if (call.get("args") instanceof Map<?, ?> args) {
       for (Object argument : args.keySet()) {
@@ -151,7 +194,7 @@ public final class CatalogChecks {
                   + argument
                   + "' of '"
                   + name
-                  + "' is not a UAX #31 identifier");
+                  + "' is not a valid UAX #31 identifier");
         }
       }
     }
@@ -160,12 +203,17 @@ public final class CatalogChecks {
       return;
     }
 
-    boolean runsHere = catalogId == null ? unqualifiedCallsRunHere : catalogId.equals(catalog.id());
+    boolean runsHere =
+        alwaysRunsHere
+            || (catalogId == null ? unqualifiedCallsRunHere : catalogId.equals(catalog.id()));
     if (!runsHere) {
       return;
     }
     if (!catalog.functions().containsKey(name)) {
-      errors.add(prefix + "unknown function '" + name + "' in catalog '" + catalog.id() + "'");
+      if (!allowUnknown) {
+        errors.add(
+            prefix + "Unrecognized function '" + name + "' in catalog '" + catalog.id() + "'");
+      }
       return;
     }
     engine
