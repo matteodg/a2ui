@@ -18,6 +18,7 @@ package com.google.a2ui.swing.surface;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -281,6 +282,46 @@ class HtmlMarkdownViewTest {
 
       assertTrue(pane.isValid(), "the component after the paint");
       assertTrue(parent.isValid(), "the parent after the paint");
+    });
+  }
+
+  @Test
+  void aComponentThatGaveASizeWithNoWindowWritesItsDocumentAgainWhenItComesToAWindow() {
+    Edt.run(() -> {
+      view.setMarkdown("Short");
+      int before = pane.getPreferredSize().width;
+      // The view does not know this change of the document. Thus the test can see if the view
+      // writes the document again.
+      pane.getDocument().insertString(2, " and some more text", null);
+
+      assertEquals(before, pane.getPreferredSize().width);
+
+      JPanel parent = new JPanel(new BorderLayout());
+      JPanel holder = new JPanel(null);
+      holder.add(parent);
+      parent.add(pane);
+      parent.addNotify();
+
+      assertEquals("Short", shownText());
+      assertEquals(before, pane.getPreferredSize().width);
+    });
+  }
+
+  @Test
+  void aComponentThatGaveNoSizeKeepsItsDocumentWhenItComesToAWindow() {
+    Edt.run(() -> {
+      view.setMarkdown("Short");
+      pane.getDocument().insertString(2, " and some more text", null);
+      String changed = shownText();
+
+      JPanel parent = new JPanel(new BorderLayout());
+      JPanel holder = new JPanel(null);
+      holder.add(parent);
+      parent.add(pane);
+      parent.addNotify();
+
+      assertNotEquals("Short", changed);
+      assertEquals(changed, shownText());
     });
   }
 

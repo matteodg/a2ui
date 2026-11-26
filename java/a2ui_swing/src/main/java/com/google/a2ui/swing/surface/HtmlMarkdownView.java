@@ -63,6 +63,7 @@ final class HtmlMarkdownView implements MarkdownView {
   private List<Block> blocks = List.of();
 
   HtmlMarkdownView() {
+    pane.renderAgain = this::render;
     pane.addPropertyChangeListener("font", styleListener);
     pane.addPropertyChangeListener("foreground", styleListener);
   }
@@ -126,6 +127,7 @@ final class HtmlMarkdownView implements MarkdownView {
       sheet.addRule(code + " { font-family: Monospaced; font-size: " + font.getSize() + "pt; }");
     }
     pane.empty = blocks.isEmpty();
+    pane.measuredWithNoWindow = false;
     pane.contentChanged();
     pane.setText(blocks.isEmpty() ? "" : MarkdownHtml.toHtml(blocks, font.getSize2D()));
     pane.revalidate();
@@ -168,6 +170,12 @@ final class HtmlMarkdownView implements MarkdownView {
 
     private int wrappedHeight;
 
+    /** True if the component measured its text while it had no window. */
+    private boolean measuredWithNoWindow;
+
+    /** Writes the document again. The view sets it. */
+    private transient Runnable renderAgain = () -> {};
+
     Pane() {
       setEditorKit(new HTMLEditorKit());
       setEditable(false);
@@ -198,6 +206,22 @@ final class HtmlMarkdownView implements MarkdownView {
         caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
       }
       contentChanged();
+    }
+
+    /**
+     * Connects the component to a window. A window can have a scale, and then it draws text with
+     * different metrics than a component that is in no window. The views of the text keep the sizes
+     * that they calculated. Thus, if the component gave a size while it was in no window, the view
+     * writes the document again. The content of a modal is an example: a presenter can ask for its
+     * size before a dialog shows it.
+     */
+    @Override
+    public void addNotify() {
+      super.addNotify();
+      if (measuredWithNoWindow) {
+        measuredWithNoWindow = false;
+        renderAgain.run();
+      }
     }
 
     @Override
@@ -294,6 +318,9 @@ final class HtmlMarkdownView implements MarkdownView {
     private Dimension measure(int contentWidth) {
       if (empty) {
         return new Dimension(0, 0);
+      }
+      if (getGraphicsConfiguration() == null) {
+        measuredWithNoWindow = true;
       }
       View root = getUI().getRootView(this);
       measuring = true;
