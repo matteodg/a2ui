@@ -69,6 +69,7 @@ class JsonSchemaEngineTest {
                       },
                       "MorningDate": {"format": "date", "pattern": "^2025"},
                       "Link": {"type": "string", "format": "uri"},
+                      "Email": {"type": "string", "format": "email"},
                       "FormatAsData": {"const": {"format": "date"}},
                       "FormatAsName": {
                         "type": "object",
@@ -217,8 +218,37 @@ class JsonSchemaEngineTest {
   }
 
   @Test
+  void theFormatOfAUriIsAnAbsoluteUriWithAScheme() {
+    for (String uri :
+        List.of(
+            "https://example.com/a?b=c#d",
+            "mailto:someone@example.com",
+            "tel:+15550100",
+            "urn:isbn:0451450523",
+            "custom+scheme-1.0:",
+            "HTTP://EXAMPLE.COM")) {
+      assertEquals(List.of(), engine.errors("/$defs/Link", uri), uri);
+    }
+    for (String text :
+        List.of(
+            "",
+            "not a link",
+            "example.com/page",
+            "/relative/path",
+            "//example.com/page",
+            "1http://example.com",
+            "https://example.com/a b",
+            "https://example.com/\n",
+            "https://example.com/a\u00a0b",
+            " https://example.com")) {
+      assertEquals(1, engine.errors("/$defs/Link", text).size(), text);
+    }
+    assertEquals(Problem.INVALID_VALUE, engine.problems("/$defs/Link", "no scheme").get(0).code());
+  }
+
+  @Test
   void theOtherFormatsAndTheWordFormatInDataAreNotAsserted() {
-    assertEquals(List.of(), engine.errors("/$defs/Link", "not a link"));
+    assertEquals(List.of(), engine.errors("/$defs/Email", "not an address"));
     assertEquals(List.of(), engine.errors("/$defs/FormatAsData", Map.of("format", "date")));
     assertEquals(List.of(), engine.errors("/$defs/FormatAsName", Map.of("format", "long")));
   }

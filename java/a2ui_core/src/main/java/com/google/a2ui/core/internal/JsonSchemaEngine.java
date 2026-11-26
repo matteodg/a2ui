@@ -48,14 +48,10 @@ import tools.jackson.databind.node.ObjectNode;
  * schema that has one of them. The offset from UTC is optional, because a date and a time of the
  * user frequently have none.
  *
- * <p>The engine does not assert other formats. The decision for the format {@code uri} is as
- * follows. The schemas of protocol v1.0 and the basic catalog use it one time, for a literal {@code
- * url} argument of the function {@code openUrl}. The other branches of that {@code oneOf} are
- * objects, thus a string agrees with one branch only, and the schema is not ambiguous without the
- * assertion. No conformance case and no rule of the specification requires the assertion. The
- * function {@code openUrl} examines the URL when it runs, and it rejects a URL that is not
- * permitted. The Python SDK and the Dart SDK assert the format when they validate a message. Thus
- * they reject a literal URL with no scheme earlier than this SDK does.
+ * <p>The engine also asserts the format {@code uri}, as the Python SDK and the Dart SDK do. The
+ * text must be an absolute URI: a scheme, a colon, and then no white space. Thus a literal {@code
+ * url} argument of the function {@code openUrl} that has no scheme is not correct when the SDK
+ * validates the message. The engine does not assert other formats.
  *
  * <p>Only this class and {@link UnicodeRegularExpressions} use the JSON Schema library. Thus the
  * library is not visible in the public API.
@@ -88,12 +84,23 @@ public final class JsonSchemaEngine {
       "([01][0-9]|2[0-3]):[0-5][0-9](:([0-5][0-9]|60)([.,][0-9]+)?)?"
           + "([Zz]|[+-]([01][0-9]|2[0-3])(:?[0-5][0-9])?)?";
 
-  /** The pattern of each format that the engine asserts. No text agrees with two of them. */
+  /**
+   * An absolute URI: a scheme, a colon, and then no white space. The Python SDK and the Dart SDK
+   * use the same rule. The white space is that of Unicode, and a line end after the text is not
+   * permitted.
+   */
+  private static final String URI = "^[A-Za-z][A-Za-z0-9+.-]*:(?U:\\S)*\\z";
+
+  /**
+   * The pattern of each format that the engine asserts. No text agrees with two of the patterns for
+   * a date and a time.
+   */
   private static final Map<String, String> FORMAT_PATTERNS =
       Map.of(
           "date", "^" + DATE + "$",
           "time", "^" + TIME + "$",
-          "date-time", "^" + DATE + "[Tt ]" + TIME + "$");
+          "date-time", "^" + DATE + "[Tt ]" + TIME + "$",
+          "uri", URI);
 
   /** The keywords whose content is data, not a schema. */
   private static final Set<String> DATA_KEYWORDS = Set.of("const", "enum", "default", "examples");
