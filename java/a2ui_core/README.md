@@ -13,11 +13,12 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 | Package                                   | Contents                                                                                                                                                                                      |
 | :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                      |
-| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`.                                                                                                              |
+| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text.                                               |
 | `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces.                                                                      |
 | `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                        |
-| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents.                                                                                                   |
-| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog.                                                                                             |
+| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents. A `FunctionImplementation` is a function with its code.                                           |
+| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog. `BasicCatalog.withFunctions()`, the catalog with the code of its functions.                 |
+| `com.google.a2ui.core.resolution`         | `DataContext`. It resolves the data bindings and the function calls of a surface.                                                                                                             |
 | `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                       |
 | `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts. |
 | `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent.                                    |
@@ -25,8 +26,8 @@ The Java module name is `com.google.a2ui.core`. It exports these packages:
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain function implementations, actions, node resolution and the
-function-call messages (`callRendererFunction`, `agentFunctionResponse`).
+The core does not yet contain the `regex` function, actions, node resolution and the function-call
+messages (`callRendererFunction`, `agentFunctionResponse`).
 
 ## Threads
 
@@ -191,6 +192,68 @@ processor.getRendererCapabilities(List.of(ProtocolVersion.V1_0));
 
 processor.getRendererDataModel(); // Optional[{version=1.0, surfaces={main={...}}}]
 ```
+
+## Functions and bindings
+
+`BasicCatalog.withFunctions` gives the basic catalog with the code of its functions. A `DataContext`
+resolves a value as a message writes it. A binding `{"@path": ...}` becomes the data at the path. A
+call `{"@call": ...}` becomes the result of the function.
+
+```java
+UrlOpener opener =
+    uri -> {
+      try {
+        Desktop.getDesktop().browse(uri);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    };
+Catalog<ComponentApi, FunctionImplementation> catalog =
+    BasicCatalog.withFunctions(Locale.US, opener);
+MessageProcessor<ComponentApi> processor = new MessageProcessor<>(List.of(catalog));
+processor.processMessages(messagesFromTheAgent);
+DataContext context = new DataContext(processor.model().getSurface("main").orElseThrow());
+
+context.resolveDynamicValue(Map.of("@path", "/user/name")); // "Ada"
+context.resolveDynamicValue(
+    Map.of("@call", "formatString", "args", Map.of("value", "Hello, ${/user/name}!")));
+// "Hello, Ada!"
+```
+
+`formatNumber`, `formatCurrency`, `formatDate` and `pluralize` write text for the locale of
+`withFunctions`. The default locale is `Locale.US`. Thus the text is the same on each computer.
+`openUrl` gives an absolute `http` or `https` URL to the `UrlOpener` of the application, and refuses
+each other URL.
+
+A call runs in the catalog that its `catalogId` names. If the call names none, it runs in the
+default catalog of the surface. A call in a `formatString` template runs in the catalog of that
+`formatString` call.
+
+A context refuses these calls with an `A2uiExpressionError`:
+
+- A call of a function that only the agent can call (`allowedCallers` is `agentOnly`).
+- A call of a function that requires a user gesture, for example `openUrl`, in a context that is not
+  the result of one. Use `context.withUserActivation()` in the handler of a click.
+- A call of a function that has no code. The `regex` function has no code yet.
+
+In a list template, `context.nested("items/2", 2)` gives the context of one item. Relative paths
+start at the item, and the `@index` function returns its position.
+
+A function of your application is a `FunctionImplementation`: a name, the definition of the function
+as a catalog document writes it, and the code. The code gets the resolved arguments. `Coercion`
+reads an argument as a boolean, as a number or as text with the rules of the protocol.
+
+```java
+FunctionImplementation shout =
+    new FunctionImplementation(
+        "shout",
+        Map.of("returnType", "string"),
+        (args, context) -> Coercion.toText(args.get("value")).toUpperCase(Locale.ROOT));
+Catalog<ComponentApi, FunctionImplementation> custom =
+    new Catalog<>("https://example.com/catalogs/custom", List.of(), List.of(shout));
+```
+
+`Catalog.withFunctions` gives a catalog from a document the code of its functions.
 
 ## Validation
 

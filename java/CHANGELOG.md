@@ -24,3 +24,8 @@
   component call of an `agentOnly` function. `MessageProcessor` also rejects a component ID or a
   component type that is not a UAX #31 identifier. The message of a component problem has a new
   text.
+- Add `DataContext` in the new package `com.google.a2ui.core.resolution`. It resolves data bindings
+  and function calls. Add `FunctionImplementation`, `FunctionBody` and `Catalog.withFunctions` in
+  `com.google.a2ui.core.catalog`, and `Coercion` in `com.google.a2ui.core.common`. Add
+  `BasicCatalog.withFunctions` and `UrlOpener` in `com.google.a2ui.core.basic_catalog.v1_0`, with
+  the code of 13 of the 14 functions of the basic catalog. The `regex` function has no code yet.
