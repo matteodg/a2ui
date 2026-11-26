@@ -32,7 +32,9 @@ import java.util.Set;
  * step. Then it reads the accessibility attributes from the Swing component that has them: the
  * accessible name and the accessible description of its {@code AccessibleContext}, its accessible
  * role, and the {@code live} and {@code hidden} attributes that the adapter keeps as a client
- * property.
+ * property. For a hidden component, the handler also makes sure that the adapter hides the
+ * component and each component below it: each one has the hidden mark of the adapter and an empty
+ * accessible name.
  *
  * <p>The handler does not use the key {@code surface}, which is for a harness with no views. It
  * does not run the {@code axeCore} rules, which need a DOM. The top level assertions of a case with

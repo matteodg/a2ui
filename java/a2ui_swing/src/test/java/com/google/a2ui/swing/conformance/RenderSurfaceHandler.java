@@ -62,8 +62,13 @@ import javax.swing.text.JTextComponent;
  * slider is its accessible value, and the value of a date field is the value of its formatted text
  * field.
  *
- * <p>An input step for a component type that has no view in this version fails. The registry skips
- * the cases that need such a component.
+ * <p>The handler reads the {@code url} of an {@code Image}, a {@code Video} and an {@code
+ * AudioPlayer}, and the {@code name} of an {@code Icon}, from the client properties of {@code
+ * SwingBasicCatalog}. A view sets them only for a URL that it accepts and for a shape that it
+ * shows. For an {@code Image}, the handler also makes sure that the view asked the image loader of
+ * the session for the URL. The loader uses no network.
+ *
+ * <p>An input step for a component type that the handler cannot operate fails.
  */
 final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
   private static final Set<String> CASE_KEYS =

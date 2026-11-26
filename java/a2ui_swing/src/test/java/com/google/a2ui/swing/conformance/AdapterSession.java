@@ -424,6 +424,8 @@ final class AdapterSession {
       }
       if (attributes.containsKey("hidden")) {
         JsonValues.assertJsonEquals(attributes.get("hidden"), given.hidden(), "hidden of " + at);
+        // The attribute hides the component and all the components below it.
+        assertHiddenBelow(find(id), given.hidden(), at);
       }
       if (attributes.containsKey("role")) {
         JsonValues.assertJsonEquals(attributes.get("role"), roleOf(control), "role of " + at);
@@ -437,6 +439,27 @@ final class AdapterSession {
             "checked of " + at);
       }
     });
+  }
+
+  /**
+   * Makes sure that the adapter hides, or does not hide, a position and each position below it from
+   * assistive tools: the mark of the adapter, and an empty accessible name.
+   */
+  private void assertHiddenBelow(MountedNode node, boolean hidden, String at) {
+    if (node.view().isPresent()) {
+      JComponent control = control(node);
+      String id = "'" + node.node().componentId() + "' below " + at;
+      if (A2uiAccessibility.isHidden(control) != hidden) {
+        throw new AssertionError(id + ": expected the hidden mark to be " + hidden);
+      }
+      if (hidden) {
+        JsonValues.assertJsonEquals(
+            "", control.getAccessibleContext().getAccessibleName(), "accessible name of " + id);
+      }
+    }
+    if (hidden) {
+      node.children().forEach(child -> assertHiddenBelow(child, true, at));
+    }
   }
 
   /** Gets the buttons below a component, for example the options of a choice picker. */
