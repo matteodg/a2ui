@@ -76,7 +76,7 @@ from the services. Give the same services to the `A2uiSurface`.
 | `ChoicePicker`  | `JRadioButton`, `JCheckBox` or `JToggleButton` for each option      | Available |
 | `Slider`        | `JSlider` with the value next to it                                 | Available |
 | `DateTimeInput` | `JSpinner` with a text field for ISO 8601 text                      | Available |
-| `Image`         | A component that paints the image of the `imageLoader` service      | Later     |
+| `Image`         | A component that paints the image of the `imageLoader` service      | Available |
 | `Icon`          | A component that paints a shape of the module or SVG path data      | Available |
 | `Video`         | The view of the `mediaPlayer` service                               | Later     |
 | `AudioPlayer`   | The view of the `mediaPlayer` service                               | Later     |

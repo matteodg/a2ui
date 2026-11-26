@@ -38,6 +38,7 @@ import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.Snapshots;
+import com.google.a2ui.swing.testing.TestImageLoader;
 import com.google.a2ui.swing.testing.TestModalPresenter;
 import java.awt.Color;
 import java.awt.Component;
@@ -959,7 +960,13 @@ class BasicCatalogSnapshotTest {
     TestModalPresenter presenter = new TestModalPresenter();
     List<A2uiError> errors = new ArrayList<>();
     A2uiSurface view =
-        mount(messages, errors, A2uiServices.DEFAULT.withModalPresenter(presenter), width);
+        mount(
+            messages,
+            errors,
+            A2uiServices.DEFAULT
+                .withModalPresenter(presenter)
+                .withImageLoader(TestImageLoader.patterns()),
+            width);
     operate.accept(view);
     fit(view, width);
     assertEquals(List.of(), errors, name);

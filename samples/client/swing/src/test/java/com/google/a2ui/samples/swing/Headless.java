@@ -17,9 +17,12 @@
 package com.google.a2ui.samples.swing;
 
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
+import com.google.a2ui.swing.surface.A2uiServices;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.EventQueue;
+import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -73,6 +76,46 @@ final class Headless {
       case Error e -> throw e;
       default -> throw new IllegalStateException(failure[0]);
     }
+  }
+
+  /**
+   * Gets the services of the tests. The image loader gives a generated image for each URL, on the
+   * event dispatch thread, after the call. Thus a test does not use the network.
+   */
+  static A2uiServices services() {
+    return A2uiServices.DEFAULT.withImageLoader((uri, onResult) -> {
+      boolean[] cancelled = {false};
+      EventQueue.invokeLater(() -> {
+        if (!cancelled[0]) {
+          onResult.accept(Optional.of(generatedImage(uri.toString())));
+        }
+      });
+      return () -> cancelled[0] = true;
+    });
+  }
+
+  /** Makes an image with a color gradient and a circle. The URL selects the colors. */
+  static BufferedImage generatedImage(String url) {
+    int hue = Math.floorMod(url.hashCode(), 360);
+    BufferedImage image = new BufferedImage(480, 320, BufferedImage.TYPE_INT_RGB);
+    Graphics2D g = image.createGraphics();
+    try {
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      g.setPaint(
+          new GradientPaint(
+              0,
+              0,
+              Color.getHSBColor(hue / 360f, 0.55f, 0.85f),
+              480,
+              320,
+              Color.getHSBColor(((hue + 60) % 360) / 360f, 0.6f, 0.55f)));
+      g.fillRect(0, 0, 480, 320);
+      g.setColor(new Color(255, 255, 255, 170));
+      g.fillOval(180, 100, 120, 120);
+    } finally {
+      g.dispose();
+    }
+    return image;
   }
 
   /** Reads the examples of the basic catalog from the repository. */

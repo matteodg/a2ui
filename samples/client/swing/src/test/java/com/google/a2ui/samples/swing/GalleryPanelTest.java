@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** The tests of the behavior of the three columns, with no display. */
 class GalleryPanelTest {
   private final List<URI> opened = new ArrayList<>();
-  private final A2uiServices services = A2uiServices.DEFAULT.withUrlOpener(opened::add);
+  private final A2uiServices services = Headless.services().withUrlOpener(opened::add);
   private GalleryPanel gallery;
 
   private void open(List<Example> examples) {

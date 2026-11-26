@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
 import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.A2uiSurface;
+import com.google.a2ui.swing.surface.MountedNode;
 import java.awt.Component;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -45,11 +47,17 @@ class GalleryExamplesTest {
   private static final int HEIGHT = 800;
 
   private final List<URI> opened = new ArrayList<>();
-  private final A2uiServices services = A2uiServices.DEFAULT.withUrlOpener(opened::add);
+  private final A2uiServices services = Headless.services().withUrlOpener(opened::add);
 
   private static List<Component> placeholders(Component root) {
     return Headless.find(
         root, component -> Placeholders.COMPONENT_NAME.equals(component.getName()));
+  }
+
+  /** Tells if the tree that a surface shows has a component of one of some types. */
+  private static boolean shows(MountedNode node, Collection<String> types) {
+    return types.contains(node.node().type())
+        || node.children().stream().anyMatch(child -> shows(child, types));
   }
 
   @Test
@@ -130,7 +138,10 @@ class GalleryExamplesTest {
         assertEquals(0, placeholders.size(), "a complete example has no placeholder");
         assertTrue(gallery.surfaceColumn().absentText().startsWith("Each component"));
       } else {
-        assertFalse(placeholders.isEmpty(), "an absent view shows as a placeholder");
+        // The content of a modal that is not open is not in the tree of the surface.
+        if (shows(surface.viewTree().orElseThrow(), example.absentViews())) {
+          assertFalse(placeholders.isEmpty(), "an absent view shows as a placeholder");
+        }
         for (String type : example.absentViews()) {
           assertTrue(gallery.surfaceColumn().absentText().contains(type), type);
         }

@@ -18,7 +18,6 @@ package com.google.a2ui.samples.swing;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.a2ui.swing.surface.A2uiServices;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -65,7 +64,7 @@ class GallerySnapshotTest {
   @Test
   void theSurfaceColumnOfEachSelectedExamplePaints() {
     Headless.onEdt(() -> {
-      gallery = new GalleryPanel(Headless.examples(), A2uiServices.DEFAULT);
+      gallery = new GalleryPanel(Headless.examples(), Headless.services());
       Headless.mount(gallery.component(), 1280, 800);
     });
 
@@ -77,7 +76,7 @@ class GallerySnapshotTest {
   @Test
   void theThreeColumnsPaint() {
     Headless.onEdt(() -> {
-      gallery = new GalleryPanel(Headless.examples(), A2uiServices.DEFAULT);
+      gallery = new GalleryPanel(Headless.examples(), Headless.services());
       Headless.mount(gallery.component(), 1280, 800);
     });
 

@@ -41,6 +41,7 @@ import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.A2uiSwing;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Headless;
+import com.google.a2ui.swing.testing.TestImageLoader;
 import com.google.a2ui.swing.testing.TestModalPresenter;
 import java.awt.Component;
 import java.awt.Container;
@@ -98,9 +99,15 @@ final class AdapterSession {
   /** The modals that the views of the surface opened. A case has no window for a dialog. */
   final TestModalPresenter modals = new TestModalPresenter();
 
+  /** The image loader of the session. It gives a pattern image for each URL, with no network. */
+  final TestImageLoader images = TestImageLoader.patterns();
+
   /** The services of the catalog and of the surface. */
   private final A2uiServices services =
-      A2uiServices.DEFAULT.withUrlOpener(opened::add).withModalPresenter(modals);
+      A2uiServices.DEFAULT
+          .withUrlOpener(opened::add)
+          .withModalPresenter(modals)
+          .withImageLoader(images);
 
   final MessageProcessor<SwingComponentImplementation> processor;
 
@@ -290,7 +297,7 @@ final class AdapterSession {
 
   /**
    * Gets the value of a property that a view of the basic catalog shows: the name of the shape of
-   * an {@code Icon}.
+   * an {@code Icon}, or the URL that a media view accepted.
    *
    * @param control the Swing component that has the accessibility attributes of the view
    * @param property the name of the property
@@ -300,6 +307,9 @@ final class AdapterSession {
     return switch (property) {
       case "name" ->
           Optional.ofNullable(control.getClientProperty(SwingBasicCatalog.ICON_NAME_PROPERTY));
+      case "url" ->
+          Optional.ofNullable(control.getClientProperty(SwingBasicCatalog.MEDIA_URL_PROPERTY))
+              .map(String::valueOf);
       default -> Optional.empty();
     };
   }

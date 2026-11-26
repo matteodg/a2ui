@@ -52,6 +52,8 @@ import java.util.function.Function;
  *   <tr><th>Component</th><th>Swing component</th></tr>
  *   <tr><td>{@code Text}</td><td>The view of the {@code markdown} service. The default is a {@code
  *       JEditorPane} that shows the Markdown subset.</td></tr>
+ *   <tr><td>{@code Image}</td><td>A component that paints the image of the {@code imageLoader}
+ *       service</td></tr>
  *   <tr><td>{@code Icon}</td><td>A component that paints a shape of the module, or the SVG path
  *       data of the agent</td></tr>
  *   <tr><td>{@code Row}, {@code Column}</td><td>{@link FlexPanel}</td></tr>
@@ -98,6 +100,14 @@ public final class SwingBasicCatalog {
    */
   public static final String ICON_NAME_PROPERTY = "a2ui.basic.iconName";
 
+  /**
+   * The key of the client property that has the URL that the view of an {@code Image}, a {@code
+   * Video} or an {@code AudioPlayer} shows. The Swing component is the {@code
+   * accessibleComponent()} of the view. The value is a {@code java.net.URI}. The property is absent
+   * if the component has no URL or if its URL is not safe. See {@code MediaUrls}.
+   */
+  public static final String MEDIA_URL_PROPERTY = "a2ui.basic.mediaUrl";
+
   /** The function that makes the view of each component that has one, in the catalog sequence. */
   private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS = views();
 
@@ -106,6 +116,7 @@ public final class SwingBasicCatalog {
   private static Map<String, Function<ViewContext, SwingComponentView>> views() {
     Map<String, Function<ViewContext, SwingComponentView>> views = new LinkedHashMap<>();
     views.put("Text", TextView::new);
+    views.put("Image", ImageView::new);
     views.put("Icon", IconView::new);
     views.put("Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL));
     views.put("Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));

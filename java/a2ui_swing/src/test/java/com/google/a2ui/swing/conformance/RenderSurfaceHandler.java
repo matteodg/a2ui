@@ -30,6 +30,7 @@ import com.google.a2ui.core.resolution.ValidationSeverity;
 import com.google.a2ui.core.state.RendererAction;
 import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.surface.MountedNode;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -465,6 +466,12 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
             expected.get(property),
             AdapterSession.basicProperty(session.control(actual), property).get(),
             property + " of " + at);
+        if (property.equals("url")
+            && node.type().equals("Image")
+            && !session.images.requests.contains(
+                URI.create(String.valueOf(expected.get(property))))) {
+          throw new AssertionError("The view did not ask the image loader for 'url' of " + at);
+        }
         continue;
       }
       if (expected.containsKey(property)) {
