@@ -217,6 +217,37 @@ public final class ComponentGraph {
     }
   }
 
+  /**
+   * Tells if the composition constraints permit a component below a parent. The method examines the
+   * {@code allowedParents} of the child and the {@code allowedChildren} of the parent.
+   *
+   * @param parent the component that refers to the child
+   * @param child the component that the parent refers to
+   * @return true if the two catalogs permit the pair
+   */
+  static boolean permits(Node parent, Node child) {
+    List<String> allowedChildren =
+        parent.api() == null ? null : parent.api().allowedChildren().orElse(null);
+    return permitsParent(child, parent.type())
+        && (allowedChildren == null || allowedChildren.contains(child.type()));
+  }
+
+  /**
+   * Tells if the composition constraints permit a component as the root of a surface.
+   *
+   * @param root the root component
+   * @return true if the catalog of the component permits the surface as its parent
+   */
+  static boolean permitsSurface(Node root) {
+    return permitsParent(root, SURFACE);
+  }
+
+  private static boolean permitsParent(Node child, String parentType) {
+    List<String> allowedParents =
+        child.api() == null ? null : child.api().allowedParents().orElse(null);
+    return allowedParents == null || allowedParents.contains(parentType);
+  }
+
   private static void checkParent(Node child, String parentId, String parentType) {
     List<String> allowedParents =
         child.api() == null ? null : child.api().allowedParents().orElse(null);

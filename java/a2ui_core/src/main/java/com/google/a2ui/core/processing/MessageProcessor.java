@@ -35,6 +35,7 @@ import com.google.a2ui.core.internal.CatalogChecks;
 import com.google.a2ui.core.internal.CatalogSchemaIndex;
 import com.google.a2ui.core.internal.ComponentGraph;
 import com.google.a2ui.core.internal.ErrorFields;
+import com.google.a2ui.core.internal.GraphUpdateCheck;
 import com.google.a2ui.core.internal.Json;
 import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.resolution.DataContext;
@@ -60,6 +61,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
@@ -141,6 +143,12 @@ public final class MessageProcessor<C extends ComponentApi> {
   private final RpcHandler rpc;
   private final Map<Catalog<?, ?>, CatalogChecks> checks = new IdentityHashMap<>();
   private final Map<Catalog<?, ?>, CatalogSchemaIndex> indexes = new IdentityHashMap<>();
+
+  /**
+   * The object that examines the component graph of each surface. A surface that the program does
+   * not use any more leaves the map.
+   */
+  private final Map<SurfaceModel<C>, GraphUpdateCheck> graphChecks = new WeakHashMap<>();
 
   /**
    * Makes a processor that uses {@link ValidationConfig#STRICT}.
@@ -857,13 +865,13 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
     // All the checks are complete. Thus the surface becomes visible fully or not at all.
     model.addSurface(surface);
-    apply(surface, planned);
+    write(surface, planned);
   }
 
   private void updateComponents(Map<String, Object> body, ValidationConfig config) {
     SurfaceModel<C> surface = existingSurface((String) body.get("surfaceId"));
     List<Planned> planned = plan(surface, (List<?>) body.get("components"), config);
-    Reactive.batch(() -> apply(surface, planned));
+    Reactive.batch(() -> write(surface, planned));
   }
 
   private void updateDataModel(Map<String, Object> body) {
@@ -952,7 +960,18 @@ public final class MessageProcessor<C extends ComponentApi> {
       throw invalidComponents(surface, planned, problems);
     }
     if (config != null) {
-      ComponentGraph.validate(candidateGraph(surface, planned), surface.rootId(), config);
+      List<ComponentGraph.Node> update = new ArrayList<>(planned.size());
+      for (int position = 0; position < planned.size(); position++) {
+        Planned entry = planned.get(position);
+        update.add(
+            node(
+                entry.id(),
+                entry.type(),
+                entry.catalog(),
+                entry.normalized(),
+                OptionalInt.of(position)));
+      }
+      graphCheckFor(surface).validate(update, surface.rootId(), config);
     }
     return planned;
   }
@@ -1174,32 +1193,36 @@ public final class MessageProcessor<C extends ComponentApi> {
     }
   }
 
-  /** Makes the graph that the surface has after the processor writes the planned components. */
-  private Map<String, ComponentGraph.Node> candidateGraph(
-      SurfaceModel<C> surface, List<Planned> planned) {
-    Map<String, ComponentGraph.Node> nodes = new LinkedHashMap<>();
-    for (ComponentModel existing : surface.componentsModel().all().values()) {
-      nodes.put(
-          existing.id(),
-          node(
-              existing.id(),
-              existing.type(),
-              existing.catalog(),
-              existing.properties(),
-              OptionalInt.empty()));
+  /**
+   * Gets the object that examines the component graph of a surface for each update. It keeps the
+   * result of an examination. Thus it does not read the full surface for each small update.
+   */
+  private GraphUpdateCheck graphCheckFor(SurfaceModel<C> surface) {
+    return graphChecks.computeIfAbsent(
+        surface,
+        key ->
+            new GraphUpdateCheck(
+                key.componentsModel(),
+                existing ->
+                    node(
+                        existing.id(),
+                        existing.type(),
+                        existing.catalog(),
+                        existing.properties(),
+                        OptionalInt.empty())));
+  }
+
+  /**
+   * Writes the planned components. If the processor examined their graph, the object that examined
+   * it follows the write.
+   */
+  private void write(SurfaceModel<C> surface, List<Planned> planned) {
+    GraphUpdateCheck check = graphChecks.get(surface);
+    if (check == null) {
+      apply(surface, planned);
+    } else {
+      check.apply(() -> apply(surface, planned));
     }
-    for (int position = 0; position < planned.size(); position++) {
-      Planned entry = planned.get(position);
-      nodes.put(
-          entry.id(),
-          node(
-              entry.id(),
-              entry.type(),
-              entry.catalog(),
-              entry.normalized(),
-              OptionalInt.of(position)));
-    }
-    return nodes;
   }
 
   private ComponentGraph.Node node(
