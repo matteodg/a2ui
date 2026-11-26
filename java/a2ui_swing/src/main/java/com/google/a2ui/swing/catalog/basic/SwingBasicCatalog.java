@@ -65,6 +65,7 @@ import java.util.function.Function;
  *   <tr><td>{@code CheckBox}</td><td>{@code JCheckBox}</td></tr>
  *   <tr><td>{@code ChoicePicker}</td><td>{@code JRadioButton}, {@code JCheckBox} or {@code
  *       JToggleButton} for each option</td></tr>
+ *   <tr><td>{@code Slider}</td><td>{@code JSlider}</td></tr>
  * </table>
  *
  * <p>Each other component of the catalog document has an implementation with no view. See {@link
@@ -103,6 +104,7 @@ public final class SwingBasicCatalog {
     views.put("TextField", TextFieldView::new);
     views.put("CheckBox", CheckBoxView::new);
     views.put("ChoicePicker", ChoicePickerView::new);
+    views.put("Slider", SliderView::new);
     return Collections.unmodifiableMap(views);
   }
 

@@ -43,6 +43,7 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
+import javax.swing.JSlider;
 import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 import javax.swing.text.JTextComponent;
@@ -54,8 +55,9 @@ import javax.swing.text.JTextComponent;
  * reads each expectation from the mounted Swing components where a component shows the value: the
  * text of a text component, the value of a control, the messages of the checks, the state of a
  * button. A step operates the Swing control: it sets the text of a text field, it clicks a button,
- * a check box or the options of a choice picker, and it selects a tab of a tabbed pane. The value
- * of an option is its action command.
+ * a check box or the options of a choice picker, it sets the accessible value of a slider, and it
+ * selects a tab of a tabbed pane. The value of an option is its action command, and the value of a
+ * slider is its accessible value.
  *
  * <p>An input step for a component type that has no view in this version fails. The registry skips
  * the cases that need such a component.
@@ -271,6 +273,22 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       }
       return;
     }
+    if (node.node().type().equals("Slider") && session.control(node) instanceof JSlider slider) {
+      // The accessible value of the slider is the number of the component. An assistive tool
+      // moves the slider with it, as the user does with the mouse or with the keys.
+      if (!(value instanceof Number number)) {
+        throw new AssertionError(where + ": '" + value + "' is not a number.");
+      }
+      session.gesture = true;
+      try {
+        if (!slider.getAccessibleContext().getAccessibleValue().setCurrentAccessibleValue(number)) {
+          throw new AssertionError(where + ": the slider did not accept " + number);
+        }
+      } finally {
+        session.gesture = false;
+      }
+      return;
+    }
     if (node.node().type().equals("Tabs") && session.control(node) instanceof JTabbedPane tabs) {
       // The input value of a Tabs component is the index of the tab that the user selects.
       if (!(value instanceof Number index)
@@ -476,6 +494,9 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
     if (control instanceof JCheckBox box) {
       return box.isSelected();
+    }
+    if (control instanceof JSlider slider) {
+      return slider.getAccessibleContext().getAccessibleValue().getCurrentAccessibleValue();
     }
     if (actual.node().type().equals("ChoicePicker")) {
       // The value of a picker is the list of the values of the selected options.
