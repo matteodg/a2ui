@@ -26,6 +26,7 @@ import com.google.a2ui.core.basic_catalog.v1_0.BasicCatalog;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.SchemaReferences;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -259,6 +260,31 @@ class ValidationSchemaTest {
     A2uiCatalogError error = assertThrows(A2uiCatalogError.class, catalog::validationSchema);
 
     assertTrue(error.getMessage().contains("unknown common type 'Missing'"), error.getMessage());
+  }
+
+  @Test
+  void aLocalReferenceToACommonTypeGetsTheDefinitionOfTheType() {
+    Catalog<ComponentApi, FunctionApi> catalog =
+        load(
+            """
+            {
+              "components": {
+                "Box": {
+                  "allOf": [{"$ref": "#/$defs/Checkable"}],
+                  "properties": {"label": {"$ref": "#/$defs/DynamicString"}}
+                }
+              }
+            }
+            """);
+
+    Map<String, Object> schema = catalog.validationSchema();
+
+    Map<String, Object> properties =
+        Json.asObject(entry(schema, "components", "Box").get("properties"));
+    assertTrue(properties.containsKey("@checks"));
+    assertEquals(
+        SchemaReferences.commonTypes().get("DynamicString"),
+        Json.asObject(schema.get("$defs")).get("DynamicString"));
   }
 
   /** Loads a v1.0 catalog document that has the given members and the ID {@code urn:test}. */

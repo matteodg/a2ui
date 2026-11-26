@@ -184,6 +184,17 @@ class CatalogTest {
   }
 
   @Test
+  void aLocalReferenceCanNameACommonType() {
+    Map<String, Object> component =
+        Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/DynamicString")));
+    Map<String, Object> inside =
+        Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/Action/properties/event")));
+
+    assertEquals(1, load("components", Map.of("Text", component)).components().size());
+    assertThrows(A2uiCatalogError.class, () -> load("components", Map.of("Text", inside)));
+  }
+
+  @Test
   void aLocalReferenceCanNameAnItemOfAList() {
     Map<String, Object> component =
         Map.of(

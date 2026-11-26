@@ -20,6 +20,7 @@ import com.google.a2ui.core.common.Uax31;
 import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.SchemaReferences;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,8 @@ final class CatalogDocumentRules {
 
   private static final int MAX_REF_DEPTH = 64;
 
+  private static final String DEFINITIONS_PREFIX = "#/$defs/";
+
   private CatalogDocumentRules() {}
 
   /**
@@ -48,7 +51,8 @@ final class CatalogDocumentRules {
    * @throws A2uiCatalogError for one of these conditions:
    *     <ul>
    *       <li>A {@code $ref} goes out of the document and does not name {@code common_types.json}.
-   *       <li>A local {@code $ref} names nothing.
+   *       <li>A local {@code $ref} names nothing in the document and is not {@code #/$defs/<Name>}
+   *           for a common type.
    *       <li>A name is not a UAX #31 identifier.
    *       <li>A function name starts with {@code @}. The protocol keeps these names.
    *       <li>A function requires user activation and lets the agent call it.
@@ -120,7 +124,7 @@ final class CatalogDocumentRules {
 
   private static void checkRef(String ref, Map<String, Object> document, String path, String id) {
     if (ref.startsWith("#")) {
-      if (ref.length() > 1 && resolveLocal(ref, document) == null) {
+      if (ref.length() > 1 && resolveLocal(ref, document) == null && !namesCommonType(ref)) {
         throw new A2uiCatalogError(
             "Catalog '" + id + "' has a $ref '" + ref + "' at " + path + " that names nothing.");
       }
@@ -140,6 +144,15 @@ final class CatalogDocumentRules {
               + id
               + "': a v1.0 catalog may only reference itself (#/...) or common_types.json.");
     }
+  }
+
+  /**
+   * Tells if a reference is {@code #/$defs/<Name>} and the name is a common type. A catalog can
+   * write a common type in this form, and the validation schema supplies the definition.
+   */
+  private static boolean namesCommonType(String ref) {
+    return ref.startsWith(DEFINITIONS_PREFIX)
+        && SchemaReferences.commonTypes().containsKey(ref.substring(DEFINITIONS_PREFIX.length()));
   }
 
   /**
