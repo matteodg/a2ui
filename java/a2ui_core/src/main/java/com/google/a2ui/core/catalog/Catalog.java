@@ -62,6 +62,9 @@ public final class Catalog<C extends ComponentApi, F extends FunctionApi> {
   private final Map<String, F> functions;
   private final DocumentLayout layout;
 
+  /** The result of {@link #validationSchema()}, or null before the first call. */
+  private Map<String, Object> validationSchema;
+
   /**
    * Makes a catalog that has components only, and that declares no protocol version.
    *
@@ -344,6 +347,45 @@ public final class Catalog<C extends ComponentApi, F extends FunctionApi> {
       document.put("$defs", Collections.unmodifiableMap(definitions));
     }
     return Collections.unmodifiableMap(document);
+  }
+
+  /**
+   * Gets the catalog as one self-contained JSON Schema document. A validator can use this schema
+   * and no other document.
+   *
+   * <p>The schema is not the document that {@link #toJson()} writes:
+   *
+   * <ul>
+   *   <li>Each {@code $ref} is local.
+   *   <li>Each component is one object schema. Its {@code properties} and its {@code required} have
+   *       the content of the {@code allOf} mixins of the component, and the {@code id} that each
+   *       component has.
+   *   <li>{@code $defs} has the definitions of the catalog, the unions {@code anyComponent} and
+   *       {@code anyFunction}, and each common type that the schema uses.
+   *   <li>The theme of the catalog is {@code $defs.theme}.
+   *   <li>The {@code args} of a function accept only the arguments that they list, unless the
+   *       function says differently.
+   * </ul>
+   *
+   * <p>The catalog makes the schema at the first call. Each subsequent call returns the same
+   * object.
+   *
+   * @return the schema as plain JSON values. It is read-only.
+   * @throws A2uiCatalogError if the catalog is not a v1.0 catalog, if it refers to a common type
+   *     that does not exist, or if its {@code $defs} has the name of a common type that the schema
+   *     uses
+   */
+  public Map<String, Object> validationSchema() {
+    if (validationSchema == null) {
+      validationSchema =
+          ValidationSchemaBuilder.build(
+              id,
+              protocolVersion,
+              toJson(),
+              componentUnion(components.keySet()),
+              functionUnion(functions.keySet()));
+    }
+    return validationSchema;
   }
 
   /**
