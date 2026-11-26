@@ -216,6 +216,27 @@ class FlexLayoutTest {
   }
 
   @Test
+  void aComponentWithTheStretchPropertyFillsTheCrossAxisWithEachAlign() {
+    b.putClientProperty(FlexLayout.STRETCH_PROPERTY, Boolean.TRUE);
+
+    row(Justify.START, Align.CENTER, 0);
+
+    assertBounds(
+        new Rectangle(0, 40, 50, 20),
+        new Rectangle(50, 0, 70, 100),
+        new Rectangle(120, 45, 30, 10));
+
+    FlexLayout column = new FlexLayout(Axis.VERTICAL, Justify.START, Align.END, 0);
+    JPanel panel = layout(column, 100, 300);
+
+    assertBounds(
+        new Rectangle(50, 0, 50, 20), new Rectangle(0, 20, 100, 30), new Rectangle(70, 50, 30, 10));
+    // The property does not change the preferred size of the container.
+    assertEquals(new Dimension(70, 60), column.preferredLayoutSize(panel));
+    assertEquals(60, column.preferredHeight(panel, 100));
+  }
+
+  @Test
   void aComponentThatIsLargerThanTheCrossAxisGetsTheCrossAxis() {
     layout(new FlexLayout(Axis.HORIZONTAL, Justify.START, Align.CENTER, 0), 300, 24);
 

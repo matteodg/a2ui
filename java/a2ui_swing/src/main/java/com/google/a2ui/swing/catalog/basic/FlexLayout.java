@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.WeakHashMap;
 import java.util.function.Function;
+import javax.swing.JComponent;
 
 /**
  * A layout that puts the components of a container in one line, for the {@code Row}, {@code Column}
@@ -46,7 +47,9 @@ import java.util.function.Function;
  *       size on the main axis has no effect then.
  *   <li>If no component has a weight, {@link Justify} tells where the free space of the main axis
  *       goes.
- *   <li>{@link Align} gives the position and the size of each component on the cross axis.
+ *   <li>{@link Align} gives the position and the size of each component on the cross axis. A
+ *       component that has the client property {@link #STRETCH_PROPERTY} always fills the cross
+ *       axis.
  *   <li>If the container is too small, the layout makes the components without a weight smaller,
  *       down to their minimum size. Then the components that have a weight get no space.
  * </ul>
@@ -175,6 +178,14 @@ public final class FlexLayout implements LayoutManager2 {
       return find(values(), Align::wireValue, value);
     }
   }
+
+  /**
+   * The key of the client property of a {@code JComponent} that always fills the cross axis. The
+   * value is {@code Boolean.TRUE}. Such a component ignores the {@link Align} of the layout, as an
+   * element with {@code align-self: stretch} does in CSS. A divider uses it: its line always has
+   * the size of its container.
+   */
+  public static final String STRETCH_PROPERTY = "a2ui.flex.stretch";
 
   /** The weight of each component that has one. A component that leaves the program goes away. */
   private final Map<Component, Double> weights = new WeakHashMap<>();
@@ -446,8 +457,9 @@ public final class FlexLayout implements LayoutManager2 {
       for (int i = 0; i < count; i++) {
         Component item = items.get(i);
         int position = (int) Math.round(offset);
+        boolean stretch = stretches(item);
         int crossSize;
-        if (align == Align.STRETCH) {
+        if (stretch) {
           crossSize = crossSpace;
         } else if (horizontal) {
           // The height of a component can depend on the width that it got on the main axis.
@@ -456,11 +468,13 @@ public final class FlexLayout implements LayoutManager2 {
           crossSize = crossSizeOfWidth(item, crossSpace);
         }
         int crossPosition =
-            switch (align) {
-              case START, STRETCH -> 0;
-              case CENTER -> (crossSpace - crossSize) / 2;
-              case END -> crossSpace - crossSize;
-            };
+            stretch
+                ? 0
+                : switch (align) {
+                  case START, STRETCH -> 0;
+                  case CENTER -> (crossSpace - crossSize) / 2;
+                  case END -> crossSpace - crossSize;
+                };
         if (horizontal) {
           int x =
               mirror
@@ -540,9 +554,14 @@ public final class FlexLayout implements LayoutManager2 {
    * @param innerWidth the width of the container without the insets
    */
   private int crossSizeOfWidth(Component item, int innerWidth) {
+    return stretches(item) ? innerWidth : Math.min(item.getPreferredSize().width, innerWidth);
+  }
+
+  /** Tells if a component fills the cross axis. See {@link #STRETCH_PROPERTY}. */
+  private boolean stretches(Component item) {
     return align == Align.STRETCH
-        ? innerWidth
-        : Math.min(item.getPreferredSize().width, innerWidth);
+        || item instanceof JComponent swing
+            && Boolean.TRUE.equals(swing.getClientProperty(STRETCH_PROPERTY));
   }
 
   /** Gets the preferred height of a component at a width. */
