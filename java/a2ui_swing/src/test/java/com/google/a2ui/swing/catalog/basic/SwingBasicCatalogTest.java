@@ -50,7 +50,22 @@ import javax.swing.JLabel;
 import org.junit.jupiter.api.Test;
 
 class SwingBasicCatalogTest {
-  private static final Set<String> VIEWS = Set.of("Text", "Row", "Column", "Button", "TextField");
+  private static final Set<String> VIEWS =
+      Set.of("Text", "Row", "Column", "Card", "Button", "TextField");
+
+  /**
+   * Makes the catalog with one component that only declares its type. Thus the tests of a component
+   * with no view do not depend on the list of the views of this version.
+   */
+  private static Catalog<SwingComponentImplementation, FunctionImplementation> catalogWithoutViewOf(
+      String name) {
+    List<SwingComponentImplementation> components = new ArrayList<>(SwingBasicCatalog.components());
+    components.replaceAll(implementation ->
+        implementation.name().equals(name)
+            ? SwingComponentImplementation.withoutView(implementation)
+            : implementation);
+    return SwingBasicCatalog.create().withComponents(components);
+  }
 
   /** Makes a surface with the catalog and mounts it. */
   private static A2uiSurface mount(
@@ -147,7 +162,7 @@ class SwingBasicCatalogTest {
     Edt.run(() -> {
       A2uiSurface view =
           mount(
-              SwingBasicCatalog.create(),
+              catalogWithoutViewOf("Card"),
               A2uiFallbacks.NONE,
               component("root", "Column", "children", List.of("first", "card", "last")),
               component("first", "Text", "text", "first"),
@@ -173,7 +188,7 @@ class SwingBasicCatalogTest {
       List<A2uiErrorInfo> infos = new ArrayList<>();
       A2uiSurface view =
           mount(
-              SwingBasicCatalog.create(),
+              catalogWithoutViewOf("Divider"),
               A2uiFallbacks.NONE.withError(info -> {
                 infos.add(info);
                 return new JLabel("no view for " + info.error().componentType().orElse("?"));

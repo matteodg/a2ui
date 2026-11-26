@@ -122,11 +122,15 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
           "catalogPaths in " + location);
     }
     // A case that does not ask for the strict checks changes its components in steps. Then a
-    // component can be an orphan for a time.
+    // component can be an orphan for a time. A case that has no value shows what a surface
+    // has, also a cycle. The processor accepts a cycle only with no configuration, and then the
+    // node resolver reports it.
     ValidationConfig config =
-        Boolean.TRUE.equals(fields.get("strictMode"))
-            ? ValidationConfig.STRICT
-            : ValidationConfig.RELAXED;
+        switch (fields.get("strictMode")) {
+          case null -> null;
+          case Boolean strict -> strict ? ValidationConfig.STRICT : ValidationConfig.RELAXED;
+          default -> throw new AssertionError("strictMode in " + location + " is not a boolean.");
+        };
     AdapterSession session = new AdapterSession(location, fields.get("catalogs"), config);
     List<Object> steps = asList(fields.get("steps"), "steps in " + location);
     for (int i = 0; i < steps.size(); i++) {

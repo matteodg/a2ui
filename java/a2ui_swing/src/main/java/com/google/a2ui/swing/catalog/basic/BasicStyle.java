@@ -123,6 +123,21 @@ final class BasicStyle {
   }
 
   /**
+   * Gets the color of a thin line that groups or divides content, for example the outline of a
+   * card. It is the border color of the look and feel. If the look and feel has none, it is a color
+   * between the text color and the background color of the component.
+   *
+   * @param component the component that paints the line
+   * @return the color
+   */
+  static Color outline(Component component) {
+    return lookAndFeelColor(
+        mix(foregroundOf(component), backgroundOf(component), 0.7),
+        "Component.borderColor",
+        "controlShadow");
+  }
+
+  /**
    * Gets the accent color of the look and feel. A primary button has this background.
    *
    * @return the color
