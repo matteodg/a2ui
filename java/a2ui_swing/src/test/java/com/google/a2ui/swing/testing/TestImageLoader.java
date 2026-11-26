@@ -79,7 +79,8 @@ public final class TestImageLoader implements ImageLoader {
   /**
    * Makes a loader that answers each request during the call of {@code load}.
    *
-   * @param answers gives the image for a URL, or an empty result for a failure
+   * @param answers gives the image for a URL, an empty result for a failure, or null to give no
+   *     answer
    * @return the loader
    */
   public static TestImageLoader answering(Function<URI, Optional<Image>> answers) {
@@ -89,14 +90,17 @@ public final class TestImageLoader implements ImageLoader {
   /**
    * Makes a loader that answers each request with a pattern image. The URL selects the size: a URL
    * that contains {@code tall} gives 200 x 400 pixels, a URL that contains {@code square} gives 300
-   * x 300 pixels, a URL that contains {@code fail} gives no image, and each other URL gives 400 x
-   * 200 pixels.
+   * x 300 pixels, a URL that contains {@code fail} gives no image, a URL that contains {@code
+   * pending} gets no answer, and each other URL gives 400 x 200 pixels.
    *
    * @return the loader
    */
   public static TestImageLoader patterns() {
     return answering(uri -> {
       String text = uri.toString();
+      if (text.contains("pending")) {
+        return null;
+      }
       if (text.contains("fail")) {
         return Optional.empty();
       }
@@ -112,9 +116,10 @@ public final class TestImageLoader implements ImageLoader {
     requests.add(uri);
     Request request = new Request(uri, onResult);
     all.add(request);
-    if (answers != null) {
+    Optional<Image> answer = answers == null ? null : answers.apply(uri);
+    if (answer != null) {
       request.answered = true;
-      onResult.accept(answers.apply(uri));
+      onResult.accept(answer);
     }
     return () -> {
       if (!request.cancelled) {

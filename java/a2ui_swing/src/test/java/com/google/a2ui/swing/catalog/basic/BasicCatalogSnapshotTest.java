@@ -115,6 +115,22 @@ class BasicCatalogSnapshotTest {
    */
   private static final List<String> WIDE_EXAMPLES = List.of("task-card");
 
+  /** The width of the sheet of the icons. */
+  private static final int ICON_SHEET = 720;
+
+  /** The examples that show the media components. */
+  private static final List<String> MEDIA_EXAMPLES =
+      List.of(
+          "contact-card",
+          "flight-status",
+          "recipe-card",
+          "movie-card",
+          "podcast-episode",
+          "product-card",
+          "user-profile",
+          "stats-card",
+          "financial-data-grid");
+
   private static final String LONG_TEXT =
       "This text is long. It does not fit in one line of the surface, and thus it breaks at the"
           + " width that its container gives it.";
@@ -425,6 +441,330 @@ class BasicCatalogSnapshotTest {
         component("link_modal", "Modal", "trigger", "link", "content", "link_content"),
         text("link", "*More information*"),
         text("link_content", "The information"));
+  }
+
+  private static final String WIDE_IMAGE = "https://example.com/wide.png";
+  private static final String TALL_IMAGE = "https://example.com/tall.png";
+
+  /** Makes a sheet with each icon of the catalog and its name below it. */
+  private static List<Object> iconSheet() {
+    List<Object> components = new ArrayList<>();
+    List<String> rows = new ArrayList<>();
+    List<String> names = IconShapesTest.catalogNames();
+    int columns = 6;
+    for (int start = 0; start < names.size(); start += columns) {
+      String row = "row" + start;
+      rows.add(row);
+      List<String> cells = new ArrayList<>();
+      for (int i = start; i < start + columns; i++) {
+        String cell = "cell" + i;
+        cells.add(cell);
+        if (i >= names.size()) {
+          // An empty cell keeps the columns of the last row in their positions.
+          components.add(component(cell, "Column", "children", List.of(), "weight", 1));
+          continue;
+        }
+        String name = names.get(i);
+        components.add(
+            component(
+                cell,
+                "Column",
+                "children",
+                List.of(name + "_icon", name + "_name"),
+                "align",
+                "center",
+                "weight",
+                1));
+        components.add(component(name + "_icon", "Icon", "name", name));
+        components.add(text(name + "_name", name, "variant", "caption"));
+      }
+      components.add(component(row, "Row", "children", cells));
+    }
+    components.add(0, component("root", "Column", "children", rows));
+    return components;
+  }
+
+  private static List<Object> iconUses() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of("buttons", "line", "path_row", "unknown_row", "card")),
+        component(
+            "buttons",
+            "Row",
+            "children",
+            List.of("primary", "plain", "link", "off"),
+            "align",
+            "center"),
+        button("primary", "primary_content", "variant", "primary"),
+        component(
+            "primary_content",
+            "Row",
+            "children",
+            List.of("primary_icon", "primary_text"),
+            "align",
+            "center"),
+        component("primary_icon", "Icon", "name", "send"),
+        text("primary_text", "Send"),
+        button("plain", "plain_icon"),
+        component("plain_icon", "Icon", "name", "refresh"),
+        button("link", "link_content", "variant", "borderless"),
+        component(
+            "link_content",
+            "Row",
+            "children",
+            List.of("link_icon", "link_text"),
+            "align",
+            "center"),
+        component("link_icon", "Icon", "name", "download"),
+        text("link_text", "Download"),
+        component(
+            "off",
+            "Button",
+            "child",
+            "off_icon",
+            "action",
+            event("off"),
+            "checks",
+            List.of(check(path("/complete"), "The form is not complete."))),
+        component("off_icon", "Icon", "name", "delete"),
+        component("line", "Divider"),
+        component(
+            "path_row", "Row", "children", List.of("path_icon", "path_text"), "align", "center"),
+        component(
+            "path_icon",
+            "Icon",
+            "name",
+            Map.of("svgPath", "M12 2 L22 12 L12 22 L2 12 Z M12 7 L7 12 L12 17 L17 12 Z")),
+        text("path_text", "An icon from the SVG path data of the agent: a diamond with a hole."),
+        component(
+            "unknown_row",
+            "Row",
+            "children",
+            List.of("unknown_icon", "unknown_text"),
+            "align",
+            "center"),
+        component("unknown_icon", "Icon", "name", path("/unknown")),
+        text("unknown_text", "A name that the catalog does not have shows the shape of help."),
+        component("card", "Card", "child", "card_row"),
+        component(
+            "card_row",
+            "Row",
+            "children",
+            List.of("card_icon", "card_text", "card_more"),
+            "align",
+            "center"),
+        component("card_icon", "Icon", "name", "accountCircle"),
+        object("id", "card_text", "component", "Text", "text", LONG_TEXT, "weight", 1),
+        component("card_more", "Icon", "name", "moreVert"));
+  }
+
+  /** Makes a surface with a wide image and a tall image for each variant. */
+  private static List<Object> imageVariants() {
+    List<Object> components = new ArrayList<>();
+    List<String> ids = new ArrayList<>();
+    for (String variant :
+        List.of("icon", "avatar", "smallFeature", "mediumFeature", "largeFeature", "header")) {
+      ids.add(variant + "_title");
+      components.add(text(variant + "_title", "variant: `" + variant + "`", "variant", "caption"));
+      if (List.of("icon", "avatar", "smallFeature").contains(variant)) {
+        ids.add(variant + "_row");
+        components.add(
+            component(
+                variant + "_row",
+                "Row",
+                "children",
+                List.of(variant + "_wide", variant + "_tall")));
+      } else {
+        ids.add(variant + "_wide");
+        ids.add(variant + "_tall");
+      }
+      components.add(
+          component(
+              variant + "_wide",
+              "Image",
+              "url",
+              WIDE_IMAGE,
+              "variant",
+              variant,
+              "description",
+              "A wide image"));
+      components.add(component(variant + "_tall", "Image", "url", TALL_IMAGE, "variant", variant));
+    }
+    components.add(0, component("root", "Column", "children", ids));
+    return components;
+  }
+
+  /** Makes a surface with each value of {@code fit} in the boxes that have a fixed size. */
+  private static List<Object> imageFits() {
+    List<Object> components = new ArrayList<>();
+    List<String> ids = new ArrayList<>();
+    for (String fit : List.of("contain", "cover", "fill", "none", "scaleDown")) {
+      ids.add(fit + "_title");
+      ids.add(fit + "_row");
+      ids.add(fit + "_header");
+      components.add(text(fit + "_title", "fit: `" + fit + "`", "variant", "caption"));
+      List<String> small = new ArrayList<>();
+      for (String variant : List.of("avatar", "icon")) {
+        for (String[] image : new String[][] {{"wide", WIDE_IMAGE}, {"tall", TALL_IMAGE}}) {
+          String id = fit + "_" + variant + "_" + image[0];
+          small.add(id);
+          components.add(component(id, "Image", "url", image[1], "variant", variant, "fit", fit));
+        }
+      }
+      components.add(component(fit + "_row", "Row", "children", small, "align", "center"));
+      components.add(
+          component(
+              fit + "_header",
+              "Image",
+              "url",
+              fit.equals("cover") ? TALL_IMAGE : WIDE_IMAGE,
+              "variant",
+              "header",
+              "fit",
+              fit));
+    }
+    ids.add("default_title");
+    ids.add("default_header");
+    components.add(
+        text(
+            "default_title",
+            "An avatar and a header with no `fit` cover their boxes.",
+            "variant",
+            "caption"));
+    ids.add(ids.size() - 1, "default_avatar");
+    components.add(component("default_avatar", "Image", "url", WIDE_IMAGE, "variant", "avatar"));
+    components.add(component("default_header", "Image", "url", TALL_IMAGE, "variant", "header"));
+    components.add(0, component("root", "Column", "children", ids));
+    return components;
+  }
+
+  /** Makes a surface with images that load, that failed, and that have no safe URL. */
+  private static List<Object> imageStates() {
+    List<Object> components = new ArrayList<>();
+    List<String> ids = new ArrayList<>();
+    for (String[] state :
+        new String[][] {
+          {"loading", "https://example.com/pending.png", "The image loads."},
+          {"failed", "https://example.com/fail.png", "The loader gave no image."},
+          {"unsafe", "file:///C:/Windows/win.ini", "The URL is not safe."}
+        }) {
+      ids.add(state[0] + "_title");
+      ids.add(state[0] + "_row");
+      ids.add(state[0] + "_medium");
+      components.add(text(state[0] + "_title", state[2], "variant", "caption"));
+      List<String> row = new ArrayList<>();
+      for (String variant : List.of("icon", "avatar", "smallFeature")) {
+        row.add(state[0] + "_" + variant);
+        components.add(
+            component(state[0] + "_" + variant, "Image", "url", state[1], "variant", variant));
+      }
+      components.add(component(state[0] + "_row", "Row", "children", row, "align", "center"));
+      components.add(component(state[0] + "_medium", "Image", "url", state[1]));
+    }
+    ids.add("header_title");
+    ids.add("header");
+    components.add(text("header_title", "A header that failed.", "variant", "caption"));
+    components.add(
+        component("header", "Image", "url", "https://example.com/fail.png", "variant", "header"));
+    components.add(0, component("root", "Column", "children", ids));
+    return components;
+  }
+
+  /** Makes a surface with the substitutes of the video and of the audio player. */
+  private static List<Object> media() {
+    return List.of(
+        component(
+            "root",
+            "Column",
+            "children",
+            List.of(
+                "video_title",
+                "video",
+                "bare_title",
+                "bare",
+                "off_title",
+                "off",
+                "audio_title",
+                "audio",
+                "long_audio",
+                "bare_audio",
+                "off_audio",
+                "row")),
+        text("video_title", "A video with a poster image.", "variant", "caption"),
+        component(
+            "video", "Video", "url", "https://example.com/intro.mp4", "posterUrl", WIDE_IMAGE),
+        text("bare_title", "A video with no poster image.", "variant", "caption"),
+        component("bare", "Video", "url", "https://example.com/intro.mp4"),
+        text("off_title", "A video with a URL that is not safe.", "variant", "caption"),
+        component("off", "Video", "url", "file:///C:/video.mp4"),
+        text("audio_title", "Audio players.", "variant", "caption"),
+        component(
+            "audio",
+            "AudioPlayer",
+            "url",
+            "https://example.com/podcast-ep1.mp3",
+            "description",
+            "Episode 1: the start"),
+        component(
+            "long_audio",
+            "AudioPlayer",
+            "url",
+            "https://example.com/podcast-ep2.mp3",
+            "description",
+            LONG_TEXT),
+        component("bare_audio", "AudioPlayer", "url", "https://example.com/podcast-ep3.mp3"),
+        component(
+            "off_audio",
+            "AudioPlayer",
+            "url",
+            "javascript:alert(1)",
+            "description",
+            "The URL of this audio is not safe."),
+        component("row", "Row", "children", List.of("row_video", "row_text")),
+        component(
+            "row_video",
+            "Video",
+            "url",
+            "https://example.com/intro.mp4",
+            "posterUrl",
+            TALL_IMAGE,
+            "weight",
+            1),
+        object("id", "row_text", "component", "Text", "text", LONG_TEXT, "weight", 1));
+  }
+
+  /** Makes a surface with a modal whose content has each media component. */
+  private static List<Object> mediaModal() {
+    return List.of(
+        component("root", "Column", "children", List.of("modal")),
+        component("modal", "Modal", "trigger", "open", "content", "content"),
+        button("open", "open_content"),
+        component(
+            "open_content",
+            "Row",
+            "children",
+            List.of("open_icon", "open_text"),
+            "align",
+            "center"),
+        component("open_icon", "Icon", "name", "photo"),
+        text("open_text", "Open the media"),
+        component("content", "Column", "children", List.of("title_row", "image", "video", "audio")),
+        component("title_row", "Row", "children", List.of("icon", "title"), "align", "center"),
+        component("icon", "Icon", "name", "star"),
+        text("title", "### Media in a modal"),
+        component("image", "Image", "url", WIDE_IMAGE, "description", "A wide image"),
+        component(
+            "video", "Video", "url", "https://example.com/intro.mp4", "posterUrl", WIDE_IMAGE),
+        component(
+            "audio",
+            "AudioPlayer",
+            "url",
+            "https://example.com/podcast-ep1.mp3",
+            "description",
+            "Episode 1"));
   }
 
   private static Map<String, Object> warning(String message) {
@@ -1041,6 +1381,19 @@ class BasicCatalogSnapshotTest {
         NARROW,
         view -> {});
     snapshot(lookAndFeel + "-inputs-modal", surfaceOf(modalInputData(), modalInputs()));
+    snapshot(lookAndFeel + "-icons", surfaceOf(Map.of(), iconSheet()), ICON_SHEET, view -> {});
+    snapshot(
+        lookAndFeel + "-icons-uses",
+        surfaceOf(Map.of("unknown", "noSuchIcon", "complete", false), iconUses()));
+    snapshot(lookAndFeel + "-images-variants", surfaceOf(Map.of(), imageVariants()));
+    snapshot(lookAndFeel + "-images-fit", surfaceOf(Map.of(), imageFits()));
+    snapshot(lookAndFeel + "-images-states", surfaceOf(Map.of(), imageStates()));
+    snapshot(lookAndFeel + "-media", surfaceOf(Map.of(), media()));
+    snapshot(lookAndFeel + "-media-narrow", surfaceOf(Map.of(), media()), NARROW, view -> {});
+    snapshot(lookAndFeel + "-media-modal", surfaceOf(Map.of(), mediaModal()));
+    for (String example : MEDIA_EXAMPLES) {
+      snapshot(lookAndFeel + "-example-" + example, example(example));
+    }
     for (String example : INPUT_EXAMPLES) {
       snapshot(
           lookAndFeel + "-example-" + example,
