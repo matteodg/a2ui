@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
+import javax.accessibility.AccessibleState;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.text.BadLocationException;
@@ -401,8 +402,12 @@ final class AdapterSession {
         JsonValues.assertJsonEquals(attributes.get("role"), roleOf(control), "role of " + at);
       }
       if (attributes.containsKey("checked")) {
-        throw new AssertionError(
-            "The harness cannot read 'checked' of " + at + ". No view of this version has it.");
+        // A check box, a radio button and a toggle button have the state CHECKED while they are
+        // selected.
+        JsonValues.assertJsonEquals(
+            attributes.get("checked"),
+            context.getAccessibleStateSet().contains(AccessibleState.CHECKED),
+            "checked of " + at);
       }
     });
   }

@@ -61,7 +61,8 @@ class SwingBasicCatalogTest {
           "Modal",
           "Divider",
           "Button",
-          "TextField");
+          "TextField",
+          "CheckBox");
 
   /**
    * Makes the catalog with one component that only declares its type. Thus the tests of a component

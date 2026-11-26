@@ -39,6 +39,8 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 import javax.accessibility.AccessibleAction;
 import javax.swing.AbstractButton;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JSeparator;
 import javax.swing.JTabbedPane;
@@ -51,8 +53,8 @@ import javax.swing.text.JTextComponent;
  * <p>The handler mounts an {@code A2uiSurface} with no window and runs the steps of the case. It
  * reads each expectation from the mounted Swing components where a component shows the value: the
  * text of a text component, the value of a control, the messages of the checks, the state of a
- * button. A step operates the Swing control: it sets the text of a text field, it clicks a button,
- * and it selects a tab of a tabbed pane.
+ * button. A step operates the Swing control: it sets the text of a text field, it clicks a button
+ * or a check box, and it selects a tab of a tabbed pane.
  *
  * <p>An input step for a component type that has no view in this version fails. The registry skips
  * the cases that need such a component.
@@ -241,6 +243,16 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       }
       return;
     }
+    if (node.node().type().equals("CheckBox") && session.control(node) instanceof JCheckBox box) {
+      if (!(value instanceof Boolean checked)) {
+        throw new AssertionError(where + ": '" + value + "' is not the state of a check box.");
+      }
+      // The user clicks the check box if it does not show the state.
+      if (box.isSelected() != checked) {
+        click(session, box);
+      }
+      return;
+    }
     if (node.node().type().equals("Tabs") && session.control(node) instanceof JTabbedPane tabs) {
       // The input value of a Tabs component is the index of the tab that the user selects.
       if (!(value instanceof Number index)
@@ -258,6 +270,16 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
     throw new AssertionError(
         where + ": the harness has no input for the component type '" + node.node().type() + "'.");
+  }
+
+  /** Clicks a button as the user does. */
+  private static void click(AdapterSession session, AbstractButton button) {
+    session.gesture = true;
+    try {
+      button.doClick(0);
+    } finally {
+      session.gesture = false;
+    }
   }
 
   private void expect(
@@ -384,10 +406,7 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       assertJsonEquals(expected.get("text"), shown, "text of " + at);
     }
     if (expected.containsKey("value")) {
-      if (!(session.control(actual) instanceof JTextComponent field)) {
-        throw new AssertionError("The harness cannot read the value of " + at);
-      }
-      assertJsonEquals(expected.get("value"), AdapterSession.documentText(field), "value of " + at);
+      assertJsonEquals(expected.get("value"), shownValue(session, actual, at), "value of " + at);
     }
     for (String property : List.of("url", "name", "axis", "badgeText")) {
       if (property.equals("axis")
@@ -431,6 +450,18 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
   }
 
+  /** Reads the value that the control of a component shows. */
+  private static Object shownValue(AdapterSession session, MountedNode actual, String at) {
+    JComponent control = session.control(actual);
+    if (control instanceof JTextComponent field) {
+      return AdapterSession.documentText(field);
+    }
+    if (control instanceof JCheckBox box) {
+      return box.isSelected();
+    }
+    throw new AssertionError("The harness cannot read the value of " + at);
+  }
+
   /** Compares the state of the checks, in the node and in what the view shows. */
   private void assertChecks(
       AdapterSession session, Map<String, Object> expected, MountedNode actual, String at) {
@@ -445,12 +476,10 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     List<String> visible = AdapterSession.labelsBelow(actual.component().orElseThrow());
     if (expected.containsKey("isValid")) {
       assertJsonEquals(expected.get("isValid"), props.isValid(), "isValid of " + at);
-      // A button that is not valid is disabled. A text field that is not valid has its error
-      // messages as its tool tip.
+      // A button that is not valid is disabled. Each other control that is not valid has its
+      // error messages as its tool tip, and the user can still operate it.
       boolean shownValid =
-          control instanceof AbstractButton
-              ? control.isEnabled()
-              : control.getToolTipText() == null;
+          control instanceof JButton ? control.isEnabled() : control.getToolTipText() == null;
       assertJsonEquals(expected.get("isValid"), shownValid, "the shown validity of " + at);
     }
     if (expected.containsKey("validationErrors")) {

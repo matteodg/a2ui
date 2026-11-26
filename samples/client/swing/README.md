@@ -78,12 +78,12 @@ and operate its button. Close the dialog with its close control or with the Esca
 
 ## Limits
 
-- The Swing adapter has views for 10 of the 18 components of the basic catalog at this time: `Text`,
-  `Row`, `Column`, `List`, `Card`, `Tabs`, `Modal`, `Divider`, `Button` and `TextField`. Thus 16 of
-  the 43 examples show completely.
-- The other 27 examples show a placeholder for each component with no view. The components with no
-  view are `Icon` (in 20 examples), `Image` (13), `CheckBox`, `ChoicePicker` and `DateTimeInput` (2
-  each), and `Slider`, `Video` and `AudioPlayer` (1 each).
+- The Swing adapter has views for 11 of the 18 components of the basic catalog at this time: `Text`,
+  `Row`, `Column`, `List`, `Card`, `Tabs`, `Modal`, `Divider`, `Button`, `TextField` and `CheckBox`.
+  Thus 17 of the 43 examples show completely.
+- The other 26 examples show a placeholder for each component with no view. The components with no
+  view are `Icon` (in 20 examples), `Image` (13), `ChoicePicker` and `DateTimeInput` (2 each), and
+  `Slider`, `Video` and `AudioPlayer` (1 each).
 - A placeholder is wider than an icon. Thus a row with placeholders can have less space for its
   text than the same row with icons, and a long word in such a row can lose its end.
 - The gallery shows the first surface of an example.
