@@ -66,7 +66,7 @@ import javax.swing.SwingConstants;
  * and its text breaks at that width. Its height is the height that its content needs at that width.
  * Thus the scroll pane scrolls vertically. The scroll pane scrolls horizontally only when the
  * viewport is narrower than the minimum width of the content. A content that is shorter than the
- * viewport fills the viewport.
+ * viewport keeps its height, at the top of the viewport.
  *
  * <p>Use the component only on the event dispatch thread. The constructors and the life cycle
  * methods throw an {@code IllegalStateException} on each other thread.
@@ -319,13 +319,12 @@ public final class A2uiSurface extends JPanel implements HeightForWidth, Scrolla
   /**
    * Tells if this component has the height of its viewport.
    *
-   * @return true if the content is not higher than the viewport. Then the content fills the
-   *     viewport.
+   * @return false. The component has the height of its content, also when the viewport is higher.
+   *     Thus a root container does not spread its children across the viewport.
    */
   @Override
   public boolean getScrollableTracksViewportHeight() {
-    return getParent() instanceof JViewport viewport
-        && viewport.getHeight() >= getPreferredSize().height;
+    return false;
   }
 
   private void unmount() {

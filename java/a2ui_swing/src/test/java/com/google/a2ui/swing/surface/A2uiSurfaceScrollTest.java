@@ -122,7 +122,7 @@ class A2uiSurfaceScrollTest {
       assertEquals(viewport.width, surface.getWidth());
       assertTrue(surface.preferredHeightFor(viewport.width) < narrow);
       assertFalse(scrollPane.getVerticalScrollBar().isVisible());
-      assertEquals(viewport.height, surface.getHeight());
+      assertEquals(surface.preferredHeightFor(viewport.width), surface.getHeight());
     });
   }
 
@@ -141,14 +141,17 @@ class A2uiSurfaceScrollTest {
   }
 
   @Test
-  void aShortSurfaceFillsTheViewportAndHasNoScrollBar() {
+  void aShortSurfaceKeepsTheHeightOfItsContentAndHasNoScrollBar() {
     mount("Hello", 300, 200);
 
     Edt.run(() -> {
+      Dimension viewport = scrollPane.getViewport().getExtentSize();
       assertFalse(scrollPane.getVerticalScrollBar().isVisible());
       assertFalse(scrollPane.getHorizontalScrollBar().isVisible());
-      assertEquals(scrollPane.getViewport().getExtentSize(), surface.getSize());
-      assertTrue(surface.getScrollableTracksViewportHeight());
+      assertEquals(viewport.width, surface.getWidth());
+      assertEquals(surface.preferredHeightFor(viewport.width), surface.getHeight());
+      assertTrue(surface.getHeight() < viewport.height, "height " + surface.getHeight());
+      assertFalse(surface.getScrollableTracksViewportHeight());
     });
   }
 
