@@ -201,6 +201,19 @@ final class ButtonView implements SwingComponentView {
     public boolean contains(int x, int y) {
       return false;
     }
+
+    /**
+     * Applies the look and feel. The panel then has no text color of its own. Thus the button gives
+     * the text color of its variant to the panel again. Swing applies a new look and feel to a
+     * button before it applies it to the content of the button.
+     */
+    @Override
+    public void updateUI() {
+      super.updateUI();
+      if (getParent() instanceof ActionButton button) {
+        button.restyle();
+      }
+    }
   }
 
   /** The button of the view. It has a layout for its content and paints two of the variants. */

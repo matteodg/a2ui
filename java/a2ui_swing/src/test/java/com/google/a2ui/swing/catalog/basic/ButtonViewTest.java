@@ -202,6 +202,24 @@ class ButtonViewTest {
   }
 
   @Test
+  void aVariantKeepsItsTextColorWhenTheWindowAppliesALookAndFeelAgain() {
+    Edt.run(() -> {
+      show(Map.of(), "Primary", "variant", "primary");
+      assertEquals(BasicStyle.onAccent(), labelText().getForeground());
+
+      // A change of the look and feel at run time does this for each component of a window.
+      SwingUtilities.updateComponentTreeUI(fixture.view);
+
+      assertEquals(BasicStyle.onAccent(), labelText().getForeground());
+
+      fixture.update(definition("variant", "borderless"));
+      SwingUtilities.updateComponentTreeUI(fixture.view);
+
+      assertEquals(BasicStyle.link(button()), labelText().getForeground());
+    });
+  }
+
+  @Test
   void theBorderlessVariantHasNoBackgroundAndTheColorOfALink() {
     Edt.run(() -> {
       show(Map.of(), "IIIIIIII", "variant", "borderless");
