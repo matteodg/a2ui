@@ -14,5 +14,9 @@
  * limitations under the License.
  */
 
-/** The data context: the scope in which the core evaluates data bindings and function calls. */
+/**
+ * The resolution of a surface. The node resolver makes a live tree of nodes with resolved
+ * properties from the components and the data of a surface. The data context is the scope in which
+ * the core evaluates data bindings and function calls.
+ */
 package com.google.a2ui.core.resolution;

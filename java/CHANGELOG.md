@@ -31,3 +31,9 @@
   the code of the 14 functions of the basic catalog.
 - Add `A2uiRegex` in `com.google.a2ui.core.common`. It compiles a pattern of the A2UI regex dialect
   and applies the static safety rules of the protocol before `java.util.regex` gets the pattern.
+- Add `NodeResolver`, `ComponentNode`, `NodeProps`, `NodeState`, `ResolvedBinding`,
+  `WritableBinding`, `NodeAction`, `ActionDispatchOptions`, `ValidationResult` and
+  `ValidationSeverity` in `com.google.a2ui.core.resolution`. A resolver makes the live node tree of
+  a surface for a UI adapter. Add `DataContext.get`. Add `onAction`, `onError`, `onDisposing`,
+  `dispatchAction` and `dispatchError` to `SurfaceModel`, `onAction` to `SurfaceGroupModel`, and
+  `RendererAction` in `com.google.a2ui.core.state`.

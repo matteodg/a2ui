@@ -16,6 +16,6 @@
 
 /**
  * The state of the surfaces: the group of the surfaces, each surface, its data model and its
- * components.
+ * components. Also the actions and the errors that a surface reports.
  */
 package com.google.a2ui.core.state;

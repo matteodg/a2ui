@@ -10,24 +10,24 @@ The module implements the A2UI protocol v1.0. The design obeys
 
 The Java module name is `com.google.a2ui.core`. It exports these packages:
 
-| Package                                   | Contents                                                                                                                                                                                      |
-| :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                      |
-| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text. `A2uiRegex` is the A2UI regex dialect.        |
-| `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces.                                                                      |
-| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                        |
-| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents. A `FunctionImplementation` is a function with its code.                                           |
-| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog. `BasicCatalog.withFunctions()`, the catalog with the code of its functions.                 |
-| `com.google.a2ui.core.resolution`         | `DataContext`. It resolves the data bindings and the function calls of a surface.                                                                                                             |
-| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                       |
-| `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts. |
-| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent.                                    |
+| Package                                   | Contents                                                                                                                                                                                                                                                               |
+| :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `com.google.a2ui.core.exceptions`         | `A2uiError` and its subclasses. Each failure of the core is one of these. `A2uiErrorDetail` is one problem of a failure.                                                                                                                                               |
+| `com.google.a2ui.core.common`             | `Signal`, `EventNotifier`, `Subscription`, `SemVer`, `Uax31`, `ProtocolVersion`. `Coercion` reads a value as a boolean, as a number or as text. `A2uiRegex` is the A2UI regex dialect.                                                                                 |
+| `com.google.a2ui.core.state`              | `SurfaceGroupModel`, `SurfaceModel`, `SurfaceComponentsModel`, `ComponentModel` and `DataModel`. They hold the surfaces. A `RendererAction` is an action that a surface reports.                                                                                       |
+| `com.google.a2ui.core.expressions`        | `ExpressionParser`, the parser for `${...}` templates.                                                                                                                                                                                                                 |
+| `com.google.a2ui.core.catalog`            | `Catalog`, `ComponentApi` and `FunctionApi`. They read, write and derive catalog documents. A `FunctionImplementation` is a function with its code.                                                                                                                    |
+| `com.google.a2ui.core.basic_catalog.v1_0` | `BasicCatalog.api()`, the signatures of the components and of the functions of the basic catalog. `BasicCatalog.withFunctions()`, the catalog with the code of its functions.                                                                                          |
+| `com.google.a2ui.core.resolution`         | `NodeResolver` makes the live tree of `ComponentNode` objects of a surface. `NodeProps`, `ResolvedBinding`, `WritableBinding`, `NodeAction` and `ValidationResult` are the resolved values of a node. `DataContext` resolves the data bindings and the function calls. |
+| `com.google.a2ui.core.schema.v1_0`        | `SchemaDocuments`, the JSON Schema documents of the v1.0 specification.                                                                                                                                                                                                |
+| `com.google.a2ui.core.validation`         | `PayloadValidator` and `CommonTypeValidator`. They examine a component, a function call or a value of a common type. `ValidationConfig` selects the problems that message processing accepts.                                                                          |
+| `com.google.a2ui.core.processing`         | `MessageProcessor`. It examines the messages of the agent and applies them to the surfaces. `OutboundMessageListener` receives the messages for the agent.                                                                                                             |
 
 The package `com.google.a2ui.core.internal` is not part of the API, and the module does not export
 it.
 
-The core does not yet contain actions, node resolution and the function-call messages
-(`callRendererFunction`, `agentFunctionResponse`).
+The core does not yet send actions and errors of a surface to the agent. It does not yet contain
+the function-call messages (`callRendererFunction`, `agentFunctionResponse`).
 
 ## Threads
 
@@ -256,6 +256,10 @@ Catalog<ComponentApi, FunctionImplementation> custom =
 
 `Catalog.withFunctions` gives a catalog from a document the code of its functions.
 
+A function reads data with `context.get(path)`, not directly from the data model. The node resolver
+records each path that a function reads through its context. Then it evaluates the binding again
+when the data at one of these paths changes.
+
 ### Regular expressions
 
 An agent writes the pattern of the `regex` function. Thus the function does not give the pattern to
@@ -287,6 +291,81 @@ pattern many times, keep the instance.
 `java.util.regex` uses one level of recursion for each repetition of a group such as `(ab|c)*`. If a
 long value causes a stack overflow, `test` does the match again on a temporary thread that has a
 large stack, and waits for the result.
+
+## Nodes
+
+A `NodeResolver` makes a live tree of `ComponentNode` objects from the components and the data of
+one surface. A UI adapter makes one resolver for each surface and shows `rootNode()`. It makes one
+view for each node and subscribes the view to `node.props()`. A view never resolves a binding.
+
+```java
+SurfaceModel<ComponentApi> surface = processor.model().getSurface("main").orElseThrow();
+NodeResolver<ComponentApi> resolver = new NodeResolver<>(surface);
+
+resolver.rootNode().subscribe(root -> showRoot(root)); // Optional<ComponentNode<ComponentApi>>
+ComponentNode<ComponentApi> node = resolver.rootNode().get().orElseThrow();
+
+NodeProps<ComponentApi> props = node.props().get();
+Object text = props.value("text"); // the value of a binding, or a static value
+props.writableBinding("value").ifPresent(binding -> binding.set("Grace"));
+props.action("action").ifPresent(NodeAction::invoke);
+List<ComponentNode<ComponentApi>> children = props.children("children");
+
+Subscription subscription = node.props().subscribe(next -> updateView(next));
+node.addCleanup(subscription::cancel);
+```
+
+The resolver follows the surface. It makes, updates and disposes nodes when the components and the
+data change. `resolver.dispose()` disposes each node. The deletion of the surface also does this.
+
+**Nodes.** There is one node for each position of the tree. A component that two parents refer to
+has two nodes. `instanceId()` is different for each child of one parent, and it stays the same when
+a new node object replaces the node at a position. Use it as the key of a child view. `id()` is
+unique in the process for one node object. `impl()` is the catalog entry of the component, for
+example your subclass of `ComponentApi` that makes the view.
+
+**Properties.** `node.props()` is a signal of `NodeProps`. It notifies one time for each update,
+with the complete new properties. A change in a child notifies only on the child. The schema of the
+component gives the form of each property, and the name of a property does not:
+
+| Schema type of the property                            | Value in `NodeProps`                         | Typed reader                          |
+| :----------------------------------------------------- | :------------------------------------------- | :------------------------------------ |
+| A `Dynamic*` type, a `DataBinding` or a `FunctionCall` | `ResolvedBinding`                            | `binding`, `writableBinding`, `value` |
+| `Action`                                               | `NodeAction`                                 | `action`                              |
+| `ComponentId` or `Child`                               | `ComponentNode`                              | `child`                               |
+| `ChildList`: a list of IDs or a template               | a list of `ComponentNode`                    | `children`                            |
+| An object, or a list of objects                        | a map, or a list of maps, of resolved values | `object`, `objects`                   |
+| Each other type                                        | the value as the agent wrote it              | `get`, `value`                        |
+
+**Bindings.** A `ResolvedBinding` is a snapshot of one value. A changed value arrives as a new
+binding in new properties. A binding is a `WritableBinding` only if the message bound the property
+to a data path. `set` writes at that path, in the data scope of the node. A property that is a
+boolean has a boolean value, with the coercion rules of the protocol. A binding that the core cannot
+evaluate has the value `null`, and the surface reports the failure to `onError` one time.
+
+**Templates.** A template in a child list makes one node for each item of the data list.
+`dataPath()` is the path of the item, for example `/people/1`, and `index()` is its position.
+
+**Placeholders.** `state()` tells if a node is resolved. A component that the surface does not have
+at this time gives a node with the state `PENDING`. A resolved node replaces it when the component
+arrives. A component of an unknown type gives `UNKNOWN_TYPE`, and a reference that repeats a parent
+at the same data scope gives `CYCLIC`. The surface reports the last two to `onError`. Show a
+fallback view for each node where `isPlaceholder()` is true.
+
+**Actions.** A view calls `NodeAction.invoke()` when the user operates the component. An event
+action resolves its context at that time and the surface reports a `RendererAction` to `onAction`.
+`SurfaceGroupModel.onAction()` gives the actions of all the surfaces. A function call action runs
+the function with user activation and reports no action. A failure goes to `onError`.
+`invoke(ActionDispatchOptions.withMetadata(metadata))` sends an `action.metadata` with the event.
+
+**Checks.** A component that has `@checks` has three more properties. `props.isValid()` is false if
+a check of the severity `error` failed. `props.validationErrors()` has the messages of these checks.
+`props.validationResults()` has each failed `ValidationResult`, with its code and its severity. The
+message of a rule replaces the message of a function result. The message of a result object that a
+data path gives replaces the message of the rule.
+
+**Metadata and accessibility.** `node.metadata()` is a signal of the `@metadata` of the component.
+It is not in the properties. `props.accessibility()` gives the resolved `@accessibility` attributes.
 
 ## Validation
 
