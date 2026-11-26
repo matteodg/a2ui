@@ -22,6 +22,7 @@ import com.google.a2ui.core.common.EventListener;
 import com.google.a2ui.core.state.SurfaceModel;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 /** Gives the test code of other packages the hooks of the node resolver that are not public API. */
 public final class ResolverHooks {
@@ -51,8 +52,11 @@ public final class ResolverHooks {
    * @param payload the action as a component declares it
    * @param sourceComponentId the ID of the component that the user operated
    * @param metadata the {@code action.metadata} to send with an event, or null
+   * @return a supplier of the result of a function call action at the time of the question. The
+   *     result is null for an event, for an action that failed, and while the call waits for the
+   *     agent.
    */
-  public static void runAction(
+  public static Supplier<Object> runAction(
       SurfaceModel<?> surface,
       String scope,
       OptionalInt index,
@@ -60,12 +64,9 @@ public final class ResolverHooks {
       Map<String, ?> payload,
       String sourceComponentId,
       A2uiMetadata metadata) {
-    DataContext context = DataContext.tracking(surface, scope, index, null);
-    ActionRunner.run(
-        surface,
-        userActivated ? context.withUserActivation() : context,
-        payload,
-        sourceComponentId,
-        metadata);
+    Object result =
+        ActionRunner.run(
+            surface, scope, index, userActivated, payload, sourceComponentId, metadata);
+    return () -> result instanceof Later later ? later.value() : result;
   }
 }

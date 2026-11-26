@@ -97,6 +97,10 @@ public final class ComponentNode<C extends ComponentApi> {
   final Map<String, DataSubscription> dataSubscriptions = new HashMap<>();
   Subscription modelSubscription;
   Set<String> reportedErrors = Set.of();
+
+  /** The calls to the agent that this node made, or null if the node made no resolution. */
+  AgentMemo agentMemo;
+
   boolean computing;
   boolean stale;
 
@@ -296,6 +300,9 @@ public final class ComponentNode<C extends ComponentApi> {
     disposed = true;
     if (modelSubscription != null) {
       modelSubscription.cancel();
+    }
+    if (agentMemo != null) {
+      agentMemo.dispose();
     }
     dataSubscriptions.values().forEach(DataSubscription::cancel);
     dataSubscriptions.clear();

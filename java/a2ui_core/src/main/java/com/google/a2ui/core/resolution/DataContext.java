@@ -29,8 +29,11 @@ import com.google.a2ui.core.exceptions.A2uiRpcError;
 import com.google.a2ui.core.exceptions.RpcErrorCode;
 import com.google.a2ui.core.expressions.Expression;
 import com.google.a2ui.core.internal.AgentCalls;
+import com.google.a2ui.core.internal.AgentRequests;
+import com.google.a2ui.core.internal.AgentRequests.Outcome;
 import com.google.a2ui.core.internal.ErrorFields;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.state.DataModel;
 import com.google.a2ui.core.state.SurfaceModel;
 import java.util.ArrayList;
@@ -42,7 +45,10 @@ import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * The scope in which the core evaluates a data binding or a function call: a surface, a position in
@@ -58,10 +64,30 @@ import java.util.function.Supplier;
  * is none. Such a refusal is an {@link A2uiRpcError} with the code {@link
  * RpcErrorCode#INVALID_FUNCTION_CALL}. An application cannot make this context.
  *
+ * <p>A function that the catalog of a call does not implement is a function of the agent, if the
+ * surface has an agent function caller. The bindings, the checks and the actions of a component
+ * wait for the answer of the agent. A context that an application makes cannot wait. Such a context
+ * gives the answer that the surface keeps for an identical call. If the surface keeps none, the
+ * call fails. The context sends nothing to the agent.
+ *
  * <p>A context cannot change. {@link #nested(String)} and {@link #withUserActivation()} make a new
  * context.
  */
 public final class DataContext {
+  /** The work of a context for a call that only the agent can run. */
+  private enum Routing {
+    /** Reads the answer that the surface keeps, and fails if there is none. Sends nothing. */
+    ANSWERED_ONLY,
+    /** Fails as if the surface had no agent function caller. */
+    NEVER,
+    /** Sends the call, or shares an identical call that waits. The node resolves again later. */
+    BINDING,
+    /** Sends the call as a request of its own each time, and continues when the agent answers. */
+    ACTION,
+  }
+
+  private static final String EXPRESSION_ERROR = "EXPRESSION_ERROR";
+
   /** The value of {@link #index} outside a list template. */
   private static final int NO_INDEX = -1;
 
@@ -91,6 +117,17 @@ public final class DataContext {
    */
   private final Set<String> reads;
 
+  private final Routing routing;
+
+  /** The memory of the node of a binding, or null if the routing is not {@link Routing#BINDING}. */
+  private final AgentMemo memo;
+
+  /**
+   * Receives a failure that does not stop the evaluation, or null to report such a failure to the
+   * surface.
+   */
+  private final Consumer<A2uiError> report;
+
   /**
    * Makes a context at the root of the data of a surface, outside a list template.
    *
@@ -115,7 +152,10 @@ public final class DataContext {
         false,
         null,
         null,
-        false);
+        false,
+        Routing.ANSWERED_ONLY,
+        null,
+        null);
   }
 
   private DataContext(
@@ -125,7 +165,10 @@ public final class DataContext {
       boolean userActivated,
       Catalog<?, ?> callCatalog,
       Set<String> reads,
-      boolean agentCaller) {
+      boolean agentCaller,
+      Routing routing,
+      AgentMemo memo,
+      Consumer<A2uiError> report) {
     this.surface = surface;
     this.path = path;
     this.index = index;
@@ -133,11 +176,30 @@ public final class DataContext {
     this.callCatalog = callCatalog;
     this.reads = reads;
     this.agentCaller = agentCaller;
+    this.routing = routing;
+    this.memo = memo;
+    this.report = report;
+  }
+
+  /** Makes a copy of this context with a different position or a different user gesture. */
+  private DataContext copy(String newPath, int newIndex, boolean newUserActivated) {
+    return new DataContext(
+        surface,
+        newPath,
+        newIndex,
+        newUserActivated,
+        callCatalog,
+        reads,
+        agentCaller,
+        routing,
+        memo,
+        report);
   }
 
   static {
     // The RPC layer is in a different package. It makes the context of an agent call through
-    // this function, which is not part of the API.
+    // this function, which is not part of the API. A call of the agent does not go back to the
+    // agent.
     AgentCalls.register((context, catalog, userActivated) ->
         new DataContext(
             context.surface,
@@ -146,7 +208,10 @@ public final class DataContext {
             userActivated,
             catalog,
             context.reads,
-            true));
+            true,
+            Routing.NEVER,
+            null,
+            context.report));
   }
 
   /**
@@ -158,11 +223,55 @@ public final class DataContext {
    * @param index the position of the list item of the scope, or an empty value outside a list
    *     template
    * @param reads the set that gets the absolute path of each read, or null to record nothing
+   * @param memo the memory of the node. A call to the agent in this context is the call of a
+   *     binding.
+   * @param report receives a failure that does not stop the evaluation
    * @return the new context
    */
   static DataContext tracking(
-      SurfaceModel<?> surface, String path, OptionalInt index, Set<String> reads) {
-    return new DataContext(surface, path, index.orElse(NO_INDEX), false, null, reads, false);
+      SurfaceModel<?> surface,
+      String path,
+      OptionalInt index,
+      Set<String> reads,
+      AgentMemo memo,
+      Consumer<A2uiError> report) {
+    return new DataContext(
+        surface,
+        path,
+        index.orElse(NO_INDEX),
+        false,
+        null,
+        reads,
+        false,
+        Routing.BINDING,
+        Objects.requireNonNull(memo, "memo"),
+        report);
+  }
+
+  /**
+   * Makes a context for an action at the scope of a node. Each call to the agent in this context is
+   * a request of its own.
+   *
+   * @param surface the surface whose data and catalogs the context uses
+   * @param path the absolute data path of the scope
+   * @param index the position of the list item of the scope, or an empty value outside a list
+   *     template
+   * @param userActivated true if the action is the result of a user gesture
+   * @return the new context
+   */
+  static DataContext forAction(
+      SurfaceModel<?> surface, String path, OptionalInt index, boolean userActivated) {
+    return new DataContext(
+        surface,
+        path,
+        index.orElse(NO_INDEX),
+        userActivated,
+        null,
+        null,
+        false,
+        Routing.ACTION,
+        null,
+        null);
   }
 
   /**
@@ -235,8 +344,7 @@ public final class DataContext {
    * @return the new context
    */
   public DataContext nested(String relativePath) {
-    return new DataContext(
-        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads, agentCaller);
+    return copy(resolvePath(relativePath), index, userActivated);
   }
 
   /**
@@ -252,8 +360,7 @@ public final class DataContext {
     if (index < 0) {
       throw new IllegalArgumentException("The position of a list item must not be negative.");
     }
-    return new DataContext(
-        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads, agentCaller);
+    return copy(resolvePath(relativePath), index, userActivated);
   }
 
   /**
@@ -264,7 +371,7 @@ public final class DataContext {
    * @return the new context
    */
   public DataContext withUserActivation() {
-    return new DataContext(surface, path, index, true, callCatalog, reads, agentCaller);
+    return copy(path, index, true);
   }
 
   /**
@@ -293,6 +400,10 @@ public final class DataContext {
    *   <li>Each other value stays as it is.
    * </ul>
    *
+   * <p>This method does not send a call to the agent. If the catalog does not implement a function
+   * and the surface has an agent function caller, the result is the answer that the surface keeps
+   * for an identical call. If the surface keeps none, the call fails.
+   *
    * <p>Before a function runs, the context reads each argument as a boolean if the schema of the
    * function gives it the type {@code DynamicBoolean}. See {@link Coercion#toBoolean(Object)}. The
    * context refuses a call that omits an argument that the schema of the function requires. Then
@@ -312,15 +423,30 @@ public final class DataContext {
    * @throws A2uiDataError if the path of a binding is not correct
    */
   public Object resolveDynamicValue(Object value) {
+    Object resolved = resolvePending(value);
+    if (resolved instanceof Later) {
+      // Only the context of a node or of an action can wait, and the core does not give such a
+      // context to other code.
+      throw new IllegalStateException("This context cannot wait for the agent.");
+    }
+    return resolved;
+  }
+
+  /**
+   * Resolves a dynamic value as {@link #resolveDynamicValue(Object)} does. But the result is a
+   * {@link Later} if the value waits for the agent.
+   */
+  Object resolvePending(Object value) {
     return switch (value) {
       case Map<?, ?> object -> {
         if (object.get("@path") instanceof String binding) {
           yield get(binding);
         }
         if (object.get("@call") instanceof String name) {
-          yield call(name, object.get("catalogId"), null, () -> resolveArguments(object));
+          yield call(name, object.get("catalogId"), null, false, () -> resolveArguments(object));
         }
-        Map<String, Object> resolved = new LinkedHashMap<>();
+        List<String> names = new ArrayList<>(object.size());
+        List<Object> members = new ArrayList<>(object.size());
         object.forEach((key, item) -> {
           String name = String.valueOf(key);
           // A literal object writes `@@name` for a key that starts with `@`.
@@ -328,17 +454,78 @@ public final class DataContext {
           if (name.startsWith("@") && !escaped) {
             throw unknownReservedKey(name);
           }
-          resolved.put(escaped ? name.substring(1) : name, resolveDynamicValue(item));
+          names.add(escaped ? name.substring(1) : name);
+          members.add(resolvePending(item));
         });
-        yield Collections.unmodifiableMap(resolved);
+        yield gather(members, values -> Collections.unmodifiableMap(zip(names, values)));
       }
       case List<?> list -> {
-        List<Object> resolved = new ArrayList<>(list.size());
-        list.forEach(item -> resolved.add(resolveDynamicValue(item)));
-        yield Collections.unmodifiableList(resolved);
+        List<Object> items = new ArrayList<>(list.size());
+        list.forEach(item -> items.add(resolvePending(item)));
+        yield gather(items, values -> Collections.unmodifiableList(new ArrayList<>(values)));
       }
       case null, default -> value;
     };
+  }
+
+  private static Map<String, Object> zip(List<String> names, List<Object> values) {
+    Map<String, Object> object = new LinkedHashMap<>();
+    for (int position = 0; position < names.size(); position++) {
+      object.put(names.get(position), values.get(position));
+    }
+    return object;
+  }
+
+  /**
+   * Makes a result from parts when no part waits for the agent. If no part waits, the result is
+   * there immediately. If a part waits, the result is a {@link Later}.
+   *
+   * <p>The parts are siblings. Thus each call of the parts goes to the agent before the agent
+   * answers one of them.
+   *
+   * @param parts the resolved parts. A part that waits is a {@link Later}.
+   * @param build makes the result from the values of the parts
+   */
+  private static Object gather(List<Object> parts, Function<List<Object>, Object> build) {
+    List<Later> waiting = new ArrayList<>();
+    for (Object part : parts) {
+      if (part == Later.PENDING) {
+        // The resolver resolves the binding again from the start when the agent answers.
+        return Later.PENDING;
+      }
+      if (part instanceof Later later) {
+        waiting.add(later);
+      }
+    }
+    if (waiting.isEmpty()) {
+      return build.apply(parts);
+    }
+    Later result = new Later();
+    int[] remaining = {waiting.size()};
+    for (Later part : waiting) {
+      part.then(end -> {
+        // The first failure ends the result. The other parts change nothing later.
+        if (result.isSettled()) {
+          return;
+        }
+        switch (end.state()) {
+          case FAILED -> result.fail(end.error());
+          case CANCELLED -> result.cancel();
+          default -> {
+            if (--remaining[0] == 0) {
+              List<Object> values = new ArrayList<>(parts.size());
+              parts.forEach(item -> values.add(item instanceof Later later ? later.value() : item));
+              try {
+                result.follow(build.apply(values));
+              } catch (A2uiError error) {
+                result.fail(error);
+              }
+            }
+          }
+        }
+      });
+    }
+    return result;
   }
 
   /**
@@ -348,6 +535,11 @@ public final class DataContext {
    * the function that evaluates the template. This is also the rule for a call in the arguments of
    * such a call. If no function runs in this context, the call runs in the default catalog of the
    * surface.
+   *
+   * <p>A template part does not wait for the agent. If the surface has an agent function caller and
+   * the catalog does not implement a function of the part, the context reports an error to the
+   * surface and the value of the call is null. Thus the part shows nothing. The context sends
+   * nothing to the agent.
    *
    * @param expression the part to evaluate
    * @return the value of the part
@@ -370,6 +562,7 @@ public final class DataContext {
               call.name(),
               null,
               callCatalog,
+              true,
               () -> {
                 Map<String, Object> arguments = new LinkedHashMap<>();
                 call.args().forEach((name, argument) -> arguments.put(name, evaluate(argument)));
@@ -445,31 +638,37 @@ public final class DataContext {
     Map<String, Object> arguments = new LinkedHashMap<>();
     if (call.get("args") instanceof Map<?, ?> written) {
       written.forEach(
-          (name, argument) -> arguments.put(String.valueOf(name), resolveDynamicValue(argument)));
+          (name, argument) -> arguments.put(String.valueOf(name), resolvePending(argument)));
     }
     return arguments;
   }
 
   /**
-   * Runs a function.
+   * Runs a function, or gives the call to the agent.
    *
    * @param name the name of the function
    * @param catalogId the {@code catalogId} that the call names, or null if it names none
    * @param inherited the catalog for a call that names none, or null to use the default catalog of
    *     the surface
-   * @param arguments resolves the arguments. The context calls it only if the function can run.
+   * @param template true if a template part makes the call. Such a call cannot wait for the agent.
+   * @param arguments resolves the arguments. The context calls it only if the function can run. An
+   *     argument that waits for the agent is a {@link Later}.
+   * @return the result, or a {@link Later} if the result waits for the agent
    */
   private Object call(
       String name,
       Object catalogId,
       Catalog<?, ?> inherited,
+      boolean template,
       Supplier<Map<String, Object>> arguments) {
     if (name.startsWith("@")) {
       // A system function is part of the protocol, not of a catalog.
       if (catalogId != null) {
         throw new A2uiExpressionError("System function '" + name + "' must not name a catalogId.");
       }
-      return systemCall(name, arguments);
+      // The context resolves no argument of a call that cannot run.
+      examineSystemCall(name);
+      return afterArguments(arguments, resolved -> systemCall(name, resolved));
     }
 
     String subject = "Function call '" + name + "'";
@@ -486,49 +685,223 @@ public final class DataContext {
       catalog = inherited != null ? inherited : surface.resolveCatalog(null, subject);
     }
     FunctionApi function = catalog.functions().get(name);
-    if (function == null) {
+    FunctionImplementation local =
+        function instanceof FunctionImplementation implementation ? implementation : null;
+    // A function that this renderer cannot run is a function of the agent, if the surface can
+    // send a call to the agent.
+    boolean routes =
+        local == null && routing != Routing.NEVER && AgentRequests.of(surface).caller() != null;
+    if (function == null && !routes) {
       throw new A2uiExpressionError(
           "Unknown function '" + name + "' in catalog '" + catalog.id() + "'.");
     }
-    if (agentCaller) {
-      // The caller boundary of the agent. It also examines the user gesture.
-      AgentCalls.examine(function, userActivated);
-    } else if (function.allowedCallers() == AllowedCallers.AGENT_ONLY) {
-      throw new A2uiExpressionError(
-          "Function '" + name + "' is agentOnly and cannot be called by renderer code.");
+    if (function != null) {
+      if (agentCaller) {
+        // The caller boundary of the agent. It also examines the user gesture.
+        AgentCalls.examine(function, userActivated);
+      } else if (function.allowedCallers() == AllowedCallers.AGENT_ONLY) {
+        throw new A2uiExpressionError(
+            "Function '" + name + "' is agentOnly and cannot be called by renderer code.");
+      }
+      if (function.requiresUserActivation() && !userActivated) {
+        throw new A2uiExpressionError(
+            "Function '"
+                + name
+                + "' requires user activation, and this call is not the result of a user gesture.");
+      }
     }
-    if (function.requiresUserActivation() && !userActivated) {
-      throw new A2uiExpressionError(
-          "Function '"
-              + name
-              + "' requires user activation, and this call is not the result of a user gesture.");
+    if (local == null) {
+      if (!routes) {
+        throw new A2uiExpressionError(
+            "Function '"
+                + name
+                + "' of catalog '"
+                + catalog.id()
+                + "' has no implementation in this renderer.");
+      }
+      if (template) {
+        // A template part cannot wait. The part shows nothing, and the other parts continue.
+        reportContinued(
+            new A2uiExpressionError(
+                "Function '"
+                    + name
+                    + "' of catalog '"
+                    + catalog.id()
+                    + "' is not implemented by this renderer. A template part cannot wait for the"
+                    + " agent. Thus the renderer did not send the call."));
+        return null;
+      }
+      return afterArguments(arguments, resolved -> send(name, catalog, function, resolved));
     }
-    if (!(function instanceof FunctionImplementation implementation)) {
-      throw new A2uiExpressionError(
-          "Function '"
-              + name
-              + "' of catalog '"
-              + catalog.id()
-              + "' has no implementation in this renderer.");
+    return afterArguments(arguments, resolved -> run(local, catalog, resolved));
+  }
+
+  /**
+   * Resolves the arguments of a call and then does the call. If an argument waits for the agent,
+   * the call waits for that argument.
+   */
+  private static Object afterArguments(
+      Supplier<Map<String, Object>> arguments, Function<Map<String, Object>, Object> call) {
+    Map<String, Object> written = arguments.get();
+    List<String> names = List.copyOf(written.keySet());
+    return gather(new ArrayList<>(written.values()), values -> call.apply(zip(names, values)));
+  }
+
+  /** Reports a failure that does not stop the evaluation. */
+  private void reportContinued(A2uiError error) {
+    if (report != null) {
+      report.accept(error);
+    } else {
+      surface.dispatchError(ErrorFields.errorCode(error, EXPRESSION_ERROR));
     }
-    Map<String, Object> resolved = coerceArguments(function, arguments.get());
+  }
+
+  /** Runs a function that the catalog implements. */
+  private Object run(
+      FunctionImplementation function, Catalog<?, ?> catalog, Map<String, Object> arguments) {
+    Map<String, Object> resolved = coerceArguments(function, arguments);
     requireArguments(function, resolved);
+    // A function cannot wait for the agent.
     DataContext scope =
-        new DataContext(surface, path, index, userActivated, catalog, reads, agentCaller);
+        new DataContext(
+            surface,
+            path,
+            index,
+            userActivated,
+            catalog,
+            reads,
+            agentCaller,
+            routing == Routing.NEVER ? Routing.NEVER : Routing.ANSWERED_ONLY,
+            null,
+            report);
     try {
-      return implementation.execute(resolved, scope);
+      return function.execute(resolved, scope);
     } catch (A2uiError error) {
       // The function ran and failed. This is not a call that the context refused.
       throw ErrorFields.raisedByFunction(error);
     } catch (RuntimeException error) {
       // Each exception of the code of a function becomes one type of failure for the caller.
       throw ErrorFields.raisedByFunction(
-          new A2uiExpressionError("Function '" + name + "' failed: " + error.getMessage(), error));
+          new A2uiExpressionError(
+              "Function '" + function.name() + "' failed: " + error.getMessage(), error));
     }
   }
 
-  /** Runs a function that the protocol defines. Such a function is in no catalog. */
-  private Object systemCall(String name, Supplier<Map<String, Object>> arguments) {
+  /**
+   * Gives a call that this renderer cannot run to the agent, as the routing of this context tells.
+   *
+   * @param declared the declaration of the function in the catalog, or null if the catalog does not
+   *     declare the function
+   * @return the answer, or a {@link Later} if the answer is not there
+   */
+  private Object send(
+      String name, Catalog<?, ?> catalog, FunctionApi declared, Map<String, Object> resolved) {
+    AgentRequests requests = AgentRequests.of(surface);
+    Map<String, Object> arguments = resolved;
+    if (declared != null) {
+      // The renderer examines a declared function as it examines a local function. Thus the
+      // agent gets the arguments that an implementation here gets, with the defaults.
+      arguments =
+          withDefaults(declared.argumentSchema().orElse(null), coerceArguments(declared, resolved));
+    }
+    Map<String, Object> call = new LinkedHashMap<>();
+    call.put("@call", name);
+    call.put("catalogId", catalog.id());
+    call.put("args", arguments);
+    Map<String, Object> frozen;
+    try {
+      frozen = Json.freezeObject(call);
+    } catch (IllegalArgumentException error) {
+      throw notJson(name, error);
+    }
+    if (declared != null) {
+      List<Problem> problems;
+      try {
+        Map<String, Object> examined = Json.asObject(frozen.get("args"));
+        problems =
+            requests
+                .checksFor(catalog)
+                .map(checks -> checks.argumentProblems(name, examined))
+                .orElse(List.of());
+      } catch (A2uiCatalogError error) {
+        throw new A2uiExpressionError(
+            "Validation failed for function '" + name + "': " + error.getMessage(), error);
+      }
+      if (!problems.isEmpty()) {
+        throw new A2uiExpressionError(
+            "Validation failed for function '"
+                + name
+                + "': "
+                + problems.stream().map(Problem::toString).collect(Collectors.joining("; ")));
+      }
+    }
+    String key = AgentRequests.keyOf(frozen);
+    if (key == null) {
+      throw notJson(name, null);
+    }
+    return switch (routing) {
+      case BINDING -> memo.valueOf(requests, key, frozen);
+      case ACTION -> {
+        Later result = new Later();
+        requests.fresh(
+            frozen,
+            outcome -> {
+              switch (outcome) {
+                case Outcome.Value answer -> result.succeed(answer.value());
+                case Outcome.Failed failed -> result.fail(failed.error());
+                case Outcome.Cancelled _ -> result.cancel();
+              }
+            });
+        yield result;
+      }
+      case ANSWERED_ONLY, NEVER -> {
+        Outcome.Value answer = requests.answer(key);
+        if (answer == null) {
+          throw new A2uiExpressionError(
+              "Function '"
+                  + name
+                  + "' is not implemented by this renderer, and this evaluation cannot wait for its"
+                  + " result. Thus the renderer did not send the call to the agent.");
+        }
+        yield answer.value();
+      }
+    };
+  }
+
+  private static A2uiExpressionError notJson(String name, Throwable cause) {
+    return new A2uiExpressionError(
+        "The arguments of function '"
+            + name
+            + "' are not JSON. Thus the renderer did not send the call to the agent.",
+        cause);
+  }
+
+  /**
+   * Adds the defaults of a schema to an object. The method adds the default of each property that
+   * the object omits. It also does this in each object that is a property.
+   */
+  private static Map<String, Object> withDefaults(Map<?, ?> schema, Map<String, Object> value) {
+    if (schema == null || !(schema.get("properties") instanceof Map<?, ?> properties)) {
+      return value;
+    }
+    Map<String, Object> filled = new LinkedHashMap<>(value);
+    properties.forEach((key, rules) -> {
+      if (!(key instanceof String name) || !(rules instanceof Map<?, ?> property)) {
+        return;
+      }
+      if (!filled.containsKey(name)) {
+        if (property.containsKey("default")) {
+          filled.put(name, property.get("default"));
+        }
+      } else if (filled.get(name) instanceof Map<?, ?> present) {
+        filled.put(name, withDefaults(property, Json.asObject(present)));
+      }
+    });
+    return filled;
+  }
+
+  /** Makes sure that a function that the protocol defines can run in this context. */
+  private void examineSystemCall(String name) {
     if (!name.equals(INDEX_FUNCTION)) {
       throw new A2uiExpressionError("Unknown system function '" + name + "'.");
     }
@@ -537,7 +910,12 @@ public final class DataContext {
           "The @index function can only be evaluated inside a collection template iteration"
               + " scope.");
     }
-    Object written = arguments.get().get("offset");
+  }
+
+  /** Runs a function that the protocol defines. Such a function is in no catalog. */
+  private Object systemCall(String name, Map<String, Object> arguments) {
+    examineSystemCall(name);
+    Object written = arguments.get("offset");
     if (written == null) {
       return (long) index;
     }

@@ -538,7 +538,9 @@ class DataContextTest {
     SurfaceModel<ComponentApi> surface =
         surface(Map.of("title", "Team", "user", Map.of("name", "Ada")));
     Set<String> reads = new LinkedHashSet<>();
-    DataContext context = DataContext.tracking(surface, "/user", OptionalInt.of(3), reads);
+    DataContext context =
+        DataContext.tracking(
+            surface, "/user", OptionalInt.of(3), reads, new AgentMemo(() -> {}), error -> {});
 
     context.resolveDynamicValue(Map.of("@path", "name"));
     context.resolveDynamicValue(call("render", Map.of("value", "${/title}")));
@@ -553,7 +555,9 @@ class DataContextTest {
   void aFunctionReadsDataThroughATrackingContext() {
     SurfaceModel<ComponentApi> surface = surface(Map.of("count", 2L));
     Set<String> reads = new LinkedHashSet<>();
-    DataContext context = DataContext.tracking(surface, "/", OptionalInt.empty(), reads);
+    DataContext context =
+        DataContext.tracking(
+            surface, "/", OptionalInt.empty(), reads, new AgentMemo(() -> {}), error -> {});
 
     Object letters =
         context.resolveDynamicValue(call("letters", Map.of("value", Map.of("@path", "/count"))));

@@ -59,6 +59,14 @@ import java.util.Set;
  * complete has a tree. The resolver reports an unknown type, a cycle and a binding that it cannot
  * evaluate to the {@code onError} of the surface. Such a binding resolves to null.
  *
+ * <p>If the surface has an agent function caller, a binding or a check can call a function that its
+ * catalog does not implement. The resolver sends the call to the agent. The binding is null and the
+ * check passes until the agent answers. Then the resolver resolves the node again. If the agent
+ * fails the call, the resolver reports the failure, the binding stays null and the check fails. A
+ * node remembers the answers and the failures of its calls. Thus it sends a failed call again only
+ * when the call changes. The agent function caller must complete each call on the thread that owns
+ * the surface.
+ *
  * <p>A resolver is not thread-safe. Use it on the thread that owns its surface.
  *
  * @param <C> the type of the components of the catalogs
@@ -69,6 +77,9 @@ public final class NodeResolver<C extends ComponentApi> {
 
   /** The location of the check rules of a component, for the key of a reported error. */
   private static final String CHECKS = "@checks";
+
+  /** The location of a failure of a template part, for the key of a reported error. */
+  private static final String TEMPLATE = "template";
 
   /** The characters of an ID or of a path that have a meaning in an instance ID. */
   private static final String ID_ESCAPES = "~#[]>@";
@@ -323,9 +334,22 @@ public final class NodeResolver<C extends ComponentApi> {
     private final Map<ChildKey, ComponentNode<C>> children = new LinkedHashMap<>();
     private final Set<String> errors = new LinkedHashSet<>();
 
+    private final AgentMemo memo;
+
     private Pass(ComponentNode<C> node) {
       this.node = node;
-      this.context = DataContext.tracking(surface, node.dataPath(), node.index(), reads);
+      if (node.agentMemo == null) {
+        node.agentMemo = new AgentMemo(() -> recompute(node));
+      }
+      this.memo = node.agentMemo;
+      this.context =
+          DataContext.tracking(
+              surface,
+              node.dataPath(),
+              node.index(),
+              reads,
+              memo,
+              error -> report(this, TEMPLATE, error));
     }
   }
 
@@ -377,6 +401,7 @@ public final class NodeResolver<C extends ComponentApi> {
       }
     });
     watch(node, pass.reads);
+    pass.memo.endOfResolution();
     node.reportedErrors = pass.errors;
     node.publish(new NodeProps<>(props));
   }
@@ -440,7 +465,9 @@ public final class NodeResolver<C extends ComponentApi> {
   }
 
   private ResolvedBinding binding(Pass pass, Object raw, boolean bool, String where) {
-    Object resolved = evaluate(pass, raw, where);
+    Object evaluated = evaluate(pass, raw, where);
+    // A value that waits for the agent is null until the answer resolves this node again.
+    Object resolved = evaluated instanceof Later ? null : evaluated;
     Object value = bool ? Coercion.toBoolean(resolved) : resolved;
     if (raw instanceof Map<?, ?> object && object.get("@path") instanceof String path) {
       return new WritableBinding(value, pass.context.resolvePath(path), surface.dataModel(), bool);
@@ -449,16 +476,17 @@ public final class NodeResolver<C extends ComponentApi> {
   }
 
   /**
-   * Evaluates a dynamic value. If the evaluation fails, the result is null and the resolver reports
-   * the failure to the surface. It reports the same failure of the same location again only after
-   * an evaluation of the node without that failure.
+   * Evaluates a dynamic value. The result is a {@link Later} while the value waits for the agent.
+   * If the evaluation fails, the result is null and the resolver reports the failure to the
+   * surface. It reports the same failure of the same location again only after an evaluation of the
+   * node without that failure.
    *
    * <p>The reported error has the code {@code EXPRESSION_ERROR}. If the surface cannot use the
    * catalog of a call, the code is {@code CATALOG_ERROR}.
    */
   private Object evaluate(Pass pass, Object raw, String where) {
     try {
-      return pass.context.resolveDynamicValue(raw);
+      return pass.context.resolvePending(raw);
     } catch (A2uiError error) {
       report(pass, where, error);
       return null;
@@ -546,10 +574,15 @@ public final class NodeResolver<C extends ComponentApi> {
       try {
         boolean pathBound =
             condition instanceof Map<?, ?> map && map.get("@path") instanceof String;
-        result =
-            ValidationResult.of(pass.context.resolveDynamicValue(condition), message, pathBound);
+        Object outcome = pass.context.resolvePending(condition);
+        if (outcome instanceof Later) {
+          // A rule that waits for the agent does not fail at this time.
+          continue;
+        }
+        result = ValidationResult.of(outcome, message, pathBound);
       } catch (A2uiError error) {
-        // The resolver reports the failure, and the check fails.
+        // The resolver reports the failure, and the check fails. This is also the rule for a
+        // call that the agent failed.
         report(pass, CHECKS + "/" + position + "/condition", error);
         result = ValidationResult.failed(message, error);
       }
@@ -597,10 +630,14 @@ public final class NodeResolver<C extends ComponentApi> {
       // The action resolves its values at this time, not at the time of the node. Thus it reports
       // the data as it is now. The user operated the component. Thus a call can require a user
       // gesture.
-      DataContext context =
-          DataContext.tracking(surface, node.dataPath(), node.index(), null).withUserActivation();
       ActionRunner.run(
-          surface, context, payload, node.componentId(), options.metadata().orElse(null));
+          surface,
+          node.dataPath(),
+          node.index(),
+          true,
+          payload,
+          node.componentId(),
+          options.metadata().orElse(null));
     }
 
     private NodeResolver<C> owner() {
