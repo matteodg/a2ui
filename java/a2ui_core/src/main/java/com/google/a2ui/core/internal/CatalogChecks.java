@@ -71,20 +71,24 @@ public final class CatalogChecks {
    * @param unqualifiedCallsRunHere true if a nested call that names no catalog runs in this catalog
    * @param allowUnknown true if a component type or a function that the catalog does not define is
    *     not a problem. Such an item is not examined.
-   * @return one message for each problem. The list is empty if the component is correct.
+   * @return the problems. The list is empty if the component is correct.
    * @throws A2uiCatalogError if the schema of the type has a reference that names nothing
    */
-  public List<String> componentErrors(
+  public List<Problem> componentProblems(
       Map<String, Object> component, boolean unqualifiedCallsRunHere, boolean allowUnknown) {
-    List<String> errors = new ArrayList<>();
+    List<Problem> errors = new ArrayList<>();
     if (!(component.get("component") instanceof String type)) {
-      errors.add("'component' must name a type");
+      errors.add(new Problem("/component", Problem.MISSING_FIELD, "'component' must name a type"));
       return errors;
     }
     if (catalog.components().containsKey(type)) {
-      errors.addAll(engine.errors("/" + COMPONENTS + "/" + Json.escapePointer(type), component));
+      errors.addAll(engine.problems("/" + COMPONENTS + "/" + Json.escapePointer(type), component));
     } else if (!allowUnknown) {
-      errors.add("Unrecognized component type '" + type + "' in catalog '" + catalog.id() + "'");
+      errors.add(
+          new Problem(
+              "/component",
+              Problem.INVALID_VALUE,
+              "Unrecognized component type '" + type + "' in catalog '" + catalog.id() + "'"));
     }
     checkCalls(component, "", unqualifiedCallsRunHere, allowUnknown, errors);
     return errors;
@@ -95,13 +99,13 @@ public final class CatalogChecks {
    * the calls in the arguments.
    *
    * @param call the call, as {@link Json#freeze(Object)} makes it
-   * @param path the JSON Pointer of the call, for the messages
+   * @param path the JSON Pointer of the call. Each problem has a path below it.
    * @param allowUnknown true if a function that the catalog does not define is not a problem
-   * @return one message for each problem. The list is empty if the call is correct.
+   * @return the problems. The list is empty if the call is correct.
    * @throws A2uiCatalogError if the schema of the function has a reference that names nothing
    */
-  public List<String> callErrors(Map<String, Object> call, String path, boolean allowUnknown) {
-    List<String> errors = new ArrayList<>();
+  public List<Problem> callProblems(Map<String, Object> call, String path, boolean allowUnknown) {
+    List<Problem> errors = new ArrayList<>();
     checkCall(call, path, true, true, allowUnknown, errors);
     return errors;
   }
@@ -112,12 +116,12 @@ public final class CatalogChecks {
    * @param node the value to examine, as {@link Json#freeze(Object)} makes it
    * @param unqualifiedCallsRunHere true if a call that names no catalog runs in this catalog
    * @param allowUnknown true if a function that the catalog does not define is not a problem
-   * @return one message for each problem. The list is empty if each call is correct.
+   * @return the problems. The list is empty if each call is correct.
    * @throws A2uiCatalogError if the schema of a function has a reference that names nothing
    */
-  public List<String> nestedCallErrors(
+  public List<Problem> nestedCallProblems(
       Object node, boolean unqualifiedCallsRunHere, boolean allowUnknown) {
-    List<String> errors = new ArrayList<>();
+    List<Problem> errors = new ArrayList<>();
     checkCalls(node, "", unqualifiedCallsRunHere, allowUnknown, errors);
     return errors;
   }
@@ -125,7 +129,7 @@ public final class CatalogChecks {
   /**
    * Examines each function call that is a node or is below a node.
    *
-   * @param path the JSON Pointer of the node, for the messages
+   * @param path the JSON Pointer of the node
    * @param unqualifiedCallsRunHere true if a call that names no catalog runs in this catalog
    * @param errors the list that receives the problems
    */
@@ -134,13 +138,18 @@ public final class CatalogChecks {
       String path,
       boolean unqualifiedCallsRunHere,
       boolean allowUnknown,
-      List<String> errors) {
+      List<Problem> errors) {
     if (node instanceof Map<?, ?> map) {
       if (map.containsKey("@call")) {
         checkCall(Json.asObject(map), path, unqualifiedCallsRunHere, false, allowUnknown, errors);
       }
       map.forEach((key, value) ->
-          checkCalls(value, path + "/" + key, unqualifiedCallsRunHere, allowUnknown, errors));
+          checkCalls(
+              value,
+              path + "/" + Json.escapePointer((String) key),
+              unqualifiedCallsRunHere,
+              allowUnknown,
+              errors));
     } else if (node instanceof List<?> list) {
       for (int index = 0; index < list.size(); index++) {
         checkCalls(
@@ -162,10 +171,9 @@ public final class CatalogChecks {
       boolean unqualifiedCallsRunHere,
       boolean alwaysRunsHere,
       boolean allowUnknown,
-      List<String> errors) {
-    String prefix = path.isEmpty() ? "" : path + ": ";
+      List<Problem> errors) {
     if (!(call.get("@call") instanceof String name)) {
-      errors.add(prefix + "'@call' must be a string");
+      errors.add(invalid(path, "'@call' must be a string"));
       return;
     }
     Object catalogId = call.get("catalogId");
@@ -173,33 +181,36 @@ public final class CatalogChecks {
     if (name.startsWith("@")) {
       // A system function is part of the protocol, not of a catalog.
       if (!name.equals(INDEX_FUNCTION)) {
-        errors.add(prefix + "unknown system function '" + name + "'");
+        errors.add(invalid(path, "unknown system function '" + name + "'"));
       } else if (catalogId != null) {
-        errors.add(prefix + "system function '" + name + "' must not name a catalogId");
+        errors.add(invalid(path, "system function '" + name + "' must not name a catalogId"));
       } else {
-        engine.errors(INDEX_FUNCTION_POINTER, call).forEach(error -> errors.add(prefix + error));
+        engine
+            .problems(INDEX_FUNCTION_POINTER, call)
+            .forEach(problem -> errors.add(problem.under(path)));
       }
       return;
     }
 
     if (!Uax31.isIdentifier(name)) {
-      errors.add(prefix + "function name '" + name + "' is not a valid UAX #31 identifier");
+      errors.add(invalid(path, "function name '" + name + "' is not a valid UAX #31 identifier"));
     }
     if (call.get("args") instanceof Map<?, ?> args) {
       for (Object argument : args.keySet()) {
         if (!Uax31.isIdentifier((String) argument)) {
           errors.add(
-              prefix
-                  + "argument name '"
-                  + argument
-                  + "' of '"
-                  + name
-                  + "' is not a valid UAX #31 identifier");
+              invalid(
+                  path,
+                  "argument name '"
+                      + argument
+                      + "' of '"
+                      + name
+                      + "' is not a valid UAX #31 identifier"));
         }
       }
     }
     if (catalogId != null && !(catalogId instanceof String)) {
-      errors.add(prefix + "'catalogId' must be a string");
+      errors.add(invalid(path, "'catalogId' must be a string"));
       return;
     }
 
@@ -212,13 +223,19 @@ public final class CatalogChecks {
     if (!catalog.functions().containsKey(name)) {
       if (!allowUnknown) {
         errors.add(
-            prefix + "Unrecognized function '" + name + "' in catalog '" + catalog.id() + "'");
+            invalid(
+                path, "Unrecognized function '" + name + "' in catalog '" + catalog.id() + "'"));
       }
       return;
     }
     engine
-        .errors("/" + CALLS + "/" + Json.escapePointer(name), call)
-        .forEach(error -> errors.add(prefix + error));
+        .problems("/" + CALLS + "/" + Json.escapePointer(name), call)
+        .forEach(problem -> errors.add(problem.under(path)));
+  }
+
+  /** Makes a problem of a call that is not a problem of a schema. */
+  private static Problem invalid(String path, String message) {
+    return new Problem(path, Problem.INVALID_VALUE, message);
   }
 
   /**

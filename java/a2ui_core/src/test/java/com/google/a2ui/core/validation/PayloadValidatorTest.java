@@ -77,13 +77,16 @@ class PayloadValidatorTest {
             A2uiValidationError.class, () -> validator.validateComponent(Map.of("component", 7)));
 
     assertEquals(
-        "Component 'x' (Carousel) is invalid: Unrecognized component type 'Carousel' in catalog '"
+        "Component 'x' (Carousel) is invalid: /component: Unrecognized component type 'Carousel' in catalog '"
             + BasicCatalog.ID
             + "'",
         unknown.getMessage());
-    assertEquals("Component 'x' (?) is invalid: 'component' must name a type", absent.getMessage());
     assertEquals(
-        "Component '?' (7) is invalid: 'component' must name a type", notAString.getMessage());
+        "Component 'x' (?) is invalid: /component: 'component' must name a type",
+        absent.getMessage());
+    assertEquals(
+        "Component '?' (7) is invalid: /component: 'component' must name a type",
+        notAString.getMessage());
   }
 
   @Test

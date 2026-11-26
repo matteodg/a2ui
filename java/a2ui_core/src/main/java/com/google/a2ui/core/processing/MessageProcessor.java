@@ -31,6 +31,7 @@ import com.google.a2ui.core.internal.CatalogChecks;
 import com.google.a2ui.core.internal.CatalogSchemaIndex;
 import com.google.a2ui.core.internal.ComponentGraph;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.Problem;
 import com.google.a2ui.core.state.ComponentModel;
 import com.google.a2ui.core.state.SurfaceComponentsModel;
 import com.google.a2ui.core.state.SurfaceGroupModel;
@@ -423,9 +424,9 @@ public final class MessageProcessor<C extends ComponentApi> {
         // A call that names no catalog runs in the default catalog of the surface. The catalog of
         // the component examines such a call only if it is that default catalog.
         boolean runsUnqualifiedCalls = entry.catalog() == defaultCatalog;
-        for (String problem :
+        for (Problem problem :
             checksFor(entry.catalog())
-                .componentErrors(entry.normalized(), runsUnqualifiedCalls, allowUnknown)) {
+                .componentProblems(entry.normalized(), runsUnqualifiedCalls, allowUnknown)) {
           problems.add("component '" + id + "': " + problem);
         }
       }
@@ -544,7 +545,9 @@ public final class MessageProcessor<C extends ComponentApi> {
               ? owner.catalog() == surface.defaultCatalog().orElse(null)
               : catalogId.equals(owner.catalog().id());
       if (config != null && !examinedByOwner) {
-        problems.addAll(checksFor(target).callErrors(map, path, allowUnknown));
+        checksFor(target)
+            .callProblems(map, path, allowUnknown)
+            .forEach(problem -> problems.add(problem.toString()));
       }
     }
     map.forEach((key, value) ->

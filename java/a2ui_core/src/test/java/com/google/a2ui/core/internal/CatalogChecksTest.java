@@ -35,9 +35,12 @@ class CatalogChecksTest {
     Map<String, Object> carousel = Map.of("id", "c", "component", "Carousel");
 
     assertEquals(
-        List.of("Unrecognized component type 'Carousel' in catalog '" + BasicCatalog.ID + "'"),
-        checks.componentErrors(carousel, true, false));
-    assertEquals(List.of(), checks.componentErrors(carousel, true, true));
+        List.of(
+            "/component: Unrecognized component type 'Carousel' in catalog '"
+                + BasicCatalog.ID
+                + "'"),
+        texts(checks.componentProblems(carousel, true, false)));
+    assertEquals(List.of(), texts(checks.componentProblems(carousel, true, true)));
   }
 
   @Test
@@ -46,7 +49,7 @@ class CatalogChecksTest {
         Json.freezeObject(
             Map.of("id", "c", "component", "Carousel", "label", Map.of("@call", "sh-out")));
 
-    List<String> errors = checks.componentErrors(carousel, true, true);
+    List<String> errors = texts(checks.componentProblems(carousel, true, true));
 
     assertEquals(
         List.of("/label: function name 'sh-out' is not a valid UAX #31 identifier"), errors);
@@ -60,13 +63,13 @@ class CatalogChecksTest {
 
     assertEquals(
         List.of("/text: Unrecognized function 'teleport' in catalog '" + BasicCatalog.ID + "'"),
-        checks.componentErrors(text, true, false));
-    assertEquals(List.of(), checks.componentErrors(text, true, true));
-    assertEquals(List.of(), checks.componentErrors(text, false, false));
+        texts(checks.componentProblems(text, true, false)));
+    assertEquals(List.of(), texts(checks.componentProblems(text, true, true)));
+    assertEquals(List.of(), texts(checks.componentProblems(text, false, false)));
   }
 
   @Test
-  void callErrorsExaminesOneCallInThisCatalogAndNotTheCallsInItsArguments() {
+  void callProblemsExaminesOneCallInThisCatalogAndNotTheCallsInItsArguments() {
     Map<String, Object> inner = Map.of("@call", "teleport");
     Map<String, Object> call =
         Json.freezeObject(
@@ -74,14 +77,14 @@ class CatalogChecksTest {
     Map<String, Object> noArguments =
         Json.freezeObject(Map.of("@call", "openUrl", "catalogId", "urn:other"));
 
-    assertEquals(List.of(), checks.callErrors(call, "/action", false));
-    List<String> errors = checks.callErrors(noArguments, "/action", false);
+    assertEquals(List.of(), texts(checks.callProblems(call, "/action", false)));
+    List<String> errors = texts(checks.callProblems(noArguments, "/action", false));
     assertEquals(1, errors.size(), errors.toString());
-    assertTrue(errors.get(0).startsWith("/action: "), errors.toString());
+    assertTrue(errors.get(0).startsWith("/action/args: "), errors.toString());
   }
 
   @Test
-  void nestedCallErrorsExaminesEachCallBelowAValue() {
+  void nestedCallProblemsExaminesEachCallBelowAValue() {
     Object value =
         Json.freeze(
             List.of(
@@ -91,9 +94,13 @@ class CatalogChecksTest {
         List.of(
             "/0: Unrecognized function 'teleport' in catalog '" + BasicCatalog.ID + "'",
             "/1/a: unknown system function '@now'"),
-        checks.nestedCallErrors(value, true, false));
+        texts(checks.nestedCallProblems(value, true, false)));
     assertEquals(
         List.of("/1/a: unknown system function '@now'"),
-        checks.nestedCallErrors(value, true, true));
+        texts(checks.nestedCallProblems(value, true, true)));
+  }
+
+  private static List<String> texts(List<Problem> problems) {
+    return problems.stream().map(Problem::toString).toList();
   }
 }

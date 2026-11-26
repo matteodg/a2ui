@@ -21,10 +21,12 @@ import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.exceptions.A2uiValidationError;
 import com.google.a2ui.core.internal.CatalogChecks;
 import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.Problem;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Examines one component or one function call against one v1.0 catalog.
@@ -65,7 +67,7 @@ public final class PayloadValidator {
     // A component that names its catalog is possibly not in the default catalog of the surface.
     // A call that names no catalog runs in that default catalog. Thus this catalog cannot examine
     // such a call.
-    List<String> errors = checks.componentErrors(value, !value.containsKey("@catalogId"), false);
+    List<Problem> errors = checks.componentProblems(value, !value.containsKey("@catalogId"), false);
     if (!errors.isEmpty()) {
       throw new A2uiValidationError(
           "Component '"
@@ -73,7 +75,7 @@ public final class PayloadValidator {
               + "' ("
               + (value.get("component") == null ? "?" : value.get("component"))
               + ") is invalid: "
-              + String.join("; ", errors));
+              + listed(errors));
     }
   }
 
@@ -90,11 +92,14 @@ public final class PayloadValidator {
     Map<String, Object> call = new LinkedHashMap<>();
     call.put("@call", Objects.requireNonNull(name, "name"));
     call.put("args", Objects.requireNonNull(args, "args"));
-    List<String> errors = checks.nestedCallErrors(frozen(call), true, false);
+    List<Problem> errors = checks.nestedCallProblems(frozen(call), true, false);
     if (!errors.isEmpty()) {
-      throw new A2uiValidationError(
-          "Call to '" + name + "' is invalid: " + String.join("; ", errors));
+      throw new A2uiValidationError("Call to '" + name + "' is invalid: " + listed(errors));
     }
+  }
+
+  private static String listed(List<Problem> problems) {
+    return problems.stream().map(Problem::toString).collect(Collectors.joining("; "));
   }
 
   private static Map<String, Object> frozen(Map<String, ?> value) {
