@@ -26,7 +26,6 @@ import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionImplementation;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.conformance.SuiteRegistry.CaseHandler;
-import com.google.a2ui.core.exceptions.A2uiCatalogError;
 import com.google.a2ui.core.resolution.DataContext;
 import com.google.a2ui.core.state.SurfaceModel;
 import java.util.ArrayList;
@@ -34,8 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The action {@code select_catalog}: the handler makes the surface of the case with its catalogs.
@@ -60,14 +57,6 @@ final class SelectCatalogHandler implements CaseHandler {
   private static final Set<String> CATALOG_KEYS = Set.of("protocolVersion");
 
   private static final Set<String> ERROR_KEYS = Set.of("category", "message");
-
-  /**
-   * The text of the suite for a catalog that a surface cannot use. This SDK reports that failure
-   * with the text {@code Catalog not found: <id> (<item> on surface '<surface>').}, as the message
-   * processor cases expect it.
-   */
-  private static final Pattern NOT_SUPPORTED =
-      Pattern.compile("Catalog '([^']*)' is not supported by surface '([^']*)'\\.");
 
   @Override
   public void run(ConformanceCase testCase) throws Exception {
@@ -156,7 +145,7 @@ final class SelectCatalogHandler implements CaseHandler {
           .forEach((id, raw) -> {
             Object catalogId = asObject(raw, "component " + id).get("catalogId");
             String named = catalogId == null ? null : asString(catalogId, "catalogId of " + id);
-            selections.add(surface.resolveCatalog(named, "Component '" + id + "'").id());
+            selections.add(surface.resolveComponentCatalog(named, id).id());
           });
     }
     if (functionCall != null) {
@@ -196,26 +185,6 @@ final class SelectCatalogHandler implements CaseHandler {
       Object expectError, ExpectedErrors.Block select, String location) throws Exception {
     Map<String, Object> expected = asObject(expectError, "expectError in " + location);
     KnownKeys.assertKnownKeys(expected, ERROR_KEYS, "expectError in " + location);
-    String message = asString(expected.get("message"), "expectError.message in " + location);
-    Matcher notSupported = NOT_SUPPORTED.matcher(message);
-    if (!notSupported.matches()) {
-      ExpectedErrors.assertRaises(expected, location, select);
-      return;
-    }
-    // The SDK has a different text for this failure. The handler examines the same facts: the
-    // category, the catalog and the surface.
-    assertJsonEquals(
-        "CatalogError", expected.get("category"), "expectError.category in " + location);
-    try {
-      select.run();
-    } catch (A2uiCatalogError e) {
-      String actual = String.valueOf(e.getMessage());
-      if (actual.startsWith("Catalog not found: " + notSupported.group(1) + " (")
-          && actual.contains("on surface '" + notSupported.group(2) + "'")) {
-        return;
-      }
-      throw new AssertionError(location + ": the message was '" + actual + "'", e);
-    }
-    throw new AssertionError(location + ": expected a CatalogError but nothing was thrown");
+    ExpectedErrors.assertRaises(expected, location, select);
   }
 }

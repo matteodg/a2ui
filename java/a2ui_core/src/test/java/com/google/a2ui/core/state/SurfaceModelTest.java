@@ -101,6 +101,27 @@ class SurfaceModelTest {
   }
 
   @Test
+  void resolveComponentCatalogGivesTheNamedCatalogOrTheDefaultCatalog() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+
+    assertSame(OTHER, surface.resolveComponentCatalog("urn:other", "root"));
+    assertSame(BASIC, surface.resolveComponentCatalog(null, "root"));
+  }
+
+  @Test
+  void resolveComponentCatalogFailsForACatalogThatTheSurfaceCannotUse() {
+    SurfaceModel<ComponentApi> surface = surface(BASIC);
+
+    A2uiCatalogError error =
+        assertThrows(
+            A2uiCatalogError.class, () -> surface.resolveComponentCatalog("urn:missing", "c1"));
+
+    assertEquals(
+        "Component 'c1': Catalog 'urn:missing' is not supported by surface 's'.",
+        error.getMessage());
+  }
+
+  @Test
   void resolveCatalogFailsIfNothingNamesACatalog() {
     SurfaceModel<ComponentApi> surface = surface(null);
 

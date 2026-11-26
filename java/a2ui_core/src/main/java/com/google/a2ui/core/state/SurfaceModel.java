@@ -232,6 +232,25 @@ public final class SurfaceModel<C extends ComponentApi> {
   }
 
   /**
+   * Gets the catalog of a component. It is the catalog that the component names. If the component
+   * names none, it is the default catalog of the surface.
+   *
+   * @param catalogId the ID that the component names, or null if it names none
+   * @param componentId the ID of the component, for the error message
+   * @return the catalog
+   * @throws A2uiCatalogError if the surface cannot use the named catalog, or if the component names
+   *     no catalog and the surface has no default catalog
+   */
+  public Catalog<C, ?> resolveComponentCatalog(String catalogId, String componentId) {
+    String subject = "Component '" + componentId + "'";
+    if (catalogId != null && !availableCatalogs.containsKey(catalogId)) {
+      throw new A2uiCatalogError(
+          subject + ": Catalog '" + catalogId + "' is not supported by surface '" + id + "'.");
+    }
+    return resolveCatalog(catalogId, subject);
+  }
+
+  /**
    * Gets the source of the action events. An event occurs when a component of this surface reports
    * an action for the agent.
    *

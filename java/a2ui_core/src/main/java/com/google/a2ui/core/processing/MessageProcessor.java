@@ -970,7 +970,7 @@ public final class MessageProcessor<C extends ComponentApi> {
       throw new A2uiValidationError(
           "Component '" + id + "' has a @catalogId that is not a string: " + catalogId);
     }
-    Catalog<C, ?> catalog = surface.resolveCatalog((String) catalogId, "Component '" + id + "'");
+    Catalog<C, ?> catalog = surface.resolveComponentCatalog((String) catalogId, id);
     for (String key : LEGACY_ENVELOPE_KEYS) {
       if (!owns(catalog, type, key)) {
         adoptLegacyKey(normalized, id, key);
