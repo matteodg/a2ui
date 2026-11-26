@@ -37,10 +37,12 @@ import com.google.a2ui.core.expressions.ExpressionParser;
 import com.google.a2ui.core.state.SurfaceModel;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 
@@ -473,5 +475,46 @@ class DataContextTest {
     Object received = context().resolveDynamicValue(call("echo", args));
 
     assertEquals(Map.of("on", false), received);
+  }
+
+  @Test
+  void getReadsAValueAtAPathThatStartsAtTheContextPath() {
+    SurfaceModel<ComponentApi> surface =
+        surface(Map.of("title", "Team", "user", Map.of("name", "Ada")));
+    DataContext context = new DataContext(surface, "/user");
+
+    assertEquals("Ada", context.get("name"));
+    assertEquals("Team", context.get("/title"));
+    assertEquals(Map.of("name", "Ada"), context.get(""));
+    assertNull(context.get("missing"));
+  }
+
+  @Test
+  void aTrackingContextRecordsEachPathThatItAndItsContextsRead() {
+    SurfaceModel<ComponentApi> surface =
+        surface(Map.of("title", "Team", "user", Map.of("name", "Ada")));
+    Set<String> reads = new LinkedHashSet<>();
+    DataContext context = DataContext.tracking(surface, "/user", OptionalInt.of(3), reads);
+
+    context.resolveDynamicValue(Map.of("@path", "name"));
+    context.resolveDynamicValue(call("render", Map.of("value", "${/title}")));
+    context.nested("address").get("city");
+    context.withUserActivation().get("/flag");
+
+    assertEquals(OptionalInt.of(3), context.index());
+    assertEquals(Set.of("/user/name", "/title", "/user/address/city", "/flag"), reads);
+  }
+
+  @Test
+  void aFunctionReadsDataThroughATrackingContext() {
+    SurfaceModel<ComponentApi> surface = surface(Map.of("count", 2L));
+    Set<String> reads = new LinkedHashSet<>();
+    DataContext context = DataContext.tracking(surface, "/", OptionalInt.empty(), reads);
+
+    Object letters =
+        context.resolveDynamicValue(call("letters", Map.of("value", Map.of("@path", "/count"))));
+
+    assertEquals("2", letters);
+    assertEquals(Set.of("/count"), reads);
   }
 }

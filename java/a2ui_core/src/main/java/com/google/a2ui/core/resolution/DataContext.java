@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -70,6 +71,12 @@ public final class DataContext {
   private final Catalog<?, ?> callCatalog;
 
   /**
+   * The set that gets the absolute path of each read through this context, or null if the context
+   * records nothing. Each context that this context makes uses the same set.
+   */
+  private final Set<String> reads;
+
+  /**
    * Makes a context at the root of the data of a surface, outside a list template.
    *
    * @param surface the surface whose data and catalogs the context uses
@@ -91,6 +98,7 @@ public final class DataContext {
         DataModel.resolvePath(Objects.requireNonNull(path, "path"), null),
         NO_INDEX,
         false,
+        null,
         null);
   }
 
@@ -99,12 +107,50 @@ public final class DataContext {
       String path,
       int index,
       boolean userActivated,
-      Catalog<?, ?> callCatalog) {
+      Catalog<?, ?> callCatalog,
+      Set<String> reads) {
     this.surface = surface;
     this.path = path;
     this.index = index;
     this.userActivated = userActivated;
     this.callCatalog = callCatalog;
+    this.reads = reads;
+  }
+
+  /**
+   * Makes a context at the scope of a resolved node. The context records each path that code reads
+   * through it and through each context that it makes.
+   *
+   * @param surface the surface whose data and catalogs the context uses
+   * @param path the absolute data path of the scope
+   * @param index the position of the list item of the scope, or an empty value outside a list
+   *     template
+   * @param reads the set that gets the absolute path of each read, or null to record nothing
+   * @return the new context
+   */
+  static DataContext tracking(
+      SurfaceModel<?> surface, String path, OptionalInt index, Set<String> reads) {
+    return new DataContext(surface, path, index.orElse(NO_INDEX), false, null, reads);
+  }
+
+  /**
+   * Reads a value from the data of the surface.
+   *
+   * <p>A function must read data through its context and not directly from the data model. The core
+   * records each path that a binding reads through a context. Then the core evaluates the binding
+   * again when the data at one of these paths changes.
+   *
+   * @param path the path to read. A path that does not start with {@code /} starts at the path of
+   *     this context.
+   * @return the value, or null if the path has no value. Maps and lists are read-only.
+   * @throws A2uiDataError if the path is not correct
+   */
+  public Object get(String path) {
+    String absolute = resolvePath(path);
+    if (reads != null) {
+      reads.add(absolute);
+    }
+    return surface.dataModel().get(absolute);
   }
 
   /**
@@ -155,7 +201,8 @@ public final class DataContext {
    * @return the new context
    */
   public DataContext nested(String relativePath) {
-    return new DataContext(surface, resolvePath(relativePath), index, userActivated, callCatalog);
+    return new DataContext(
+        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads);
   }
 
   /**
@@ -171,7 +218,8 @@ public final class DataContext {
     if (index < 0) {
       throw new IllegalArgumentException("The position of a list item must not be negative.");
     }
-    return new DataContext(surface, resolvePath(relativePath), index, userActivated, callCatalog);
+    return new DataContext(
+        surface, resolvePath(relativePath), index, userActivated, callCatalog, reads);
   }
 
   /**
@@ -182,7 +230,7 @@ public final class DataContext {
    * @return the new context
    */
   public DataContext withUserActivation() {
-    return new DataContext(surface, path, index, true, callCatalog);
+    return new DataContext(surface, path, index, true, callCatalog, reads);
   }
 
   /**
@@ -226,7 +274,7 @@ public final class DataContext {
     return switch (value) {
       case Map<?, ?> object -> {
         if (object.get("@path") instanceof String binding) {
-          yield surface.dataModel().get(resolvePath(binding));
+          yield get(binding);
         }
         if (object.get("@call") instanceof String name) {
           yield call(name, object.get("catalogId"), null, () -> resolveArguments(object));
@@ -268,7 +316,7 @@ public final class DataContext {
   public Object evaluate(Expression expression) {
     return switch (Objects.requireNonNull(expression, "expression")) {
       case Expression.Literal literal -> literal.value();
-      case Expression.Path binding -> surface.dataModel().get(resolvePath(binding.path()));
+      case Expression.Path binding -> get(binding.path());
       case Expression.Call call ->
           call(
               call.name(),
@@ -345,7 +393,7 @@ public final class DataContext {
     }
     return implementation.execute(
         coerceArguments(function, arguments.get()),
-        new DataContext(surface, path, index, userActivated, catalog));
+        new DataContext(surface, path, index, userActivated, catalog, reads));
   }
 
   /** Runs a function that the protocol defines. Such a function is in no catalog. */
