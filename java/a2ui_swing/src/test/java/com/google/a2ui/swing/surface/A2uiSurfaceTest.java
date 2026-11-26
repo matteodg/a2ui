@@ -36,6 +36,7 @@ import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.testing.Edt;
+import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.TestCatalog;
 import com.google.a2ui.swing.testing.TestSurface;
 import java.awt.Component;
@@ -54,8 +55,7 @@ class A2uiSurfaceTest {
   /** Makes the surface component and connects it, as a window does. */
   private A2uiSurface mount(A2uiFallbacks fallbacks) {
     A2uiSurface view = new A2uiSurface(surface.model(), fallbacks);
-    view.addNotify();
-    return view;
+    return Headless.mount(view);
   }
 
   private static Object[] form() {
@@ -318,8 +318,8 @@ class A2uiSurfaceTest {
                           "badgeText",
                           "Operational")))));
 
-      A2uiSurface view = new A2uiSurface(processor.model().getSurface("s").orElseThrow());
-      view.addNotify();
+      A2uiSurface view =
+          Headless.mount(new A2uiSurface(processor.model().getSurface("s").orElseThrow()));
 
       JPanel box = (JPanel) view.getComponent(0);
       assertEquals("System Status", ((JLabel) box.getComponent(0)).getText());

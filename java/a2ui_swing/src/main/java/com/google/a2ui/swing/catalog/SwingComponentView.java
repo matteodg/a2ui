@@ -19,6 +19,7 @@ package com.google.a2ui.swing.catalog;
 import com.google.a2ui.core.resolution.ComponentNode;
 import com.google.a2ui.core.resolution.NodeProps;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import javax.swing.JComponent;
 
@@ -63,6 +64,37 @@ public interface SwingComponentView {
    * @param props the current properties of the node
    */
   void update(ComponentNode<?> node, NodeProps<?> props);
+
+  /**
+   * Gets the Swing component that gets the accessibility attributes of the component. The adapter
+   * gives the {@code @accessibility} attributes of the node to this component after each update:
+   * the label is its accessible name, and the description is its accessible description. Do not set
+   * these two values in the view. To give a default name, override {@link
+   * #inferredAccessibleName()}.
+   *
+   * <p>The default implementation returns {@link #component()}. A view whose control is in a panel
+   * returns the control, because the element that gets the focus must have the attributes.
+   *
+   * @return the component. It is the same object for the life of the view.
+   */
+  default JComponent accessibleComponent() {
+    return component();
+  }
+
+  /**
+   * Gets the accessible name that the view infers from its visible text, for a component that has
+   * no {@code @accessibility} label. Examples are the text of the child of a button, and the label
+   * of a text field. The adapter calls this method after each update of the view, and after each
+   * update of a view below it.
+   *
+   * <p>The default implementation returns an empty result. Then the Swing component keeps the name
+   * that Swing gives it, for example the text of a {@code JLabel}.
+   *
+   * @return the name, or an empty result if the view infers none
+   */
+  default Optional<String> inferredAccessibleName() {
+    return Optional.empty();
+  }
 
   /**
    * Releases the listeners, the timers and the other resources of this view. The adapter calls this

@@ -264,9 +264,7 @@ public final class A2uiSurface extends JPanel {
         return;
       }
       if (rootHost == null) {
-        rootHost =
-            new NodeHost(
-                scope, Optional.empty(), host -> setContent(host.component().orElse(null)));
+        rootHost = new NodeHost(scope, host -> setContent(host.component().orElse(null)));
       }
       rootHost.bind(root);
       setContent(rootHost.component().orElse(null));

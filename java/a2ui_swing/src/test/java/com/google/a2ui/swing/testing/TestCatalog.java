@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -194,6 +195,7 @@ public final class TestCatalog {
     public final JTextField field = new JTextField(12);
 
     private final TextBinding value = new TextBinding(field);
+    private String label = "";
 
     @Override
     public JComponent component() {
@@ -203,8 +205,14 @@ public final class TestCatalog {
     @Override
     void show(NodeProps<?> props) {
       value.update(props, "value");
+      label = Coercion.toText(props.value("label"));
       List<String> errors = props.validationErrors();
       field.setToolTipText(errors.isEmpty() ? null : String.join(" ", errors));
+    }
+
+    @Override
+    public Optional<String> inferredAccessibleName() {
+      return label.isEmpty() ? Optional.empty() : Optional.of(label);
     }
 
     @Override
@@ -247,6 +255,15 @@ public final class TestCatalog {
       button.setEnabled(props.isValid());
       action = props.action("action").orElse(null);
       child.sync(props.child("child"));
+    }
+
+    /** Gets the text of the child, as a button gets its name from its visible text. */
+    @Override
+    public Optional<String> inferredAccessibleName() {
+      return child.components().stream()
+          .filter(JLabel.class::isInstance)
+          .map(component -> ((JLabel) component).getText())
+          .findFirst();
     }
   }
 

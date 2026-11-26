@@ -39,6 +39,10 @@ import javax.swing.JComponent;
  */
 final class ChildReconciler implements ChildViews, NodeHost.Listener {
   private final SurfaceScope scope;
+
+  /** The host of the component that has the children. */
+  private final NodeHost owner;
+
   private final String parentComponentType;
   private final Container container;
 
@@ -58,10 +62,12 @@ final class ChildReconciler implements ChildViews, NodeHost.Listener {
 
   ChildReconciler(
       SurfaceScope scope,
+      NodeHost owner,
       String parentComponentType,
       Container container,
       Function<? super ComponentNode<?>, ?> constraints) {
     this.scope = scope;
+    this.owner = owner;
     this.parentComponentType = parentComponentType;
     this.container = Objects.requireNonNull(container, "container");
     this.constraints = constraints;
@@ -84,7 +90,7 @@ final class ChildReconciler implements ChildViews, NodeHost.Listener {
         }
         NodeHost host = before.remove(child.instanceId());
         if (host == null) {
-          host = new NodeHost(scope, Optional.of(parentComponentType), this);
+          host = new NodeHost(scope, owner, Optional.of(parentComponentType), this);
         }
         next.put(child.instanceId(), host);
         host.bind(child);

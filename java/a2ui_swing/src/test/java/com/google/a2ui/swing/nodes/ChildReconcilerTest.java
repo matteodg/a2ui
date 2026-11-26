@@ -63,7 +63,7 @@ class ChildReconcilerTest {
     surface.create(data, components);
     scope = new SurfaceScope(surface.model(), fallbacks, A2uiServices.DEFAULT);
     resolver = new NodeResolver<>(surface.model());
-    rootHost = new NodeHost(scope, Optional.empty(), host -> {});
+    rootHost = new NodeHost(scope, host -> {});
     resolver.rootNode().subscribe(root -> root.ifPresent(rootHost::bind));
     rootHost.bind(root());
     JPanel panel = (JPanel) rootHost.component().orElseThrow();
@@ -347,7 +347,7 @@ class ChildReconcilerTest {
           component("text", "Label", "text", "Save"));
       scope = new SurfaceScope(surface.model(), fallbacks, A2uiServices.DEFAULT);
       resolver = new NodeResolver<>(surface.model());
-      rootHost = new NodeHost(scope, Optional.empty(), host -> {});
+      rootHost = new NodeHost(scope, host -> {});
       rootHost.bind(root());
 
       JButton button = (JButton) rootHost.component().orElseThrow();

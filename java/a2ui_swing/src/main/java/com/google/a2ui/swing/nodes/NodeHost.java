@@ -74,6 +74,10 @@ public final class NodeHost {
   }
 
   private final SurfaceScope scope;
+
+  /** The host of the parent position, or null for the root. */
+  private final NodeHost parent;
+
   private final Optional<String> parentComponentType;
   private final Listener listener;
 
@@ -84,6 +88,9 @@ public final class NodeHost {
   private SwingComponentImplementation implementation;
 
   private SwingComponentView view;
+
+  /** The accessibility state of the view, or null if there is no view. */
+  private Accessibility accessibility;
 
   /** The context of the view, or null if there is no view. */
   private HostViewContext context;
@@ -98,15 +105,32 @@ public final class NodeHost {
   private boolean disposed;
 
   /**
+   * Makes the host of the root. It shows nothing until the first call of {@link
+   * #bind(ComponentNode)}.
+   *
+   * @param scope the objects of the mounted surface
+   * @param listener receives the changes of this host
+   */
+  public NodeHost(SurfaceScope scope, Listener listener) {
+    this(scope, null, Optional.empty(), listener);
+  }
+
+  /**
    * Makes a host that shows nothing until the first call of {@link #bind(ComponentNode)}.
    *
    * @param scope the objects of the mounted surface
+   * @param parent the host of the parent position, or null for the root
    * @param parentComponentType the type of the component whose child this position is, or an empty
    *     value for the root
    * @param listener receives the changes of this host
    */
-  public NodeHost(SurfaceScope scope, Optional<String> parentComponentType, Listener listener) {
+  NodeHost(
+      SurfaceScope scope,
+      NodeHost parent,
+      Optional<String> parentComponentType,
+      Listener listener) {
     this.scope = Objects.requireNonNull(scope, "scope");
+    this.parent = parent;
     this.parentComponentType = Objects.requireNonNull(parentComponentType, "parentComponentType");
     this.listener = Objects.requireNonNull(listener, "listener");
   }
@@ -234,6 +258,7 @@ public final class NodeHost {
       Objects.requireNonNull(made, "createView returned null");
       Objects.requireNonNull(made.component(), "the view has no component");
       view = made;
+      accessibility = new Accessibility();
       context = created;
       implementation = resolved;
     } catch (RuntimeException e) {
@@ -250,7 +275,24 @@ public final class NodeHost {
       SurfaceScope.log(
           "The view of the component '" + node.componentId() + "' failed in an update.", e);
     }
+    applyAccessibility(true);
+    // The name that a parent infers can come from the text of this view, as for a button.
+    for (NodeHost above = parent; above != null; above = above.parent) {
+      above.applyAccessibility(false);
+    }
     listener.updated(this);
+  }
+
+  private void applyAccessibility(boolean updated) {
+    if (view == null) {
+      return;
+    }
+    try {
+      accessibility.apply(view, node.props().get(), updated);
+    } catch (RuntimeException e) {
+      SurfaceScope.log(
+          "The accessibility attributes failed for the component '" + node.componentId() + "'.", e);
+    }
   }
 
   private void showFallback(ComponentNode<?> placeholder) {
@@ -298,6 +340,7 @@ public final class NodeHost {
     SwingComponentView disposedView = view;
     HostViewContext disposedContext = context;
     view = null;
+    accessibility = null;
     context = null;
     implementation = null;
     // The views of the children go first, as the children of a Swing component do.
@@ -341,7 +384,7 @@ public final class NodeHost {
         throw new IllegalStateException("The view of this context is disposed.");
       }
       ChildReconciler reconciler =
-          new ChildReconciler(scope, componentType, container, constraints);
+          new ChildReconciler(scope, NodeHost.this, componentType, container, constraints);
       reconcilers.add(reconciler);
       return reconciler;
     }

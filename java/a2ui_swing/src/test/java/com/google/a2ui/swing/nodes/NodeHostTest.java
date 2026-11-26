@@ -73,7 +73,7 @@ class NodeHostTest {
   /** Makes the surface and a host for its root. */
   private NodeHost rootHost(Map<String, Object> data, Object... components) {
     mount(data, components);
-    NodeHost host = new NodeHost(scope, Optional.empty(), listener);
+    NodeHost host = new NodeHost(scope, listener);
     host.bind(root());
     return host;
   }
@@ -92,7 +92,7 @@ class NodeHostTest {
   /** Makes the surface and a host for the child of its root button. */
   private NodeHost childHost(Object... components) {
     mount(Map.of(), components);
-    NodeHost host = new NodeHost(scope, Optional.of("Button"), listener);
+    NodeHost host = new NodeHost(scope, null, Optional.of("Button"), listener);
     host.bind(child());
     return host;
   }
@@ -244,7 +244,7 @@ class NodeHostTest {
           });
       mount(Map.of(), component("root", "Button", "child", "middle"));
       surface.put("middle", "Button", "child", "root");
-      NodeHost host = new NodeHost(scope, Optional.of("Button"), listener);
+      NodeHost host = new NodeHost(scope, null, Optional.of("Button"), listener);
 
       host.bind(child().props().get().child("child").orElseThrow());
 
