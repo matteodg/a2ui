@@ -77,9 +77,7 @@ final class SuiteRegistry {
   private static final String NEEDS_VALIDATOR =
       "Needs the JSON Schema validator, which java-core does not have yet";
   private static final String NEEDS_VALIDATION_SCHEMA =
-      "Needs the flattened validation schema of a catalog, which java-core does not have yet";
-  private static final String NEEDS_COMPONENT_VALIDATION =
-      "Needs the validation of component instances, which java-core does not have yet";
+      "Needs the handler for the golden validation schema files, which java-core does not have yet";
   private static final String V1_ONLY = "java-core implements protocol v1.0 only";
   private static final String ADAPTER = "Framework adapter suite; java-core has no UI";
 
@@ -199,11 +197,7 @@ final class SuiteRegistry {
                 "to_json", new ToJsonHandler(),
                 "round_trip", new RoundTripHandler(),
                 "derive", new DeriveHandler()),
-            reasons(
-                "validation_schema", NEEDS_VALIDATION_SCHEMA,
-                "from_json.expect.selfContained", NEEDS_VALIDATION_SCHEMA,
-                "from_json.expect.validComponents", NEEDS_COMPONENT_VALIDATION,
-                "from_json.expect.invalidComponents", NEEDS_COMPONENT_VALIDATION),
+            reasons("validation_schema", NEEDS_VALIDATION_SCHEMA),
             Set.of()));
     suites.put(
         "core/common_types.yaml",

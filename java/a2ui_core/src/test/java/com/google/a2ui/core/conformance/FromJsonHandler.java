@@ -16,6 +16,7 @@
 
 package com.google.a2ui.core.conformance;
 
+import static com.google.a2ui.core.conformance.JsonValues.asList;
 import static com.google.a2ui.core.conformance.JsonValues.asObject;
 import static com.google.a2ui.core.conformance.JsonValues.assertJsonEquals;
 
@@ -26,6 +27,10 @@ import com.google.a2ui.core.catalog.ComponentApi;
 import com.google.a2ui.core.catalog.FunctionApi;
 import com.google.a2ui.core.common.ProtocolVersion;
 import com.google.a2ui.core.conformance.SuiteRegistry.CaseHandler;
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.validation.PayloadValidator;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +54,11 @@ final class FromJsonHandler implements CaseHandler {
           "componentMetadata",
           "components",
           "functions",
+          "invalidComponents",
           "matchesBuiltinCatalog",
-          "protocolVersion");
+          "protocolVersion",
+          "selfContained",
+          "validComponents");
 
   @Override
   public void run(ConformanceCase testCase) throws Exception {
@@ -108,6 +116,80 @@ final class FromJsonHandler implements CaseHandler {
     if (Boolean.TRUE.equals(expect.get("matchesBuiltinCatalog"))) {
       assertMatchesBuiltin(catalog, location);
     }
+    if (Boolean.TRUE.equals(expect.get("selfContained"))) {
+      assertSelfContained(catalog.validationSchema(), location);
+    }
+    if (expect.containsKey("validComponents") || expect.containsKey("invalidComponents")) {
+      assertComponents(catalog, expect, location);
+    }
+  }
+
+  /**
+   * Fails if a validation schema has a {@code $ref} that goes out of the document or that names
+   * nothing. A schema with no reference also fails, because then the case examines nothing.
+   */
+  private static void assertSelfContained(Map<String, Object> schema, String where) {
+    List<String> refs = new ArrayList<>();
+    collectRefs(schema, refs);
+    if (refs.isEmpty()) {
+      throw new AssertionError(where + ": the validation schema has no references");
+    }
+    for (String ref : refs) {
+      if (!ref.startsWith("#")) {
+        throw new AssertionError(where + ": the reference " + ref + " goes out of the document");
+      }
+      Object current = schema;
+      String[] segments = ref.substring(1).split("/", -1);
+      for (int i = 1; i < segments.length; i++) {
+        String segment = Json.unescapePointer(segments[i]);
+        if (!(current instanceof Map<?, ?> map) || !map.containsKey(segment)) {
+          throw new AssertionError(where + ": the reference " + ref + " names nothing");
+        }
+        current = map.get(segment);
+      }
+    }
+  }
+
+  private static void collectRefs(Object node, List<String> refs) {
+    if (node instanceof Map<?, ?> map) {
+      map.forEach((key, value) -> {
+        if ("$ref".equals(key) && value instanceof String ref) {
+          refs.add(ref);
+        }
+        collectRefs(value, refs);
+      });
+    } else if (node instanceof List<?> list) {
+      list.forEach(item -> collectRefs(item, refs));
+    }
+  }
+
+  /**
+   * Validates the components of an expectation against the catalog. Each component of {@code
+   * validComponents} must be valid, and each component of {@code invalidComponents} must not be.
+   */
+  private static void assertComponents(
+      Catalog<ComponentApi, FunctionApi> catalog, Map<String, Object> expect, String where) {
+    PayloadValidator validator = new PayloadValidator(catalog);
+    for (Object component : listOf(expect, "validComponents", where)) {
+      try {
+        validator.validateComponent(asObject(component, "validComponents entry in " + where));
+      } catch (A2uiValidationError e) {
+        throw new AssertionError(
+            where + ": expected <" + component + "> to be valid: " + e.getMessage(), e);
+      }
+    }
+    for (Object component : listOf(expect, "invalidComponents", where)) {
+      try {
+        validator.validateComponent(asObject(component, "invalidComponents entry in " + where));
+      } catch (A2uiValidationError e) {
+        continue;
+      }
+      throw new AssertionError(where + ": expected <" + component + "> to be rejected");
+    }
+  }
+
+  private static List<Object> listOf(Map<String, Object> expect, String key, String where) {
+    return expect.get(key) == null ? List.of() : asList(expect.get(key), key + " in " + where);
   }
 
   /** Converts the metadata of a component to the notation of the suite, or to null. */
