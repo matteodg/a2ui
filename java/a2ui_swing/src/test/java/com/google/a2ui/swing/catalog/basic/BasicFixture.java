@@ -26,6 +26,7 @@ import com.google.a2ui.core.exceptions.A2uiError;
 import com.google.a2ui.core.processing.MessageProcessor;
 import com.google.a2ui.core.state.RendererAction;
 import com.google.a2ui.core.state.SurfaceModel;
+import com.google.a2ui.core.validation.ValidationConfig;
 import com.google.a2ui.swing.catalog.SwingComponentImplementation;
 import com.google.a2ui.swing.catalog.SwingComponentView;
 import com.google.a2ui.swing.catalog.ViewContext;
@@ -46,7 +47,8 @@ import javax.swing.SwingUtilities;
 
 /**
  * A message processor with the basic catalog and one mounted surface, for the tests of the views of
- * the basic catalog. Use it on the event dispatch thread.
+ * the basic catalog. The processor accepts a reference to a component that did not arrive. Use the
+ * fixture on the event dispatch thread.
  */
 final class BasicFixture {
   /** The ID of the surface. */
@@ -60,7 +62,10 @@ final class BasicFixture {
 
   /** The view of each component of the basic catalog that the adapter can show. */
   private static final Map<String, Function<ViewContext, SwingComponentView>> VIEWS =
-      Map.of("Text", TextView::new);
+      Map.of(
+          "Text", TextView::new,
+          "Row", context -> new FlexContainerView(context, FlexLayout.Axis.HORIZONTAL),
+          "Column", context -> new FlexContainerView(context, FlexLayout.Axis.VERTICAL));
 
   /** The URLs that the function {@code openUrl} opened. */
   final List<URI> opened = new ArrayList<>();
@@ -73,7 +78,7 @@ final class BasicFixture {
 
   /** The processor that owns the surface. */
   final MessageProcessor<SwingComponentImplementation> processor =
-      new MessageProcessor<>(List.of(catalog()));
+      new MessageProcessor<>(List.of(catalog()), ValidationConfig.RELAXED);
 
   private final A2uiServices services;
 
