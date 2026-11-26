@@ -9,7 +9,7 @@ This document is the authoritative guide for AI agents working within the A2UI r
 > **INSTRUCTION FOR ALL AGENTS (Gemini CLI, Claude, OpenAI, Antigravity, etc.):**
 > Before performing any specific tasks, load and read the respective skill recipe file in full:
 
-- **For authoring code, refactoring, addressing review feedback, or reviewing PR diffs across any language:** Read [.agents/skills/coding-principles/SKILL.md](.agents/skills/coding-principles/SKILL.md) (progressively activates cross-language principles and routes by language to TypeScript/Web, Python, Swift, and Dart guides)
+- **For authoring code, refactoring, addressing review feedback, or reviewing PR diffs across any language:** Read [.agents/skills/coding-principles/SKILL.md](.agents/skills/coding-principles/SKILL.md) (progressively activates cross-language principles and routes by language to TypeScript/Web, Python, Swift, Dart, and Java guides)
 - **For preparing, splitting, or reviewing a pull request:** Read [.agents/skills/pr-hygiene/SKILL.md](.agents/skills/pr-hygiene/SKILL.md)
 - **For updating `CHANGELOG.md` files across A2UI packages:** Read [.agents/skills/update-changelog/SKILL.md](.agents/skills/update-changelog/SKILL.md)
 - **For working with Spec-Driven Development (SDD) or repository blueprints:** Read [blueprints/README.md](blueprints/README.md)
@@ -19,6 +19,7 @@ This document is the authoritative guide for AI agents working within the A2UI r
 - **For developing Python code anywhere in the repository (libraries, agents, tools, scripts, best practices):** Read [.agents/skills/coding-principles/subskills/python/INDEX.md](.agents/skills/coding-principles/subskills/python/INDEX.md)
 - **For developing in the Swift codebase (core, SwiftUI, sample):** Read [.agents/skills/coding-principles/subskills/swift/INDEX.md](.agents/skills/coding-principles/subskills/swift/INDEX.md)
 - **For developing in the Dart & Flutter codebases (`dart/`, `samples/client/flutter/`) or versioning Dart packages:** Read [.agents/skills/coding-principles/subskills/dart/INDEX.md](.agents/skills/coding-principles/subskills/dart/INDEX.md)
+- **For developing in the Java & Swing codebases (`java/`, `samples/client/swing/`):** Read [.agents/skills/coding-principles/subskills/java/INDEX.md](.agents/skills/coding-principles/subskills/java/INDEX.md)
 - **For triaging GitHub issues and PRs, including starting or stopping the triage bot:** Read [.agents/skills/a2ui-triage-bot/SKILL.md](.agents/skills/a2ui-triage-bot/SKILL.md)
 - **For writing documentation, READMEs, or PR descriptions:** Read [.agents/skills/natural-writing/SKILL.md](.agents/skills/natural-writing/SKILL.md)
 - **For authoring or editing public documentation and developer site guides (`docs/site/`):** Read [.agents/skills/public-documentation/SKILL.md](.agents/skills/public-documentation/SKILL.md)
@@ -115,7 +116,7 @@ When creating or modifying workspaces, guarantee strict script uniformity by imp
 Do not use hardcoded or guessed build/run sequences. Each subdirectory contains detailed setup, build, dependency resolution, and execution steps.
 
 - **Prerequisite:** Consult the `README.md` files under `typescript/core/web_core/` and `typescript/renderers/` to build the shared web core and renderer packages before running any web tools or clients.
-- **Running SDKs & Samples:** Consult the local `README.md` inside any targeted directory under `python/`, `kotlin/`, `samples/`, or `tools/` for specific run/test/build commands.
+- **Running SDKs & Samples:** Consult the local `README.md` inside any targeted directory under `python/`, `java/`, `kotlin/`, `samples/`, or `tools/` for specific run/test/build commands.
 
 ---
 
@@ -138,4 +139,4 @@ To ensure the integrity, consistency, and high quality of the repository, all ag
 - **Enforce Script Uniformity**: Strictly maintain Yarn workspace script hygiene. Ensure all Node/TypeScript packages implement the five canonical targets (`build`, `lint`, `lint:fix`, `test`, `format`, `format:check`).
 - **Keep Inference Formats Catalog-Agnostic**: When implementing or updating inference formats (Express, Elemental, Atom, Direct JSON, etc.), system prompt rules, compilers, and parsers must remain catalog-agnostic. Catalog-specific constraints, component property rules, or syntax hints must be defined in and derived dynamically from the component catalog JSON schema, rather than hardcoding catalog-specific logic or string filters into format generators.
 - **Export Public Facades and Ban Deep Imports**: Packages across all languages must expose their public API through root or versioned facade barrels (e.g. `__all__` in Python `__init__.py`, `exports` in Node `package.json`, `lib/*.dart` in Dart). Never expose, rely on, or demonstrate deep internal submodule import paths in code, tests, docstrings, or README examples.
-- **Sort and Group Imports**: Across all languages (Python, TypeScript, Dart, Swift), maintain clean, predictable import ordering. Group imports into standard/system libraries, external third-party dependencies, and internal/local packages, separated by a single empty line. Within each group, sort module paths and imported symbols alphabetically. Never use wildcard imports.
+- **Sort and Group Imports**: Across all languages (Python, TypeScript, Dart, Swift, Java), maintain clean, predictable import ordering. Group imports into standard/system libraries, external third-party dependencies, and internal/local packages, separated by a single empty line. Within each group, sort module paths and imported symbols alphabetically. Never use wildcard imports.
