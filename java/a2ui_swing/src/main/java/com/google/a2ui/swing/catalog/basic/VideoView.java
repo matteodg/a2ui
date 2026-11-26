@@ -26,7 +26,6 @@ import com.google.a2ui.swing.internal.ViewMarks;
 import com.google.a2ui.swing.surface.MediaPlayer;
 import com.google.a2ui.swing.surface.MediaUrls;
 import com.google.a2ui.swing.surface.MediaView;
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -34,6 +33,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
@@ -63,9 +64,10 @@ import javax.swing.JComponent;
  * proportions 16 to 9, at most {@value #MAX_WIDTH} pixels wide, with the poster image and a play
  * mark. The {@code imageLoader} service loads the poster. The area is a button. When the user
  * operates it, the {@code urlOpener} service opens the URL of the video in an external application.
- * The view never opens a URL by itself. The user cannot operate the button, and it shows no play
- * mark, if the URL is absent, is not safe, or is not an absolute {@code http} or {@code https} URL.
- * That is not an error of the surface.
+ * While the button has the keyboard focus, it shows a ring of a dark line and a light line. Thus
+ * the user sees the ring on a poster image of each color. The view never opens a URL by itself. The
+ * user cannot operate the button, and it shows no play mark, if the URL is absent, is not safe, or
+ * is not an absolute {@code http} or {@code https} URL. That is not an error of the surface.
  *
  * <p>The Swing component of the view is a panel that gives the margin of a leaf. The accessibility
  * attributes go to the component of the media view, or to the button. The accessible name of the
@@ -179,9 +181,34 @@ final class VideoView implements SwingComponentView {
 
     private final transient ImageSource image;
 
+    /** True while the button has the keyboard focus. */
+    private boolean focused;
+
     Poster(ImageSource image) {
       this.image = image;
       setRolloverEnabled(true);
+      addFocusListener(
+          new FocusListener() {
+            @Override
+            public void focusGained(FocusEvent event) {
+              showFocus(true);
+            }
+
+            @Override
+            public void focusLost(FocusEvent event) {
+              showFocus(false);
+            }
+          });
+    }
+
+    private void showFocus(boolean next) {
+      focused = next;
+      repaint();
+    }
+
+    /** Tells if the button shows the mark of the keyboard focus. */
+    boolean showsFocus() {
+      return focused;
     }
 
     /** Applies the look and feel, and then removes the parts that the button paints itself. */
@@ -246,10 +273,8 @@ final class VideoView implements SwingComponentView {
         if (isEnabled()) {
           paintMark(g, box);
         }
-        if (isFocusOwner()) {
-          g.setColor(BasicStyle.accent());
-          g.setStroke(new BasicStroke(2));
-          g.draw(new Rectangle2D.Double(1, 1, size.width - 2, size.height - 2));
+        if (focused) {
+          BasicStyle.paintFocusRing(g, size.width, size.height);
         }
       } catch (RuntimeException e) {
         // A paint never fails the surface.

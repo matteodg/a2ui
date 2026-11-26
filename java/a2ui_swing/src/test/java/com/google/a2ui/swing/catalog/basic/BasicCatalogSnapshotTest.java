@@ -37,6 +37,7 @@ import com.google.a2ui.swing.surface.A2uiSurface;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Headless;
+import com.google.a2ui.swing.testing.Pointer;
 import com.google.a2ui.swing.testing.Snapshots;
 import com.google.a2ui.swing.testing.TestImageLoader;
 import com.google.a2ui.swing.testing.TestModalPresenter;
@@ -1327,6 +1328,20 @@ class BasicCatalogSnapshotTest {
     assertEquals(List.of(), presenter.open(), name + ": a modal is open after the unmount");
   }
 
+  /**
+   * Tells the substitute of each video that it has the keyboard focus. Thus the image shows the
+   * focus ring on a poster image, on an area with no image, and on a button that is not enabled.
+   */
+  private static void focusPosters(Component component) {
+    if (component instanceof VideoView.Poster poster) {
+      Pointer.focus(poster, true);
+    } else if (component instanceof Container container) {
+      for (Component child : container.getComponents()) {
+        focusPosters(child);
+      }
+    }
+  }
+
   /** Operates the trigger of each modal of a tree, as the user does. */
   private static void openModals(MountedNode node) {
     if (node.node().type().equals("Modal") && node.view().isPresent()) {
@@ -1390,6 +1405,11 @@ class BasicCatalogSnapshotTest {
     snapshot(lookAndFeel + "-images-states", surfaceOf(Map.of(), imageStates()));
     snapshot(lookAndFeel + "-media", surfaceOf(Map.of(), media()));
     snapshot(lookAndFeel + "-media-narrow", surfaceOf(Map.of(), media()), NARROW, view -> {});
+    snapshot(
+        lookAndFeel + "-media-focus",
+        surfaceOf(Map.of(), media()),
+        WIDTH,
+        BasicCatalogSnapshotTest::focusPosters);
     snapshot(lookAndFeel + "-media-modal", surfaceOf(Map.of(), mediaModal()));
     for (String example : MEDIA_EXAMPLES) {
       snapshot(lookAndFeel + "-example-" + example, example(example));

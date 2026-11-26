@@ -20,6 +20,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
+import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -214,5 +215,19 @@ public final class Pointer {
   private static void key(KeyEvent event) {
     KeyboardFocusManager.getCurrentKeyboardFocusManager()
         .redispatchEvent(event.getComponent(), event);
+  }
+
+  /**
+   * Tells a component that it got the keyboard focus, or that it lost it, with the event that the
+   * keyboard focus manager sends. The component does not become the focus owner, because a
+   * component in no window cannot be the focus owner.
+   *
+   * @param component the component. It does not need a root pane.
+   * @param gained true for the event {@code FOCUS_GAINED}, false for {@code FOCUS_LOST}
+   */
+  public static void focus(Component component, boolean gained) {
+    FocusEvent event =
+        new FocusEvent(component, gained ? FocusEvent.FOCUS_GAINED : FocusEvent.FOCUS_LOST);
+    KeyboardFocusManager.getCurrentKeyboardFocusManager().redispatchEvent(component, event);
   }
 }

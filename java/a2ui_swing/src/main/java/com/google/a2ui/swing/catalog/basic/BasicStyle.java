@@ -20,8 +20,10 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.geom.Path2D;
 import java.util.List;
 import java.util.Map;
 import javax.swing.JComponent;
@@ -53,6 +55,9 @@ final class BasicStyle {
 
   /** The least contrast between a text and its background that the views accept. */
   private static final double TEXT_CONTRAST = 4.5;
+
+  /** The width of each of the two lines of a focus ring, in pixels. */
+  private static final int FOCUS_LINE = 2;
 
   /** The least contrast between a thin line and its background that the views accept. */
   private static final double LINE_CONTRAST = 1.3;
@@ -157,6 +162,50 @@ final class BasicStyle {
         "textHighlight",
         "List.selectionBackground",
         "TextField.selectionBackground");
+  }
+
+  /**
+   * Gets the color that the look and feel has for the mark of the keyboard focus. It is the accent
+   * color if the look and feel has no such color.
+   *
+   * @return the color
+   */
+  static Color focus() {
+    Color accent = accent();
+    return lookAndFeelColor(accent, "Component.focusColor", "nimbusFocus", "Button.focus");
+  }
+
+  /**
+   * Paints the mark of the keyboard focus for an area that can have each color, for example an
+   * image: a ring of two lines at the edge of the area.
+   *
+   * <p>The outer line has the focus color of the look and feel. The inner line is black or white,
+   * the one that has more contrast with the focus color. Each color has a contrast of more than 4.5
+   * with black or with white. Thus one line is dark and the other line is light, and the user sees
+   * the ring on a dark area and on a light area.
+   *
+   * @param g the graphics. The method changes its color.
+   * @param width the width of the area, which starts at the origin of the graphics
+   * @param height the height of the area
+   */
+  static void paintFocusRing(Graphics2D g, int width, int height) {
+    Color focus = focus();
+    g.setColor(focus);
+    g.fill(frame(0, width, height));
+    g.setColor(readableOn(focus));
+    g.fill(frame(FOCUS_LINE, width, height));
+  }
+
+  /**
+   * Makes the shape of one line of a focus ring: the area between two rectangles. The edges are on
+   * whole pixels. Thus the line has one color, also with antialiasing.
+   */
+  private static Path2D frame(int inset, int width, int height) {
+    Path2D frame = new Path2D.Double(Path2D.WIND_EVEN_ODD);
+    frame.append(new Rectangle(inset, inset, width - 2 * inset, height - 2 * inset), false);
+    int inner = inset + FOCUS_LINE;
+    frame.append(new Rectangle(inner, inner, width - 2 * inner, height - 2 * inner), false);
+    return frame;
   }
 
   /**

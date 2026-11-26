@@ -30,6 +30,7 @@ import com.google.a2ui.swing.surface.A2uiServices;
 import com.google.a2ui.swing.surface.MediaPlayer;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.LogCapture;
+import com.google.a2ui.swing.testing.Pointer;
 import com.google.a2ui.swing.testing.Snapshots;
 import com.google.a2ui.swing.testing.TestImageLoader;
 import com.google.a2ui.swing.testing.TestMediaPlayer;
@@ -100,6 +101,71 @@ class VideoViewTest {
       assertNotEquals(colorAt(10, 10), colorAt(width / 2 - 15, 108));
       assertEquals(List.of(), loader.requests);
       assertEquals(List.of(), opened);
+    });
+  }
+
+  @Test
+  void theFocusRingHasADarkLineAndALightLineAndPaintsOnlyWithTheFocus() {
+    Edt.run(() -> {
+      show(Map.of(), "url", VIDEO, "posterUrl", POSTER);
+      loader.complete(POSTER, TestImageLoader.solid(160, 90, Color.BLACK));
+      int middle = poster().box().height / 2;
+      Color outer = BasicStyle.focus();
+      Color inner =
+          BasicStyle.contrast(outer, Color.WHITE) >= BasicStyle.contrast(outer, Color.BLACK)
+              ? Color.WHITE
+              : Color.BLACK;
+
+      assertFalse(poster().showsFocus());
+      assertEquals(Color.BLACK, colorAt(0, middle));
+      assertEquals(Color.BLACK, colorAt(2, middle));
+
+      Pointer.focus(poster(), true);
+
+      assertTrue(poster().showsFocus());
+      for (int x : new int[] {0, 1}) {
+        assertEquals(outer, colorAt(x, middle), "the outer line at " + x);
+        assertEquals(outer, colorAt(poster().box().width - 1 - x, middle));
+        assertEquals(outer, colorAt(100, x));
+        assertEquals(outer, colorAt(100, poster().box().height - 1 - x));
+      }
+      for (int x : new int[] {2, 3}) {
+        assertEquals(inner, colorAt(x, middle), "the inner line at " + x);
+        assertEquals(inner, colorAt(poster().box().width - 1 - x, middle));
+        assertEquals(inner, colorAt(100, x));
+        assertEquals(inner, colorAt(100, poster().box().height - 1 - x));
+      }
+      assertEquals(Color.BLACK, colorAt(4, middle));
+      // One line is dark and one line is light. Thus one of them shows on each image.
+      assertTrue(BasicStyle.contrast(outer, inner) >= 4.5, outer + " and " + inner);
+
+      Pointer.focus(poster(), false);
+
+      assertFalse(poster().showsFocus());
+      assertEquals(Color.BLACK, colorAt(0, middle));
+      assertEquals(Color.BLACK, colorAt(2, middle));
+    });
+  }
+
+  @Test
+  void theFocusRingShowsOnALightImageAndOnADarkImage() {
+    Edt.run(() -> {
+      show(Map.of("poster", POSTER), "url", VIDEO, "posterUrl", path("/poster"));
+      Pointer.focus(poster(), true);
+      int middle = poster().box().height / 2;
+
+      for (Color background : new Color[] {Color.BLACK, Color.WHITE, BasicStyle.focus()}) {
+        String url = "https://example.com/" + Integer.toHexString(background.getRGB()) + ".png";
+        fixture.setData("/poster", url);
+        loader.complete(url, TestImageLoader.solid(160, 90, background));
+        assertEquals(background, colorAt(10, middle));
+
+        double outer = BasicStyle.contrast(colorAt(1, middle), background);
+        double inner = BasicStyle.contrast(colorAt(3, middle), background);
+        assertTrue(
+            Math.max(outer, inner) >= 3,
+            "on " + background + " the lines have the contrasts " + outer + " and " + inner);
+      }
     });
   }
 
