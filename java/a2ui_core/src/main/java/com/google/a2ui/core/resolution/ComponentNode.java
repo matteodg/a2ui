@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * One component at one position of the tree of a surface, with resolved properties.
  *
- * <p>A {@code NodeResolver} makes the nodes and keeps them up to date. A view reads {@link
+ * <p>A {@link NodeResolver} makes the nodes and keeps them up to date. A view reads {@link
  * #props()} and subscribes to it. A view never resolves a binding.
  *
  * <p>There is one node for each position. Thus a component that two parents refer to has two nodes,

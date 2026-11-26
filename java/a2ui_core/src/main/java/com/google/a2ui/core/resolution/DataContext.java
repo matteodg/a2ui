@@ -147,10 +147,12 @@ public final class DataContext {
    */
   public Object get(String path) {
     String absolute = resolvePath(path);
+    Object value = surface.dataModel().get(absolute);
+    // The context records only a path that the data model accepts.
     if (reads != null) {
       reads.add(absolute);
     }
-    return surface.dataModel().get(absolute);
+    return value;
   }
 
   /**
