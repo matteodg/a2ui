@@ -55,6 +55,7 @@ import java.util.Set;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
+import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.text.BadLocationException;
@@ -412,6 +413,25 @@ final class AdapterSession {
     });
   }
 
+  /** Gets the buttons below a component, for example the options of a choice picker. */
+  static List<AbstractButton> optionsOf(Component component) {
+    List<AbstractButton> buttons = new ArrayList<>();
+    collectButtons(component, buttons);
+    return buttons;
+  }
+
+  private static void collectButtons(Component component, List<AbstractButton> buttons) {
+    if (component instanceof AbstractButton button) {
+      buttons.add(button);
+      return;
+    }
+    if (component instanceof Container container) {
+      for (Component child : container.getComponents()) {
+        collectButtons(child, buttons);
+      }
+    }
+  }
+
   /** Gets the name that the suites use for the accessible role of a component. */
   private static String roleOf(JComponent control) {
     AccessibleRole role = control.getAccessibleContext().getAccessibleRole();
@@ -420,6 +440,18 @@ final class AdapterSession {
     }
     if (role == AccessibleRole.CHECK_BOX) {
       return "checkbox";
+    }
+    if (role == AccessibleRole.RADIO_BUTTON) {
+      return "radio";
+    }
+    if (role == AccessibleRole.GROUP_BOX) {
+      // Swing has no role for a group of radio buttons. A group box of radio buttons is one.
+      for (AbstractButton option : optionsOf(control)) {
+        if (option.getAccessibleContext().getAccessibleRole() == AccessibleRole.RADIO_BUTTON) {
+          return "radiogroup";
+        }
+      }
+      return "group";
     }
     if (control instanceof JTextComponent field && field.isEditable()) {
       return "textbox";

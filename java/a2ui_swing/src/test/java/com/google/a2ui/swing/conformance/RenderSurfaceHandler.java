@@ -53,8 +53,9 @@ import javax.swing.text.JTextComponent;
  * <p>The handler mounts an {@code A2uiSurface} with no window and runs the steps of the case. It
  * reads each expectation from the mounted Swing components where a component shows the value: the
  * text of a text component, the value of a control, the messages of the checks, the state of a
- * button. A step operates the Swing control: it sets the text of a text field, it clicks a button
- * or a check box, and it selects a tab of a tabbed pane.
+ * button. A step operates the Swing control: it sets the text of a text field, it clicks a button,
+ * a check box or the options of a choice picker, and it selects a tab of a tabbed pane. The value
+ * of an option is its action command.
  *
  * <p>An input step for a component type that has no view in this version fails. The registry skips
  * the cases that need such a component.
@@ -250,6 +251,23 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
       // The user clicks the check box if it does not show the state.
       if (box.isSelected() != checked) {
         click(session, box);
+      }
+      return;
+    }
+    if (node.node().type().equals("ChoicePicker")) {
+      // The input value is the list of the values that the user selects. The user first selects
+      // each wanted option, and then clears each other selected option.
+      List<Object> wanted = asList(value, "inputValue of " + where);
+      List<AbstractButton> options = AdapterSession.optionsOf(session.control(node));
+      for (AbstractButton option : options) {
+        if (!option.isSelected() && wanted.contains(option.getActionCommand())) {
+          click(session, option);
+        }
+      }
+      for (AbstractButton option : options) {
+        if (option.isSelected() && !wanted.contains(option.getActionCommand())) {
+          click(session, option);
+        }
       }
       return;
     }
@@ -458,6 +476,16 @@ final class RenderSurfaceHandler implements SuiteRegistry.CaseHandler {
     }
     if (control instanceof JCheckBox box) {
       return box.isSelected();
+    }
+    if (actual.node().type().equals("ChoicePicker")) {
+      // The value of a picker is the list of the values of the selected options.
+      List<Object> values = new ArrayList<>();
+      for (AbstractButton option : AdapterSession.optionsOf(control)) {
+        if (option.isSelected()) {
+          values.add(option.getActionCommand());
+        }
+      }
+      return values;
     }
     throw new AssertionError("The harness cannot read the value of " + at);
   }

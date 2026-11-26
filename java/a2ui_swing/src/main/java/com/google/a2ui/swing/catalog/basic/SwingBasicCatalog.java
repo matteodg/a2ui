@@ -63,6 +63,8 @@ import java.util.function.Function;
  *   <tr><td>{@code TextField}</td><td>{@code JTextField}, {@code JTextArea} or {@code
  *       JPasswordField}</td></tr>
  *   <tr><td>{@code CheckBox}</td><td>{@code JCheckBox}</td></tr>
+ *   <tr><td>{@code ChoicePicker}</td><td>{@code JRadioButton}, {@code JCheckBox} or {@code
+ *       JToggleButton} for each option</td></tr>
  * </table>
  *
  * <p>Each other component of the catalog document has an implementation with no view. See {@link
@@ -100,6 +102,7 @@ public final class SwingBasicCatalog {
     views.put("Button", ButtonView::new);
     views.put("TextField", TextFieldView::new);
     views.put("CheckBox", CheckBoxView::new);
+    views.put("ChoicePicker", ChoicePickerView::new);
     return Collections.unmodifiableMap(views);
   }
 
