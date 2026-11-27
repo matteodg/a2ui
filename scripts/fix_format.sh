@@ -215,6 +215,12 @@ fi
 if [ "$SKIP_JAVA" = false ]; then
   echo "Running google-java-format for Java files..."
   cd "$REPO_ROOT/java"
+  # google-java-format needs a newer JDK than the Kotlin step. If the default JDK is too old, set
+  # A2UI_JAVA_FORMAT_JAVA_HOME to the home directory of JDK 25 or later.
+  if [ -n "${A2UI_JAVA_FORMAT_JAVA_HOME:-}" ]; then
+    export JAVA_HOME="$A2UI_JAVA_FORMAT_JAVA_HOME"
+    export PATH="$JAVA_HOME/bin:$PATH"
+  fi
   # Do a test of the runtime. On macOS, /usr/bin/java is on PATH when no JDK is installed.
   if java -version >/dev/null 2>&1; then
     if [ "$CHECK_ONLY" = true ]; then
