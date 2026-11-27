@@ -16,6 +16,7 @@
 
 /**
  * The media player service that plays the {@code Video} and {@code AudioPlayer} components of a
- * surface with JavaFX.
+ * surface with JavaFX. {@link com.google.a2ui.swing.javafx.JavaFxMediaPlayer} is the one public
+ * class.
  */
 package com.google.a2ui.swing.javafx;

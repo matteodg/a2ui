@@ -27,4 +27,7 @@ module com.google.a2ui.swing.javafx {
   requires javafx.swing;
 
   exports com.google.a2ui.swing.javafx;
+
+  provides com.google.a2ui.swing.surface.MediaPlayer with
+      com.google.a2ui.swing.javafx.JavaFxMediaPlayer;
 }
