@@ -16,7 +16,7 @@ Activate this subskill when:
 Configuration: [`java/pom.xml`](../../../../../java/pom.xml)
 
 - Run every command from the `java/` directory with the Maven wrapper. The build needs JDK 25 or later.
-- `./mvnw verify` compiles the three modules of the reactor (`a2ui_core`, `a2ui_swing`, and the sample `samples/client/swing`), runs the unit tests and the conformance suites, and checks the format. Do not run `./mvnw install`: the modules are not released, and the reactor resolves them without the local repository.
+- `./mvnw verify` compiles the four modules of the reactor (`a2ui_core`, `a2ui_swing`, the optional `a2ui_swing_javafx`, and the sample `samples/client/swing`), runs the unit tests and the conformance suites, and checks the format. Do not run `./mvnw install`: the modules are not released, and the reactor resolves them without the local repository.
 - `./mvnw spotless:apply` applies google-java-format. The property `google-java-format.version` in `java/pom.xml` sets its version. `./scripts/fix_format.sh` runs the same goal from the repository root.
 - The compiler runs with `-Xlint:all -Werror`, so a warning fails the build.
 

@@ -176,8 +176,9 @@ These rules apply to the views:
   the image. `fit` applies as CSS `object-fit`. Its default is `fill`, and `cover` for `avatar` and
   `header`. `description` is the accessible name and the tool tip.
 - **Video and AudioPlayer.** Swing cannot play media. If the `mediaPlayer` service gives a
-  `MediaView`, the view shows its component and gives the URLs to it. The default service gives
-  none. Then `Video` shows an area of 16 to 9, at most 480 pixels wide, with the poster image and a
+  `MediaView`, the view shows its component and gives the URLs and the description to it. The
+  optional module [`a2ui_swing_javafx`](../a2ui_swing_javafx) has such a service. The default
+  service gives none. Then `Video` shows an area of 16 to 9, at most 480 pixels wide, with the poster image and a
   play mark, and `AudioPlayer` shows a button with a play mark and the description. The area and
   the button open the URL in an external application with the `urlOpener` service. This occurs only
   when the user operates them, and only for an absolute `http` or `https` URL. The accessible name
@@ -472,13 +473,13 @@ sees. The core reports each error to the agent.
 `A2uiServices` has the extension points for the functions that plain Swing does not have. Each
 service has a default. `A2uiServices.DEFAULT.withImageLoader(loader)` replaces one service.
 
-| Service          | Interface          | Default                                                                                         |
-| :--------------- | :----------------- | :---------------------------------------------------------------------------------------------- |
-| `markdown`       | `MarkdownRenderer` | Shows the Markdown subset of the protocol in a `JEditorPane` that the user cannot edit.         |
-| `imageLoader`    | `ImageLoader`      | Reads `http`, `https` and `data` URLs with `ImageIO`, not on the EDT, with limits. No cache.    |
-| `mediaPlayer`    | `MediaPlayer`      | `MediaPlayer.NONE`. Swing cannot play media. An application can supply a JavaFX or vlcj player. |
-| `modalPresenter` | `ModalPresenter`   | Shows a modal `JDialog` above the window of the surface. It needs a display.                    |
-| `urlOpener`      | `UrlOpener`        | Opens the URL in the browser of the system with `java.awt.Desktop`.                             |
+| Service          | Interface          | Default                                                                                          |
+| :--------------- | :----------------- | :----------------------------------------------------------------------------------------------- |
+| `markdown`       | `MarkdownRenderer` | Shows the Markdown subset of the protocol in a `JEditorPane` that the user cannot edit.          |
+| `imageLoader`    | `ImageLoader`      | Reads `http`, `https` and `data` URLs with `ImageIO`, not on the EDT, with limits. No cache.     |
+| `mediaPlayer`    | `MediaPlayer`      | `MediaPlayer.NONE`. Swing cannot play media. The module `a2ui_swing_javafx` has a JavaFX player. |
+| `modalPresenter` | `ModalPresenter`   | Shows a modal `JDialog` above the window of the surface. It needs a display.                     |
+| `urlOpener`      | `UrlOpener`        | Opens the URL in the browser of the system with `java.awt.Desktop`.                              |
 
 A view gets the services from `ViewContext.services()`.
 
@@ -493,8 +494,11 @@ the EDT, and it stops when the view cancels the request.
 
 To play media in the surface, give a `MediaPlayer`. `createView(kind)` makes one `MediaView` for
 each `Video` and each `AudioPlayer`: a Swing component with the controls of the player,
-`setSource(url)`, `setPoster(url)` and `dispose()`. The adapter does not start the media. A failure
-of a media view does not fail the surface.
+`setSource(url)`, `setPoster(url)`, `setDescription(text)` and `dispose()`. The adapter does not
+start the media. A failure of a media view does not fail the surface.
+
+The optional module [`a2ui_swing_javafx`](../a2ui_swing_javafx) has such a player. Its
+`JavaFxMediaPlayer` plays the media in the surface with JavaFX. This module does not depend on it.
 
 ```java
 A2uiServices services =

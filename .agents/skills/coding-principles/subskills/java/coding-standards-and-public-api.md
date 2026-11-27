@@ -12,9 +12,9 @@ Activate this subskill when:
 
 ## 1. Module Layout
 
-- `java/a2ui_core` is the Java module `com.google.a2ui.core` (artifact `a2ui-java-core`). `java/a2ui_swing` is `com.google.a2ui.swing` (artifact `a2ui-java-swing`) and requires the core and `java.desktop` transitively. Both implement protocol v1.0 only.
+- `java/a2ui_core` is the Java module `com.google.a2ui.core` (artifact `a2ui-java-core`). `java/a2ui_swing` is `com.google.a2ui.swing` (artifact `a2ui-java-swing`) and requires the core and `java.desktop` transitively. `java/a2ui_swing_javafx` is `com.google.a2ui.swing.javafx` (artifact `a2ui-java-swing-javafx`), an optional media player for the Swing adapter. All implement protocol v1.0 only.
 - The sample `samples/client/swing` is the third module of the Maven reactor in [`java/pom.xml`](../../../../../java/pom.xml).
-- The module READMEs hold the details: [`java/README.md`](../../../../../java/README.md), [`java/a2ui_core/README.md`](../../../../../java/a2ui_core/README.md), [`java/a2ui_swing/README.md`](../../../../../java/a2ui_swing/README.md), and [`samples/client/swing/README.md`](../../../../../samples/client/swing/README.md).
+- The module READMEs hold the details: [`java/README.md`](../../../../../java/README.md), [`java/a2ui_core/README.md`](../../../../../java/a2ui_core/README.md), [`java/a2ui_swing/README.md`](../../../../../java/a2ui_swing/README.md), [`java/a2ui_swing_javafx/README.md`](../../../../../java/a2ui_swing_javafx/README.md), and [`samples/client/swing/README.md`](../../../../../samples/client/swing/README.md).
 
 ---
 
@@ -28,7 +28,7 @@ Activate this subskill when:
 
 ## 3. Dependencies and Resources
 
-- Declare dependency and plugin versions as properties in `java/pom.xml`. `a2ui_swing` has no runtime dependency other than the core and the JDK.
+- Declare dependency and plugin versions as properties in `java/pom.xml`. `a2ui_swing` has no runtime dependency other than the core and the JDK. Only `a2ui_swing_javafx` depends on OpenJFX: keep each JavaFX type out of the other modules.
 - The build copies the specification schemas and the basic catalog into the module resources. Do not commit copies of files from `specification/` or `catalogs/`.
 
 ---

@@ -64,8 +64,14 @@
     formats of `ImageIO` and has no cache. The default modal is a `JDialog`, which needs a display.
     The Java Accessibility API has no equivalent of `hidden` and of `live`, thus the adapter keeps
     them as attributes of the Swing component.
+- Add `a2ui-java-swing-javafx` (Java module `com.google.a2ui.swing.javafx`), an optional media
+  player for the Swing adapter. `JavaFxMediaPlayer` is a `MediaPlayer` service that plays the
+  `Video` and `AudioPlayer` components in the surface with OpenJFX 27, with Swing controls. It
+  starts a media only when the user asks for it, plays only `http` and `https` URLs, and gives no
+  view if JavaFX cannot operate. Only this module depends on OpenJFX (GPL-2.0 with the Classpath
+  exception).
 - Add the gallery sample `samples/client/swing`. It shows the examples of the basic catalog with
-  the Swing adapter.
+  the Swing adapter. Its Maven profile `javafx` adds the JavaFX media player.
 - Add the conformance harnesses `java-core` and `swing`. `./mvnw verify` runs the `core` corpus
   with the core, and the `adapter` corpus and the renderer part of the `e2e` corpus with the Swing
   adapter.

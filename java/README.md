@@ -2,15 +2,19 @@
 
 This directory contains the Java client SDK for the A2UI protocol v1.0.
 
-| Module                     | Artifact                          | Contents                                                                    |
-| :------------------------- | :-------------------------------- | :-------------------------------------------------------------------------- |
-| [`a2ui_core`](a2ui_core)   | `com.google.a2ui:a2ui-java-core`  | The state model and the protocol logic. It has no UI code.                  |
-| [`a2ui_swing`](a2ui_swing) | `com.google.a2ui:a2ui-java-swing` | The Swing adapter. It shows the surfaces of the core with Swing components. |
+| Module                                   | Artifact                                 | Contents                                                                     |
+| :--------------------------------------- | :--------------------------------------- | :--------------------------------------------------------------------------- |
+| [`a2ui_core`](a2ui_core)                 | `com.google.a2ui:a2ui-java-core`         | The state model and the protocol logic. It has no UI code.                   |
+| [`a2ui_swing`](a2ui_swing)               | `com.google.a2ui:a2ui-java-swing`        | The Swing adapter. It shows the surfaces of the core with Swing components.  |
+| [`a2ui_swing_javafx`](a2ui_swing_javafx) | `com.google.a2ui:a2ui-java-swing-javafx` | Optional. It plays the video and the audio of the Swing adapter with JavaFX. |
 
 The Maven build also has the module
 [`samples/client/swing`](../samples/client/swing), `com.google.a2ui:a2ui-java-swing-gallery`. It is
 a sample application that shows the examples of the basic catalog with the Swing adapter. To start
 it, run `./mvnw -q -pl ../samples/client/swing -am compile exec:java` from the `java/` directory.
+
+Only `a2ui_swing_javafx` depends on OpenJFX, which has the license GPL-2.0 with the Classpath
+exception. The other modules do not need it.
 
 The SDK is in development. It is not released.
 
@@ -43,6 +47,10 @@ other work:
 ```sh
 ./mvnw -Pperformance verify
 ```
+
+The module `a2ui_swing_javafx` has tests that play a media file with the JavaFX toolkit. They have
+the JUnit tag `javafx` and need a display, thus the `verify` phase does not run them. The
+[README of the module](a2ui_swing_javafx/README.md#tests) gives the command.
 
 ## Conformance
 
