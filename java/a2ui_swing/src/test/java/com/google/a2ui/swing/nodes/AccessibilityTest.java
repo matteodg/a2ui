@@ -36,6 +36,7 @@ import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import com.google.a2ui.swing.testing.Headless;
 import com.google.a2ui.swing.testing.TestSurface;
+import java.awt.Component;
 import java.awt.FocusTraversalPolicy;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -361,6 +363,78 @@ class AccessibilityTest {
       assertSame(own, panel.getFocusTraversalPolicy());
       // The field was not focusable before. Thus it is not focusable after.
       assertFalse(field.isFocusable());
+    });
+  }
+
+  /** Gives access to the test of Swing that tells if a component is a stop of the Tab key. */
+  private static final class TabStops extends LayoutFocusTraversalPolicy {
+    private static final long serialVersionUID = 1L;
+
+    boolean isStop(Component component) {
+      return accept(component);
+    }
+  }
+
+  @Test
+  void aPanelIsNotAStopOfTheTabKeyAfterItsViewShowsAgain() {
+    Edt.run(() -> {
+      JPanel panel = new JPanel();
+      JButton button = new JButton("Save");
+      JPanel window = new JPanel();
+      panel.add(button);
+      window.add(panel);
+      window.setSize(300, 100);
+      window.addNotify();
+      TabStops stops = new TabStops();
+      assertFalse(stops.isStop(panel));
+      assertTrue(stops.isStop(button));
+      HiddenFocus focus = new HiddenFocus();
+
+      focus.apply(panel, panel, true);
+      focus.apply(panel, panel, false);
+
+      // The Tab key stops at the button, not at the panel around the button.
+      assertFalse(stops.isStop(panel));
+      assertTrue(stops.isStop(button));
+      window.removeNotify();
+    });
+  }
+
+  @Test
+  void aComponentThatItsCodeMadeFocusableIsAStopAgainAfterItsViewShowsAgain() {
+    Edt.run(() -> {
+      JPanel canvas = new JPanel();
+      canvas.setFocusable(true);
+      JPanel window = new JPanel();
+      window.add(canvas);
+      window.setSize(300, 100);
+      window.addNotify();
+      TabStops stops = new TabStops();
+      assertTrue(stops.isStop(canvas));
+      HiddenFocus focus = new HiddenFocus();
+
+      focus.apply(canvas, canvas, true);
+      assertFalse(stops.isStop(canvas));
+      focus.apply(canvas, canvas, false);
+
+      assertTrue(stops.isStop(canvas));
+      window.removeNotify();
+    });
+  }
+
+  @Test
+  void aControlIsFocusableAgainAfterItsViewShowsAgain() {
+    Edt.run(() -> {
+      JPanel panel = new JPanel();
+      JButton button = new JButton("Save");
+      panel.add(button);
+      HiddenFocus focus = new HiddenFocus();
+
+      focus.apply(panel, button, true);
+      assertFalse(button.isFocusable());
+      focus.apply(panel, button, false);
+
+      assertTrue(button.isFocusable());
     });
   }
 

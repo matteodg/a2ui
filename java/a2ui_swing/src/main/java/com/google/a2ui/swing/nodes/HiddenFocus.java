@@ -18,8 +18,10 @@ package com.google.a2ui.swing.nodes;
 
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.DefaultFocusTraversalPolicy;
 import java.awt.FocusTraversalPolicy;
 import java.awt.KeyboardFocusManager;
+import javax.swing.InputMap;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
@@ -41,7 +43,10 @@ import javax.swing.SwingUtilities;
  *   <li>The root component of the view gives a focus traversal policy that has no components. Thus
  *       the Tab key goes past the view and past all the components below it, also the views of the
  *       nodes below. This is correct in each window: the surface, and the dialog of a modal.
- *   <li>The root component and the control of the view are not focusable.
+ *   <li>The root component and the control of the view are not focusable. When the view shows
+ *       again, a component gets the focusable value back only if it was a stop of the Tab key
+ *       before. A panel or a label stays not focusable, because the call that makes it focusable
+ *       again also makes it a stop of the Tab key.
  *   <li>If a component of the view has the focus when the view becomes hidden, the focus goes to
  *       the subsequent component.
  * </ul>
@@ -94,8 +99,8 @@ final class HiddenFocus {
   private boolean rootWasProvider;
 
   private FocusTraversalPolicy rootPolicy;
-  private boolean rootWasFocusable;
-  private boolean controlWasFocusable;
+  private boolean rootGetsFocusableBack;
+  private boolean controlGetsFocusableBack;
 
   /**
    * Tells if this object keeps the focus out of a view at this time.
@@ -124,8 +129,8 @@ final class HiddenFocus {
     control = viewControl;
     rootWasProvider = root.isFocusTraversalPolicyProvider();
     rootPolicy = root.isFocusTraversalPolicySet() ? root.getFocusTraversalPolicy() : null;
-    rootWasFocusable = root.isFocusable();
-    controlWasFocusable = control.isFocusable();
+    rootGetsFocusableBack = isFocusTarget(root);
+    controlGetsFocusableBack = isFocusTarget(control);
 
     Component owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
     boolean hadFocus = owner != null && SwingUtilities.isDescendingFrom(owner, root);
@@ -154,10 +159,48 @@ final class HiddenFocus {
     shield = null;
     root.setFocusTraversalPolicy(rootPolicy);
     root.setFocusTraversalPolicyProvider(rootWasProvider);
-    control.setFocusable(controlWasFocusable);
-    root.setFocusable(rootWasFocusable);
+    // A call of setFocusable(true) makes each component a stop of the Tab key, also a panel or a
+    // label. Thus only a component that was a stop before gets the value back. A component that
+    // was not a stop stays not focusable, which changes nothing for the Tab key.
+    if (controlGetsFocusableBack) {
+      control.setFocusable(true);
+    }
+    if (rootGetsFocusableBack) {
+      root.setFocusable(true);
+    }
     root = null;
     control = null;
     rootPolicy = null;
   }
+
+  /**
+   * Tells if a component is a stop of the Tab key at this time.
+   *
+   * <p>A component is a stop if it is focusable and one of these conditions is true: its code set
+   * the focusable property, or it has key bindings for the focused state. These are the conditions
+   * of the focus traversal policies of AWT and Swing. The first condition can be found only for a
+   * component that shows.
+   */
+  private static boolean isFocusTarget(JComponent component) {
+    if (!component.isFocusable()) {
+      return false;
+    }
+    if (FOCUSABLE_PROBE.accepts(component)) {
+      return true;
+    }
+    InputMap inputMap = component.getInputMap(JComponent.WHEN_FOCUSED);
+    Object[] keys = inputMap.allKeys();
+    return keys != null && keys.length > 0;
+  }
+
+  /** Gives access to the test of AWT that tells if the code of a component made it focusable. */
+  private static final class FocusableProbe extends DefaultFocusTraversalPolicy {
+    private static final long serialVersionUID = 1L;
+
+    boolean accepts(Component component) {
+      return accept(component);
+    }
+  }
+
+  private static final FocusableProbe FOCUSABLE_PROBE = new FocusableProbe();
 }
