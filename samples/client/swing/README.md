@@ -41,6 +41,21 @@ These system properties are optional:
 | `gallery.screenshot` | A PNG file. See [the screenshot mode](#the-screenshot-mode).                   |
 | `gallery.size`       | Only in the screenshot mode: a new size for the window, for example `900x600`. |
 
+### Play video and audio
+
+Swing cannot play media. To play the `Video` and `AudioPlayer` components in the gallery, add the
+optional JavaFX media player, [`java/a2ui_swing_javafx`](../../../java/a2ui_swing_javafx), with the
+Maven profile `javafx`:
+
+```sh
+./mvnw -q -Pjavafx -pl ../samples/client/swing -am compile exec:java
+```
+
+The profile adds the module to the class path. The gallery finds the player with
+`java.util.ServiceLoader`. Select the example `movie-card`, open its trailer and operate the play
+control. The player loads the video from the network. Without the profile, the gallery and its
+tests do not need JavaFX.
+
 ## The three columns
 
 The window has three columns, as the
@@ -82,10 +97,11 @@ and operate its button. Close the dialog with its close control or with the Esca
 - The Swing adapter has views for 18 of the 18 components of the basic catalog. Thus 43 of the 43
   examples show completely. The mark for a component with no view stays in the gallery, for a
   directory with examples that use other component types.
-- Swing cannot play media. The `Video` component shows its poster image as a button, and the
-  `AudioPlayer` component shows a button and its description. The button opens the URL in the
-  browser of the system. See the section about the services in the
+- Swing cannot play media. Without the Maven profile `javafx`, the `Video` component shows its
+  poster image as a button, and the `AudioPlayer` component shows a button and its description.
+  The button opens the URL in the browser of the system. See the section about the services in the
   [README of the adapter](../../../java/a2ui_swing/README.md).
+- The screenshot mode always uses the substitute, also with the profile `javafx`.
 - The gallery loads the images from the network with the default image loader of the adapter. An
   example with an image shows a neutral area while the image loads, and an area with a mark if the
   computer has no network. The tests do not use the network.

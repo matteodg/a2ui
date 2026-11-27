@@ -18,11 +18,16 @@ package com.google.a2ui.samples.swing;
 
 import com.google.a2ui.swing.catalog.basic.SwingBasicCatalog;
 import com.google.a2ui.swing.surface.A2uiServices;
+import com.google.a2ui.swing.surface.MediaPlayer;
 import java.awt.EventQueue;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 
 /**
  * The gallery of the Swing adapter. It shows each example of the basic catalog in a window with
@@ -43,6 +48,10 @@ import java.util.Optional;
  *   <li>{@code gallery.size}: only in the screenshot mode, a size such as {@code 900x600}. The
  *       program gives this size to the window after the example shows.
  * </ul>
+ *
+ * <p>The gallery plays video and audio only if the class path has a provider of the service {@code
+ * MediaPlayer}. The Maven profile {@code javafx} adds the module {@code a2ui_swing_javafx}, which
+ * has one. Without a provider, the components show their substitute.
  */
 public final class GalleryApp {
   /** The system property that gives the example to show first. */
@@ -107,12 +116,42 @@ public final class GalleryApp {
       System.err.println(e.getMessage());
       lookAndFeel = "";
     }
-    GalleryFrame window = new GalleryFrame(examples, A2uiServices.DEFAULT, lookAndFeel);
+    Optional<MediaPlayer> player = mediaPlayer();
+    A2uiServices services =
+        player.map(A2uiServices.DEFAULT::withMediaPlayer).orElse(A2uiServices.DEFAULT);
+    GalleryFrame window = new GalleryFrame(examples, services, lookAndFeel);
+    if (player.isPresent()) {
+      // The threads of a media player can keep the program in operation after the window closes.
+      window
+          .frame()
+          .addWindowListener(
+              new WindowAdapter() {
+                @Override
+                public void windowClosed(WindowEvent event) {
+                  System.exit(0);
+                }
+              });
+    }
     window.frame().setVisible(true);
     property(TAB_PROPERTY).ifPresent(window.gallery().inspector()::selectTab);
     Optional<String> first =
         property(EXAMPLE_PROPERTY).or(() -> examples.stream().findFirst().map(Example::id));
     first.ifPresent(window.gallery()::select);
+  }
+
+  /**
+   * Finds a media player on the class path, with {@code java.util.ServiceLoader}.
+   *
+   * @return the first provider of the service {@code MediaPlayer}, or an empty result if the class
+   *     path has none or if the provider cannot load
+   */
+  static Optional<MediaPlayer> mediaPlayer() {
+    try {
+      return ServiceLoader.load(MediaPlayer.class).findFirst();
+    } catch (ServiceConfigurationError e) {
+      System.err.println("The media player did not load. " + e.getMessage());
+      return Optional.empty();
+    }
   }
 
   private static Optional<String> property(String name) {

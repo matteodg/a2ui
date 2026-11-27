@@ -98,4 +98,23 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <!--
+        Adds the optional JavaFX media player to the gallery. The gallery then plays the Video and
+        AudioPlayer components. From the directory java:
+        ./mvnw -q -Pjavafx -pl ../samples/client/swing -am compile exec:java
+      -->
+      <id>javafx</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.google.a2ui</groupId>
+          <artifactId>a2ui-java-swing-javafx</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>
