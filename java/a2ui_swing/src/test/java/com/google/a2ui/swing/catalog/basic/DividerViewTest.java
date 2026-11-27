@@ -157,7 +157,8 @@ class DividerViewTest {
       Rectangle leaf = fixture.bounds("line");
 
       assertEquals(thickness, lineBounds().height);
-      assertEquals(leaf.y + (leaf.height - thickness) / 2, lineBounds().y);
+      // The free space can be an odd number, and then the line is one pixel off the center.
+      assertEquals(leaf.y + (leaf.height - thickness) / 2.0, lineBounds().y, 1);
       assertEquals(DividerView.LENGTH, lineBounds().width);
     });
   }

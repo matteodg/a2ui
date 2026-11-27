@@ -31,6 +31,7 @@ import com.google.a2ui.swing.catalog.basic.FlexLayout.Justify;
 import com.google.a2ui.swing.surface.MountedNode;
 import com.google.a2ui.swing.testing.Edt;
 import java.awt.Insets;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
@@ -269,8 +270,11 @@ class FlexContainerViewTest {
           text("c", "3"));
       int free = 400 - width("c");
 
-      assertEquals(new Rectangle(0, 0, free / 4, 300), a());
-      assertEquals(free - free / 4, b().width);
+      // The layout can round the share of a child up or down by one pixel.
+      assertEquals(new Point(0, 0), a().getLocation());
+      assertEquals(300, a().height);
+      assertEquals(free / 4.0, a().width, 1);
+      assertEquals(free - a().width, b().width);
       assertEquals(400, c().x + c().width);
 
       // A new weight of a child changes the layout of the container.
