@@ -45,6 +45,9 @@ public final class TestMediaPlayer implements MediaPlayer {
     /** Each value that {@link #setPoster(Optional)} got. */
     public final List<Optional<URI>> posters = new ArrayList<>();
 
+    /** Each value that {@link #setDescription(String)} got. */
+    public final List<String> descriptions = new ArrayList<>();
+
     /** The number of the calls of {@link #dispose()}. */
     public int disposals;
 
@@ -72,6 +75,12 @@ public final class TestMediaPlayer implements MediaPlayer {
     public void setPoster(Optional<URI> url) {
       fail();
       posters.add(url);
+    }
+
+    @Override
+    public void setDescription(String description) {
+      fail();
+      descriptions.add(description);
     }
 
     @Override

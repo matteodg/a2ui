@@ -46,8 +46,8 @@ import javax.swing.JComponent;
  *
  * <p>Swing cannot play audio from a URL. Thus the view asks the {@code mediaPlayer} service for a
  * {@code MediaView}. If the service gives one, the view shows its component with the width of the
- * container, and gives the URL to it. The description is then the accessible name of that
- * component, unless the agent gave a label.
+ * container, and gives the URL and the description to it. The description is then also the
+ * accessible name of that component, unless the agent gave a label.
  *
  * <p>The default service gives no view. Then the view shows a substitute: a button with a play
  * mark, and the description as text that breaks at the width of the container. When the user
@@ -79,6 +79,9 @@ final class AudioPlayerView implements SwingComponentView {
   private final UrlOpener opener;
   private final ActionListener listener = event -> open();
   private String description = "";
+
+  /** True after the media view got the description for the first time. */
+  private boolean described;
 
   /** The URL that the button opens, or null. */
   private URI target;
@@ -129,9 +132,15 @@ final class AudioPlayerView implements SwingComponentView {
     Optional<URI> url = MediaUrls.safe(props.value("url"));
     ViewMarks.setMediaUrl(accessibleComponent(), url.orElse(null));
     Object value = props.value("description");
+    String before = description;
     description = value == null ? "" : Coercion.toText(value).strip();
     if (media != null) {
       MediaSupport.guarded(() -> media.setSource(url));
+      // The media view gets the description one time, and then only when it changes.
+      if (!described || !description.equals(before)) {
+        described = true;
+        MediaSupport.guarded(() -> media.setDescription(description));
+      }
     } else {
       target = MediaSupport.external(props.value("url")).orElse(null);
       button.setEnabled(target != null);

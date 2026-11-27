@@ -274,6 +274,31 @@ class AudioPlayerViewTest {
   }
 
   @Test
+  void theViewOfTheMediaPlayerServiceGetsTheDescriptionWhenItChanges() {
+    Edt.run(() -> {
+      showWithPlayer(
+          Map.of("url", AUDIO, "title", " Episode 1 "),
+          "url",
+          path("/url"),
+          "description",
+          path("/title"));
+      TestMediaPlayer.View view = player.views.get(0);
+
+      assertEquals(List.of("Episode 1"), view.descriptions);
+
+      // A change of a different property gives no second call.
+      fixture.setData("/url", OTHER);
+      assertEquals(List.of("Episode 1"), view.descriptions);
+
+      fixture.setData("/title", "Episode 2");
+      assertEquals(List.of("Episode 1", "Episode 2"), view.descriptions);
+
+      fixture.update(component("audio", "AudioPlayer", "url", path("/url")));
+      assertEquals(List.of("Episode 1", "Episode 2", ""), view.descriptions);
+    });
+  }
+
+  @Test
   void aMediaViewThatFailsDoesNotFailTheSurface() {
     Edt.run(() -> {
       showWithPlayer(Map.of("url", AUDIO), "url", path("/url"));

@@ -50,6 +50,15 @@ public interface MediaView {
    */
   default void setPoster(Optional<URI> url) {}
 
+  /**
+   * Sets the title or the summary of the media, for a view that shows it or that uses it in the
+   * names of its controls. The {@code AudioPlayer} component gives its {@code description}. The
+   * default implementation does nothing.
+   *
+   * @param description the text, or an empty text if the component has none
+   */
+  default void setDescription(String description) {}
+
   /** Stops the player and releases its resources. The default implementation does nothing. */
   default void dispose() {}
 }
