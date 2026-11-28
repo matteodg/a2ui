@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright 2024 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      https://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.google.a2ui</groupId>
+    <artifactId>a2ui-java-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../../java/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>a2ui-java-swing-gallery</artifactId>
+
+  <name>A2UI Java Swing Gallery</name>
+  <description>Sample application that shows the examples of the basic catalog with the Swing adapter.</description>
+
+  <properties>
+    <a2ui.repoRoot>${project.basedir}/../../..</a2ui.repoRoot>
+    <!-- The application reads the examples from the repository. It has no copy of them. -->
+    <gallery.examples>${a2ui.repoRoot}/catalogs/basic/v1/examples</gallery.examples>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.google.a2ui</groupId>
+      <artifactId>a2ui-java-swing</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- Reads the example files and writes JSON text for the inspector. -->
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!--
+      The JSON Schema validator of the core brings slf4j-api. This provider discards the log
+      output. Without a provider, SLF4J prints a warning when the application starts.
+    -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!--
+            The tests need no display. Thus they also run on a build server. The tests also do not
+            use the network: the proxy settings send each HTTP request to a closed port of this
+            computer.
+          -->
+          <argLine>-Djava.awt.headless=true -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=9 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=9</argLine>
+          <systemPropertyVariables>
+            <gallery.examples>${gallery.examples}</gallery.examples>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <!-- From the directory java: ./mvnw -q -pl ../samples/client/swing -am compile exec:java -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <configuration>
+          <skip>false</skip>
+          <mainClass>com.google.a2ui.samples.swing.GalleryApp</mainClass>
+          <systemProperties>
+            <systemProperty>
+              <key>gallery.examples</key>
+              <value>${gallery.examples}</value>
+            </systemProperty>
+          </systemProperties>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <!--
+        Adds the optional JavaFX media player to the gallery. The gallery then plays the Video and
+        AudioPlayer components. From the directory java:
+        ./mvnw -q -Pjavafx -pl ../samples/client/swing -am compile exec:java
+      -->
+      <id>javafx</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.google.a2ui</groupId>
+          <artifactId>a2ui-java-swing-javafx</artifactId>
+          <version>${project.version}</version>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+</project>

@@ -64,6 +64,7 @@ To keep our codebase consistent and maintainable, we follow specific coding stan
 - **Python**: [Pyink](https://github.com/google/pyink) (Google style Black)
 - **Dart**: `dart format`
 - **Swift**: `swift-format`
+- **Java**: [google-java-format](https://github.com/google/google-java-format), run by the Spotless Maven plugin in `java/`
 
 You can use the provided script to format the entire repo or check formatting:
 
@@ -87,6 +88,7 @@ Please refer to the following guidelines for detailed information on styles:
 - **Python**: [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
 - **TypeScript**: [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html).
 - **Swift**: [Google Swift Style Guide](https://google.github.io/swift/)
+- **Java**: [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)
 - **License Headers**: required copyright notices.
 
 We expect all contributors to adhere to these styles.

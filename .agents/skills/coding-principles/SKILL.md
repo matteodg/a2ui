@@ -31,7 +31,7 @@ Before modifying or implementing code in any language, consult the authoritative
 
 ## Progressive Discoverability: Two-Level Subskill Routing
 
-Because the A2UI repository spans multiple languages (`typescript/`, `python/`, `dart/`, `swift/`) and shared specifications (`specification/`, `catalogs/`), agents must use a two-level progressive discovery workflow:
+Because the A2UI repository spans multiple languages (`typescript/`, `python/`, `dart/`, `swift/`, `java/`) and shared specifications (`specification/`, `catalogs/`), agents must use a two-level progressive discovery workflow:
 
 1. **Level 1 (Cross-Language Subskills)**: Activate language-agnostic principles that govern pull request scope, software design, public API boundaries, specification immutability, and changelogs across the entire monorepo.
 2. **Level 2 (Language-Specific Routing)**: Route by the programming languages modified in the diff to load only the subskills and language guides relevant to those languages.
@@ -48,7 +48,7 @@ git diff main --stat
 Identify both:
 
 - **Cross-cutting functional areas** impacted (public exports, specifications, catalogs, changelogs, PR structure).
-- **Programming languages and directories** touched (`typescript/`, `python/`, `dart/`, `swift/`, `samples/`, `tools/`).
+- **Programming languages and directories** touched (`typescript/`, `python/`, `dart/`, `swift/`, `java/`, `samples/`, `tools/`).
 
 ---
 
@@ -90,6 +90,7 @@ Inspect the file extensions and directories in `git diff main --stat` and follow
 | **Python** (Core, Agent SDK, Builders, Evaluators, Scripts)     | `*.py`, `python/`, `eval/`, `samples/agent/`, `tools/`, `scripts/`                       | Read the Python router: [`subskills/python/INDEX.md`](subskills/python/INDEX.md) to activate Python package architecture, facade conventions, typing, and verification subskills.                                              |
 | **Swift & SwiftUI** (Core, SwiftUI Adapter, iOS Sample)         | `*.swift`, `swift/`, `Package.swift`                                                     | Read the Swift & SwiftUI router: [`subskills/swift/INDEX.md`](subskills/swift/INDEX.md) to activate Swift target architecture, coding standards, and `Testing` subskills.                                                      |
 | **Dart & Flutter** (Core, Agent SDK, Flutter Adapter)           | `*.dart`, `dart/`, `samples/client/flutter/`, `pubspec.yaml`                             | Read the Dart & Flutter router: [`subskills/dart/INDEX.md`](subskills/dart/INDEX.md) to activate Dart analyzer rules, package versioning, and changelog subskills.                                                             |
+| **Java & Swing** (Core, Swing Adapter, Swing Sample)            | `*.java`, `java/`, `samples/client/swing/`, `pom.xml`                                    | Read the Java & Swing router: [`subskills/java/INDEX.md`](subskills/java/INDEX.md) to activate Maven build, module layout, event dispatch thread, and conformance harness rules.                                               |
 
 ---
 

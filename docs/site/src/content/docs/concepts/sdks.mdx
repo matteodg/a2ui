@@ -1,6 +1,6 @@
 ---
 title: 'SDKs'
-description: 'Official A2UI Core, Agent, and Renderer SDKs across TypeScript, Python, Dart, Swift, and Kotlin.'
+description: 'Official A2UI Core, Agent, and Renderer SDKs across TypeScript, Python, Dart, Swift, Kotlin, and Java.'
 ---
 
 Official A2UI SDKs are organized into three layers:
@@ -31,8 +31,9 @@ Every Agent SDK and Renderer SDK depends on its language's Core SDK, which imple
 | Dart       | [a2ui_core](https://pub.dev/packages/a2ui_core)                                                                                                                | v0.9.1,&nbsp;v1.0            | [dart/a2ui_core](https://github.com/a2ui-project/a2ui/tree/main/dart/a2ui_core)                     |
 | Swift      | [A2UISwiftCore](https://github.com/a2ui-project/a2ui/blob/main/Package.swift)<br/>[BasicCatalog](https://github.com/a2ui-project/a2ui/blob/main/Package.swift) | v0.9.1,&nbsp;v1.0            | [swift/core](https://github.com/a2ui-project/a2ui/tree/main/swift/core)                             |
 | Kotlin     | [androidx.a2ui](https://developer.android.com/jetpack/androidx/releases/a2ui)                                                                                  | v0.9.1                       | [AndroidX a2ui](https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:a2ui/)  |
+| Java       | Not published yet (`a2ui-java-core`, built from source)                                                                                                        | v1.0                         | [java/a2ui_core](https://github.com/a2ui-project/a2ui/tree/main/java/a2ui_core)                     |
 
-All v0.9.1 packages accept v0.9 wire envelopes and catalog IDs. Swift packages are distributed through Swift Package Manager from [`a2ui-project/a2ui`](https://github.com/a2ui-project/a2ui) (the `A2UISwiftCore` product exposes the `A2UICore` module), and the AndroidX group on Google Maven publishes the `a2ui-model` and `a2ui-engine` artifacts.
+All v0.9.1 packages accept v0.9 wire envelopes and catalog IDs. Swift packages are distributed through Swift Package Manager from [`a2ui-project/a2ui`](https://github.com/a2ui-project/a2ui) (the `A2UISwiftCore` product exposes the `A2UICore` module), and the AndroidX group on Google Maven publishes the `a2ui-model` and `a2ui-engine` artifacts. The Java modules need JDK 25 or later and are not on Maven Central: build them with the Maven wrapper in [`java/`](https://github.com/a2ui-project/a2ui/tree/main/java).
 
 Most applications install a Core SDK automatically through an [Agent SDK](#agent-sdk) or [Renderer SDK](#renderer-sdk), though you can depend on a Core SDK directly to build headless state processors or custom UI adapters. To implement a Core SDK in another language, read [`blueprints/modules`](https://github.com/a2ui-project/a2ui/tree/main/blueprints/modules) and validate against the YAML suites in [`conformance/core`](https://github.com/a2ui-project/a2ui/tree/main/conformance/core).
 
@@ -56,7 +57,7 @@ An Agent SDK connects a language model or agent runtime to the A2UI protocol whi
 | Python     | [a2ui-agent-sdk](https://pypi.org/project/a2ui-agent-sdk/)<br/>[a2ui-adk](https://pypi.org/project/a2ui-adk/) (ADK)<br/>[a2ui-a2a](https://pypi.org/project/a2ui-a2a/) (A2A) | v0.8,&nbsp;v0.9.1,&nbsp;v1.0 | [python/a2ui_agent](https://github.com/a2ui-project/a2ui/tree/main/python/a2ui_agent)<br/>[python/a2ui_adk](https://github.com/a2ui-project/a2ui/tree/main/python/a2ui_adk)<br/>[python/a2ui_a2a](https://github.com/a2ui-project/a2ui/tree/main/python/a2ui_a2a) |
 | Dart       | [a2ui_agent](https://pub.dev/packages/a2ui_agent)                                                                                                                            | v0.9.1,&nbsp;v1.0            | [dart/a2ui_agent](https://github.com/a2ui-project/a2ui/tree/main/dart/a2ui_agent)                                                                                                                                                                                 |
 
-Swift and Kotlin target client-side rendering; for legacy v0.8 and v0.9 JVM servers, [`kotlin/agent_sdk_legacy`](https://github.com/a2ui-project/a2ui/tree/main/kotlin/agent_sdk_legacy) remains in the repository.
+Swift, Kotlin, and Java target client-side rendering; for legacy v0.8 and v0.9 JVM servers, [`kotlin/agent_sdk_legacy`](https://github.com/a2ui-project/a2ui/tree/main/kotlin/agent_sdk_legacy) remains in the repository.
 
 ### Go and community SDKs
 
@@ -76,7 +77,7 @@ A Renderer SDK connects a Core SDK's resolved surface state to a client UI frame
 2. Evaluates [reactive data bindings](../data-binding/), nested collection scopes, relative JSON Pointers, and local two-way input edits.
 3. Executes [local catalog functions](../catalogs/#functions) and [reactive validation checks](../../specification/v1.0-a2ui/#component-validation--check-rules), enforcing v1.0 caller and user-activation rules.
 4. Builds capability and data-model sync metadata payloads for your transport layer, dispatches user action events and structured error messages, and handles v1.0 bidirectional function RPCs.
-5. Maps protocol accessibility attributes to host accessibility APIs across Flutter, Web WAI-ARIA, SwiftUI, and Jetpack Compose.
+5. Maps protocol accessibility attributes to host accessibility APIs across Flutter, Web WAI-ARIA, SwiftUI, Jetpack Compose, and Swing.
 
 ### Packages
 
@@ -88,6 +89,7 @@ A Renderer SDK connects a Core SDK's resolved surface state to a client UI frame
 | Angular         | [@a2ui/angular](https://www.npmjs.com/package/@a2ui/angular)                                                                                                                                  | v0.8,&nbsp;v0.9.1,&nbsp;v1.0 | [typescript/renderers/angular](https://github.com/a2ui-project/a2ui/tree/main/typescript/renderers/angular)                                                                                                                                                                                             |
 | SwiftUI         | [A2UISwiftUI](https://github.com/a2ui-project/a2ui/blob/main/Package.swift)<br/>[BasicCatalogSwiftUI](https://github.com/a2ui-project/a2ui/blob/main/Package.swift)                           | v0.9.1,&nbsp;v1.0            | [swift/swiftui](https://github.com/a2ui-project/a2ui/tree/main/swift/swiftui)                                                                                                                                                                                                                           |
 | Jetpack Compose | [androidx.a2ui.compose](https://developer.android.com/jetpack/androidx/releases/a2ui-compose)<br/>[material3-a2ui](https://developer.android.com/jetpack/androidx/releases/compose-material3) | v0.9.1                       | [AndroidX a2ui](https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:a2ui/) · [material3-a2ui](https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/material3/material3-a2ui/) · [Docs](https://developer.android.com/develop/ui/compose/agentic) |
+| Swing           | Not published yet (`a2ui-java-swing`, built from source)                                                                                                                                      | v1.0                         | [java/a2ui_swing](https://github.com/a2ui-project/a2ui/tree/main/java/a2ui_swing)                                                                                                                                                                                                                       |
 
 On Web, [`@a2ui/web_core`](https://www.npmjs.com/package/@a2ui/web_core) provides the shared Basic Catalog implementation used by React, Lit, and Angular, [`@a2ui/markdown-it`](https://www.npmjs.com/package/@a2ui/markdown-it) ([source](https://github.com/a2ui-project/a2ui/tree/main/typescript/renderers/markdown-it)) renders Markdown inside text components, and [`@a2ui/catalog-mcp`](https://www.npmjs.com/package/@a2ui/catalog-mcp) adds MCP app components (see [Call MCP Tools from A2UI](../../guides/mcp-catalog/)).
 

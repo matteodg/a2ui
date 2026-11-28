@@ -1,0 +1,1311 @@
+/*
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.google.a2ui.core.processing;
+
+import com.google.a2ui.core.catalog.A2uiMetadata;
+import com.google.a2ui.core.catalog.Catalog;
+import com.google.a2ui.core.catalog.ComponentApi;
+import com.google.a2ui.core.common.ProtocolVersion;
+import com.google.a2ui.core.common.Reactive;
+import com.google.a2ui.core.common.Uax31;
+import com.google.a2ui.core.exceptions.A2uiCatalogError;
+import com.google.a2ui.core.exceptions.A2uiDataError;
+import com.google.a2ui.core.exceptions.A2uiError;
+import com.google.a2ui.core.exceptions.A2uiErrorDetail;
+import com.google.a2ui.core.exceptions.A2uiExpressionError;
+import com.google.a2ui.core.exceptions.A2uiIntegrityError;
+import com.google.a2ui.core.exceptions.A2uiRecursionError;
+import com.google.a2ui.core.exceptions.A2uiStateError;
+import com.google.a2ui.core.exceptions.A2uiValidationError;
+import com.google.a2ui.core.internal.CatalogChecks;
+import com.google.a2ui.core.internal.CatalogSchemaIndex;
+import com.google.a2ui.core.internal.ComponentGraph;
+import com.google.a2ui.core.internal.ErrorFields;
+import com.google.a2ui.core.internal.GraphUpdateCheck;
+import com.google.a2ui.core.internal.Json;
+import com.google.a2ui.core.internal.Problem;
+import com.google.a2ui.core.resolution.DataContext;
+import com.google.a2ui.core.rpc.CallOptions;
+import com.google.a2ui.core.rpc.RpcHandler;
+import com.google.a2ui.core.state.ComponentModel;
+import com.google.a2ui.core.state.RendererAction;
+import com.google.a2ui.core.state.SurfaceComponentsModel;
+import com.google.a2ui.core.state.SurfaceGroupModel;
+import com.google.a2ui.core.state.SurfaceModel;
+import com.google.a2ui.core.validation.ValidationConfig;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Queue;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
+
+/**
+ * Reads the v1.0 messages of the agent, examines them and applies them to the surfaces of {@link
+ * #model()}.
+ *
+ * <p>The processor examines a full message before it changes a surface. Thus a message that it
+ * rejects changes nothing. In a batch, the messages before the rejected message stay applied. For a
+ * rejected message, the processor sends the {@code error} message of the protocol to its {@link
+ * OutboundMessageListener}, and then it throws the error.
+ *
+ * <p>A processor with a unified outbound listener also sends the listener each message that a
+ * surface has for the agent. It sends an {@code action} message for each event action that a
+ * surface reports to its {@code onAction}. It sends an {@code error} message for each failure that
+ * a surface reports to its {@code onError}, for example a binding that the core cannot evaluate.
+ * The listeners of the surfaces continue to receive their events.
+ *
+ * <p>The processor gives the {@code callRendererFunction} and the {@code agentFunctionResponse}
+ * messages to its {@link RpcHandler}, after it examined them. The handler runs the function that
+ * the agent calls and sends a {@code rendererFunctionResponse} message to the outbound listener.
+ * {@link #callAgentFunction(String, Map)} sends a {@code callAgentFunction} message to the same
+ * listener. These two messages always go to the outbound listener, with or without a unified
+ * outbound listener. Without a listener, a function that the agent calls runs and the processor
+ * sends no response, and a call to the agent fails.
+ *
+ * <p>A processor that has an outbound listener sets an agent function caller on each surface that
+ * it makes. Thus a binding, a check or an action of such a surface can call a function that its
+ * catalog does not implement. The surface sends the call to the agent through the RPC handler, with
+ * the default timeout of the handler. Without an outbound listener, such a call fails on the
+ * surface.
+ *
+ * <p>A processor is not thread-safe. Use a processor and its models from one thread. The answer to
+ * a call of a surface changes the nodes of the surface. Thus the processor gives the answer to the
+ * surface only on the thread that made the call. If the future of the call completes on a different
+ * thread, the processor keeps the answer and gives it at the start or at the end of the subsequent
+ * {@link #processMessages(Object)} call. Only a timeout of the default scheduler completes on a
+ * different thread. To get a timeout immediately, give the RPC handler a scheduler that runs its
+ * tasks on the thread of the processor: {@code
+ * rpc().setScheduler(RpcScheduler.onExecutor(executor))}.
+ *
+ * @param <C> the type of the components of the catalogs
+ */
+public final class MessageProcessor<C extends ComponentApi> {
+  /** The keys of a component that are not its properties. */
+  private static final Set<String> ENVELOPE_KEYS =
+      Set.of("id", "component", "@catalogId", "@metadata", "@accessibility", "@checks");
+
+  /** The envelope keys that v1.0 accepts without their {@code @}, apart from {@code catalogId}. */
+  private static final List<String> LEGACY_ENVELOPE_KEYS =
+      List.of("metadata", "accessibility", "checks");
+
+  /** The actions that are about one surface. */
+  private static final Set<String> SURFACE_ACTIONS =
+      Set.of("createSurface", "updateComponents", "updateDataModel", "deleteSurface");
+
+  /** The error codes whose {@code error} message tells the location of the problem. */
+  private static final Set<String> LOCATED_CODES =
+      Set.of("VALIDATION_FAILED", "UNALLOWED_PARENT", "UNALLOWED_CHILD");
+
+  private static final String CALL_RENDERER_FUNCTION = "callRendererFunction";
+
+  /** The keys whose text value is a JSON Pointer. */
+  private static final List<String> PATH_KEYS = List.of("path", "@path");
+
+  private final SurfaceGroupModel<C> model = new SurfaceGroupModel<>();
+  private final Map<String, Catalog<C, ?>> catalogs = new LinkedHashMap<>();
+  private final Map<String, Catalog<C, ?>> catalogsView = Collections.unmodifiableMap(catalogs);
+  private final ValidationConfig validationConfig;
+  private final OutboundMessageListener outboundListener;
+
+  /**
+   * The answers to the calls of the surfaces that arrived on a thread that did not make the call.
+   * The queue is thread-safe, because a timeout can add an answer from the thread of a scheduler.
+   */
+  private final Queue<Runnable> heldAnswers = new ConcurrentLinkedQueue<>();
+
+  private final RpcHandler rpc;
+  private final Map<Catalog<?, ?>, CatalogChecks> checks = new IdentityHashMap<>();
+  private final Map<Catalog<?, ?>, CatalogSchemaIndex> indexes = new IdentityHashMap<>();
+
+  /**
+   * The object that examines the component graph of each surface. A surface that the program does
+   * not use any more leaves the map.
+   */
+  private final Map<SurfaceModel<C>, GraphUpdateCheck> graphChecks = new WeakHashMap<>();
+
+  /**
+   * Makes a processor that uses {@link ValidationConfig#STRICT}.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   */
+  public MessageProcessor(Collection<? extends Catalog<C, ?>> catalogs) {
+    this(catalogs, ValidationConfig.STRICT);
+  }
+
+  /**
+   * Makes a processor.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @param validationConfig the problems to accept. A null value stops the catalog checks and the
+   *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
+   *     message envelope and to resolve each catalog.
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   */
+  public MessageProcessor(
+      Collection<? extends Catalog<C, ?>> catalogs, ValidationConfig validationConfig) {
+    this(catalogs, validationConfig, null);
+  }
+
+  /**
+   * Makes a processor that sends messages to the agent.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @param validationConfig the problems to accept. A null value stops the catalog checks and the
+   *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
+   *     message envelope and to resolve each catalog.
+   * @param outboundListener receives the messages for the agent, or null. The processor sends the
+   *     {@code error} message for each message that it rejects. It sends the message before it
+   *     throws the error. The listener also receives the messages of the function calls: {@code
+   *     rendererFunctionResponse} and {@code callAgentFunction}. The processor does not send the
+   *     actions and the failures of the surfaces.
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   */
+  public MessageProcessor(
+      Collection<? extends Catalog<C, ?>> catalogs,
+      ValidationConfig validationConfig,
+      OutboundMessageListener outboundListener) {
+    this(catalogs, validationConfig, outboundListener, false);
+  }
+
+  /**
+   * Makes a processor that sends messages to the agent, and that can send all of them to one
+   * listener.
+   *
+   * <p>With {@code unifiedOutbound}, the listener also receives an {@code action} message for each
+   * event action that a surface reports, and an {@code error} message for each failure that a
+   * surface reports after the processor accepted its messages. Each message is a read-only map of
+   * plain JSON values with the structure of the schema {@code renderer_to_agent.json}. Thus a
+   * transport needs only this listener. The listeners of {@code onAction} and of {@code onError}
+   * continue to receive their events.
+   *
+   * <p>The listener runs in the call that reports the action or the failure. An exception of the
+   * listener goes to the caller of that call.
+   *
+   * @param catalogs each catalog that this renderer supports. A surface can use the v1.0 catalogs.
+   * @param validationConfig the problems to accept. A null value stops the catalog checks and the
+   *     graph checks, for a renderer that trusts its agent. The processor continues to examine the
+   *     message envelope and to resolve each catalog.
+   * @param outboundListener receives the messages for the agent, or null. The processor sends the
+   *     {@code error} message for each message that it rejects. It sends the message before it
+   *     throws the error. The listener also receives the messages of the function calls: {@code
+   *     rendererFunctionResponse} and {@code callAgentFunction}.
+   * @param unifiedOutbound true to also send the actions and the failures of the surfaces to the
+   *     listener
+   * @throws A2uiCatalogError if two catalogs have the same ID
+   * @throws IllegalArgumentException if {@code unifiedOutbound} is true and there is no listener
+   */
+  public MessageProcessor(
+      Collection<? extends Catalog<C, ?>> catalogs,
+      ValidationConfig validationConfig,
+      OutboundMessageListener outboundListener,
+      boolean unifiedOutbound) {
+    Objects.requireNonNull(catalogs, "catalogs");
+    if (unifiedOutbound && outboundListener == null) {
+      throw new IllegalArgumentException("unifiedOutbound needs an outboundListener.");
+    }
+    this.validationConfig = validationConfig;
+    this.outboundListener = outboundListener;
+    for (Catalog<C, ?> catalog : catalogs) {
+      if (this.catalogs.put(catalog.id(), catalog) != null) {
+        throw new A2uiCatalogError("Two catalogs have the id '" + catalog.id() + "'.");
+      }
+    }
+    // The handler reads the catalogs through the view. Thus it gets each catalog that the
+    // processor adds subsequently.
+    this.rpc = new RpcHandler(catalogsView, outboundListener);
+    // This is also correct for a surface that the application deletes from the model.
+    model.onSurfaceDeleted().subscribe(rpc::cancelSurfaceCalls);
+    if (unifiedOutbound) {
+      // Each surface of the model sends its messages, also a surface that the application adds.
+      model
+          .onSurfaceCreated()
+          .subscribe(surface -> {
+            surface
+                .onAction()
+                .subscribe(action -> outboundListener.onMessage(actionMessage(action)));
+            surface
+                .onError()
+                .subscribe(error -> outboundListener.onMessage(errorMessage(error, null)));
+          });
+    }
+  }
+
+  /**
+   * Gets the surfaces that this processor made and did not delete.
+   *
+   * @return the model of the surfaces
+   */
+  public SurfaceGroupModel<C> model() {
+    return model;
+  }
+
+  /**
+   * Gets the handler of the function calls between this renderer and its agent.
+   *
+   * <p>The processor gives the {@code callRendererFunction} and the {@code agentFunctionResponse}
+   * messages to the handler. Use the handler to set the timeout, the scheduler of the timeouts and
+   * the test of the user activation, and to cancel the calls of a surface.
+   *
+   * @return the handler
+   */
+  public RpcHandler rpc() {
+    return rpc;
+  }
+
+  /**
+   * Calls a function of the agent with the default options. See {@link #callAgentFunction(String,
+   * Map, CallOptions)}.
+   *
+   * @param surfaceId the ID of the surface that makes the call
+   * @param call the call as the protocol writes it
+   * @return the future of the result
+   */
+  public CompletableFuture<Object> callAgentFunction(String surfaceId, Map<String, ?> call) {
+    return rpc.callAgentFunction(surfaceId, call);
+  }
+
+  /**
+   * Calls a function of the agent. This method is the same as {@link
+   * RpcHandler#callAgentFunction(String, Map, CallOptions)} of {@link #rpc()}. That method tells
+   * how the future ends and on which thread.
+   *
+   * @param surfaceId the ID of the surface that makes the call
+   * @param call the call as the protocol writes it: <code>{"@call": name, "catalogId": id, "args":
+   *     {...}}</code>. The arguments are resolved values.
+   * @param options the timeout and the ID of the call
+   * @return the future of the result. It fails with an {@code A2uiRpcError}.
+   */
+  public CompletableFuture<Object> callAgentFunction(
+      String surfaceId, Map<String, ?> call, CallOptions options) {
+    return rpc.callAgentFunction(surfaceId, call, options);
+  }
+
+  /**
+   * Gets the catalogs that this processor supports.
+   *
+   * @return the catalogs by ID. The map is a read-only view, and it shows each catalog that {@link
+   *     #addCatalog(Catalog)} adds subsequently.
+   */
+  public Map<String, Catalog<C, ?>> catalogs() {
+    return catalogsView;
+  }
+
+  /**
+   * Adds a catalog to the catalogs that this processor supports.
+   *
+   * <p>A surface that a subsequent {@code createSurface} message makes can use the catalog. Each
+   * surface that exists keeps the catalogs that it had at its creation. The agent can call the
+   * functions of the catalog with a {@code callRendererFunction} message.
+   *
+   * @param catalog the catalog to add
+   * @throws A2uiCatalogError if the processor already has a catalog with the same ID
+   */
+  public void addCatalog(Catalog<C, ?> catalog) {
+    Objects.requireNonNull(catalog, "catalog");
+    if (catalogs.containsKey(catalog.id())) {
+      throw new A2uiCatalogError(
+          "The processor already has a catalog with the id '" + catalog.id() + "'.");
+    }
+    catalogs.put(catalog.id(), catalog);
+  }
+
+  /**
+   * Processes a payload with the validation configuration of the processor. See {@link
+   * #processMessages(Object, ValidationConfig)}.
+   *
+   * @param payload one message, a list of messages, or a {@code {"messages": [...]}} wrapper, as
+   *     plain JSON values
+   * @throws A2uiValidationError if a message is not correct
+   * @throws A2uiCatalogError if a message needs a catalog that the processor or the surface does
+   *     not have
+   * @throws A2uiDataError if an {@code updateDataModel} message cannot write its path
+   */
+  public void processMessages(Object payload) {
+    processMessages(payload, validationConfig);
+  }
+
+  /**
+   * Processes a payload.
+   *
+   * <p>The payload is one message, a list of messages, or a {@code {"messages": [...]}} wrapper. A
+   * list can contain lists and wrappers. A null payload and an empty list contain no message. The
+   * processor ignores the other keys of a wrapper, but it examines their depth and their paths.
+   *
+   * <p>The error of a rejected message tells its surface or its function call, and the location and
+   * the details of its problems if it knows them. Before the processor throws the error, it sends
+   * the {@code error} message of the protocol to the outbound listener.
+   *
+   * @param payload the payload, as plain JSON values
+   * @param validationConfig the problems to accept. It replaces the configuration of the processor
+   *     for this call only. A null value stops the catalog checks and the graph checks.
+   * @throws A2uiValidationError if a message is not an object, has an incorrect envelope, or does
+   *     not agree with the schema of a catalog
+   * @throws A2uiIntegrityError if a message names a surface that does not exist, makes a surface
+   *     that exists, or gives a surface a component graph that is not correct. This error is an
+   *     {@code A2uiValidationError}.
+   * @throws A2uiRecursionError if a message or the containers around it nest values deeper than 50
+   *     levels. This error is an {@code A2uiValidationError}.
+   * @throws A2uiCatalogError if a message needs a catalog that the processor or the surface does
+   *     not have
+   * @throws A2uiDataError if an {@code updateDataModel} message cannot write its path
+   */
+  public void processMessages(Object payload, ValidationConfig validationConfig) {
+    deliverHeldAnswers();
+    try {
+      List<Map<String, Object>> messages = new ArrayList<>();
+      unwrap(payload, 0, messages);
+      for (int index = 0; index < messages.size(); index++) {
+        Map<String, Object> message = messages.get(index);
+        try {
+          process(index, message, validationConfig);
+        } catch (A2uiError e) {
+          writeMessageContext(e, message);
+          if (outboundListener != null) {
+            outboundListener.onMessage(errorMessage(e, actionOf(message)));
+          }
+          throw e;
+        }
+      }
+    } finally {
+      deliverHeldAnswers();
+    }
+  }
+
+  /**
+   * Makes a future that completes as a call to the agent completes, but only on the thread that
+   * made the call. The surface changes its nodes on the thread that completes this future.
+   *
+   * <p>If the call completes on a different thread, the processor holds the result. See {@link
+   * #deliverHeldAnswers()}.
+   */
+  private CompletableFuture<Object> onCallingThread(CompletableFuture<Object> call) {
+    Thread caller = Thread.currentThread();
+    CompletableFuture<Object> delivered = new CompletableFuture<>();
+    call.whenComplete((value, error) -> {
+      Runnable delivery =
+          () -> {
+            if (error != null) {
+              delivered.completeExceptionally(error);
+            } else {
+              delivered.complete(value);
+            }
+          };
+      if (Thread.currentThread() == caller) {
+        delivery.run();
+      } else {
+        heldAnswers.add(delivery);
+      }
+    });
+    return delivered;
+  }
+
+  /** Gives the surfaces each answer that arrived on a thread that did not make its call. */
+  private void deliverHeldAnswers() {
+    for (Runnable delivery = heldAnswers.poll(); delivery != null; delivery = heldAnswers.poll()) {
+      delivery.run();
+    }
+  }
+
+  /**
+   * Gets the capabilities of this renderer, without the inline catalogs. See {@link
+   * #getRendererCapabilities(Collection, boolean)}.
+   *
+   * @param versions the protocol versions to tell the capabilities for
+   * @return the capabilities by the wire value of each version, as read-only plain JSON values
+   * @throws A2uiValidationError if there is no version
+   */
+  public Map<String, Object> getRendererCapabilities(Collection<ProtocolVersion> versions) {
+    return getRendererCapabilities(versions, false);
+  }
+
+  /**
+   * Gets the capabilities of this renderer, for the agent.
+   *
+   * <p>For each version, the result has the IDs of the catalogs for that version, in sorted
+   * sequence, as {@code supportedCatalogIds}. If the caller asks for the inline catalogs, the
+   * result also has the document of each of these catalogs, as {@code inlineCatalogs}. A transport
+   * can write the result as JSON and send it.
+   *
+   * @param versions the protocol versions to tell the capabilities for
+   * @param includeInlineCatalogs true to also give the document of each catalog
+   * @return the capabilities by the wire value of each version, as read-only plain JSON values
+   * @throws A2uiValidationError if there is no version
+   */
+  public Map<String, Object> getRendererCapabilities(
+      Collection<ProtocolVersion> versions, boolean includeInlineCatalogs) {
+    Objects.requireNonNull(versions, "versions");
+    if (versions.isEmpty()) {
+      throw new A2uiValidationError("Renderer capabilities need at least one protocol version.");
+    }
+    Map<String, Object> capabilities = new LinkedHashMap<>();
+    for (ProtocolVersion version : versions) {
+      List<Catalog<C, ?>> supported =
+          catalogs.values().stream()
+              .filter(catalog -> catalog.protocolVersion().orElse(null) == version)
+              .sorted(Comparator.comparing((Catalog<C, ?> catalog) -> catalog.id()))
+              .toList();
+      Map<String, Object> entry = new LinkedHashMap<>();
+      entry.put("supportedCatalogIds", supported.stream().map(Catalog::id).toList());
+      if (includeInlineCatalogs) {
+        entry.put("inlineCatalogs", supported.stream().map(Catalog::toJson).toList());
+      }
+      capabilities.put(version.wireValue(), Collections.unmodifiableMap(entry));
+    }
+    return Collections.unmodifiableMap(capabilities);
+  }
+
+  /**
+   * Gets the data of each v1.0 surface that asked for its data model. See {@link
+   * #getRendererDataModel(ProtocolVersion)}.
+   *
+   * @return the data, or an empty result if no v1.0 surface asked for its data model
+   */
+  public Optional<Map<String, Object>> getRendererDataModel() {
+    return getRendererDataModel(ProtocolVersion.V1_0);
+  }
+
+  /**
+   * Gets the data of each surface that asked for its data model with {@code sendDataModel}. A
+   * transport attaches the result to the messages that it sends to the agent.
+   *
+   * <p>The result has the structure {@code {"version": ..., "surfaces": {id: data}}}. The data of a
+   * surface is its data model at the time of the call.
+   *
+   * @param version the protocol version of the surfaces to give
+   * @return the data as read-only plain JSON values, or an empty result if no surface of that
+   *     version asked for its data model
+   */
+  public Optional<Map<String, Object>> getRendererDataModel(ProtocolVersion version) {
+    Objects.requireNonNull(version, "version");
+    Map<String, Object> surfaces = new LinkedHashMap<>();
+    for (SurfaceModel<C> surface : model.all().values()) {
+      if (surface.sendDataModel() && surface.protocolVersion() == version) {
+        surfaces.put(surface.id(), surface.dataModel().get("/"));
+      }
+    }
+    if (surfaces.isEmpty()) {
+      return Optional.empty();
+    }
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("version", version.wireValue());
+    result.put("surfaces", Collections.unmodifiableMap(surfaces));
+    return Optional.of(Collections.unmodifiableMap(result));
+  }
+
+  /**
+   * Disposes the function calls, deletes each surface and removes each listener. Each call to the
+   * agent that waits for a response fails. See {@link RpcHandler#dispose()}.
+   */
+  public void dispose() {
+    rpc.dispose();
+    model.dispose();
+  }
+
+  /**
+   * Collects the messages of a payload.
+   *
+   * @param depth the number of containers around the payload. A list adds one level. A wrapper adds
+   *     two levels: the wrapper and its list.
+   */
+  private void unwrap(Object payload, int depth, List<Map<String, Object>> messages) {
+    if (depth > ComponentGraph.MAX_DEPTH) {
+      throw new A2uiRecursionError(
+          "Global recursion limit exceeded: the containers around the messages nest deeper than "
+              + ComponentGraph.MAX_DEPTH
+              + " levels.");
+    }
+    switch (payload) {
+      case null -> {}
+      case Collection<?> list -> list.forEach(item -> unwrap(item, depth + 1, messages));
+      case Map<?, ?> map when map.get("messages") instanceof Collection<?> wrapped -> {
+        // The other keys of a wrapper contain no message. They obey the same limits as a message.
+        Map<Object, Object> siblings = new LinkedHashMap<>(map);
+        siblings.remove("messages");
+        checkValue("the message wrapper", frozen(siblings), depth);
+        unwrap(wrapped, depth + 1, messages);
+      }
+      case Map<?, ?> map -> messages.add(frozen(map));
+      default ->
+          throw new A2uiValidationError(
+              "An A2UI message must be a JSON object, but got: " + payload);
+    }
+  }
+
+  /**
+   * Writes the function call and the surface of a rejected message to its error, unless the error
+   * already has them.
+   */
+  private static void writeMessageContext(A2uiError error, Map<String, Object> message) {
+    String action = actionOf(message);
+    Map<String, Object> body = action == null ? null : Json.asObject(message.get(action));
+    if (error.functionCallId().isEmpty()
+        && body != null
+        && body.get("functionCallId") instanceof String functionCallId) {
+      ErrorFields.functionCallId(error, functionCallId);
+    }
+    if (error.surfaceId().isEmpty()) {
+      if (body != null && body.get("surfaceId") instanceof String surfaceId) {
+        ErrorFields.surfaceId(error, surfaceId);
+      } else if (action != null && SURFACE_ACTIONS.contains(action)) {
+        // The error of a surface message that names no surface is about the surface "".
+        ErrorFields.surfaceId(error, "");
+      }
+    }
+  }
+
+  /** Makes the {@code action} message that tells the agent about an action of the user. */
+  private static Map<String, Object> actionMessage(RendererAction action) {
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("version", ProtocolVersion.V1_0.wireValue());
+    message.put("action", action.toJson());
+    return Collections.unmodifiableMap(message);
+  }
+
+  /**
+   * Makes the {@code error} message that tells the agent about a rejected message, or about a
+   * failure that a surface reports.
+   *
+   * @param action the action of the rejected message, or null
+   */
+  private static Map<String, Object> errorMessage(A2uiError error, String action) {
+    boolean isCall = CALL_RENDERER_FUNCTION.equals(action);
+    String code = error.errorCode().orElseGet(() -> defaultCode(error, isCall));
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("code", code);
+    // An error is about a function call or about a surface, not about the two. A failure that a
+    // surface reports is about a function call if the agent failed that call.
+    if ((isCall || action == null) && error.functionCallId().isPresent()) {
+      body.put("functionCallId", error.functionCallId().get());
+    } else {
+      body.put("surfaceId", error.surfaceId().orElse(""));
+    }
+    if (LOCATED_CODES.contains(code)) {
+      body.put("path", error.path().orElse("/"));
+    }
+    body.put("message", error.getMessage() == null ? "" : error.getMessage());
+    if (ErrorFields.hasContextForAgent(error) && !LOCATED_CODES.contains(code)) {
+      // The code of a function or of a component gave the path and the details. The schema of an
+      // error with a located code permits no other property. The schema of each other error
+      // permits more properties.
+      error.path().ifPresent(path -> body.put("path", path));
+      if (!error.details().isEmpty()) {
+        body.put("details", error.details().stream().map(MessageProcessor::detailJson).toList());
+      }
+    }
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("version", ProtocolVersion.V1_0.wireValue());
+    message.put("error", Collections.unmodifiableMap(body));
+    return Collections.unmodifiableMap(message);
+  }
+
+  /** Makes the JSON object of one problem of a failure. */
+  private static Map<String, Object> detailJson(A2uiErrorDetail detail) {
+    Map<String, Object> json = new LinkedHashMap<>();
+    json.put("path", detail.path());
+    json.put("code", detail.code());
+    json.put("message", detail.message());
+    return Collections.unmodifiableMap(json);
+  }
+
+  /** Gets the protocol error code of an error that has no code of its own. */
+  private static String defaultCode(A2uiError error, boolean isCall) {
+    if (isCall) {
+      return "INVALID_FUNCTION_CALL";
+    }
+    return switch (error) {
+      case A2uiCatalogError _ -> "CATALOG_NOT_FOUND";
+      case A2uiRecursionError _ -> "RECURSION_LIMIT_EXCEEDED";
+      case A2uiIntegrityError _ -> "INTEGRITY_ERROR";
+      case A2uiStateError _ -> "STATE_ERROR";
+      // The code VALIDATION_FAILED needs a path.
+      case A2uiValidationError invalid ->
+          invalid.path().isPresent() ? "VALIDATION_FAILED" : "SCHEMA_VALIDATION_FAILED";
+      case A2uiDataError _ -> "DATA_ERROR";
+      case A2uiExpressionError _ -> "EXPRESSION_ERROR";
+      default -> "INTERNAL_ERROR";
+    };
+  }
+
+  /** Gets the first action key of a message, or null if the message has no action. */
+  private static String actionOf(Map<String, Object> message) {
+    return message.keySet().stream()
+        .filter(MessageSchemas.ACTIONS::containsKey)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Makes the error of a message with an envelope that is not correct.
+   *
+   * @param index the index of the message in the batch
+   * @param pointer the JSON Pointer of the problem in the message
+   * @param code the type of the problem
+   */
+  private static A2uiValidationError malformed(
+      int index, String pointer, String code, String problem) {
+    return ErrorFields.details(
+        new A2uiValidationError(problem),
+        List.of(new A2uiErrorDetail(batchPath(index, pointer), code, problem)));
+  }
+
+  /**
+   * Gets the path of a location in one message of a batch, for example {@code messages.0.version}.
+   */
+  private static String batchPath(int index, String pointer) {
+    return "messages." + index + pointer.replace('/', '.');
+  }
+
+  private static Map<String, Object> frozen(Map<?, ?> raw) {
+    try {
+      return Json.asObject(Json.freeze(raw));
+    } catch (IllegalArgumentException e) {
+      throw new A2uiValidationError("The message is not JSON: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Examines one message and applies it.
+   *
+   * @param index the index of the message in the batch, for the details of an error
+   */
+  private void process(int index, Map<String, Object> received, ValidationConfig config) {
+    Map<String, Object> message = received;
+    List<String> actions =
+        message.keySet().stream().filter(MessageSchemas.ACTIONS::containsKey).toList();
+    Map<String, Object> update =
+        actions.equals(List.of("updateDataModel"))
+            ? Json.asObject(message.get("updateDataModel"))
+            : null;
+    if (update != null && update.get("path") instanceof String path) {
+      try {
+        checkPath("the updateDataModel message", path);
+      } catch (A2uiValidationError e) {
+        throw ErrorFields.path(e, "/path");
+      }
+    }
+    checkValue(
+        actions.size() == 1 ? "the " + actions.getFirst() + " message" : "the message", message, 0);
+
+    Object version = message.get("version");
+    if (version == null) {
+      throw malformed(
+          index, "/version", Problem.MISSING_FIELD, "Missing required version field in message.");
+    }
+    if (!(version instanceof String text)
+        || ProtocolVersion.tryParse(text).orElse(null) != ProtocolVersion.V1_0) {
+      throw new A2uiValidationError(
+          "Unsupported protocol version '" + version + "': this SDK processes version 1.0.");
+    }
+    if (actions.size() > 1) {
+      throw new A2uiValidationError(
+          "Message contains multiple conflicting update actions: " + actions);
+    }
+    if (actions.isEmpty()) {
+      Optional<String> otherVersion =
+          message.keySet().stream()
+              .filter(MessageSchemas.OTHER_VERSION_ACTIONS::contains)
+              .findFirst();
+      throw new A2uiValidationError(
+          otherVersion
+              .map(key ->
+                  "The action '"
+                      + key
+                      + "' is not supported in protocol version 1.0. Its actions are "
+                      + MessageSchemas.ACTIONS.keySet()
+                      + ".")
+              .orElseGet(() ->
+                  "Message has no action. Protocol version 1.0 has "
+                      + MessageSchemas.ACTIONS.keySet()
+                      + "."));
+    }
+    String action = actions.getFirst();
+
+    Map<String, Object> body = Json.asObject(message.get(action));
+    if (body == null) {
+      throw new A2uiValidationError("'" + action + "' must be an object.");
+    }
+    Object surfaceId = body.get("surfaceId");
+    if (surfaceId != null && !(surfaceId instanceof String)) {
+      throw malformed(
+          index,
+          "/" + action + "/surfaceId",
+          Problem.TYPE_MISMATCH,
+          "surfaceId must be a string in '" + action + "', but got: " + surfaceId);
+    }
+    // v1.0 removed `theme`. A renderer that accepts unknown elements removes the field. For each
+    // other renderer, the schema rejects it.
+    if (action.equals("createSurface") && body.containsKey("theme") && acceptsUnknown(config)) {
+      Map<String, Object> withoutTheme = new LinkedHashMap<>(body);
+      withoutTheme.remove("theme");
+      Map<String, Object> changed = new LinkedHashMap<>(message);
+      changed.put(action, withoutTheme);
+      message = changed;
+      body = withoutTheme;
+    }
+    List<Problem> problems = MessageSchemas.problems(action, message);
+    if (!problems.isEmpty()) {
+      A2uiValidationError error =
+          new A2uiValidationError("Invalid " + action + " message: " + listed(problems));
+      ErrorFields.details(
+          error,
+          problems.stream()
+              .map(problem ->
+                  new A2uiErrorDetail(
+                      batchPath(index, problem.path()), problem.code(), problem.message()))
+              .toList());
+      // The path of a problem in the body of the action is relative to the body.
+      String first = problems.getFirst().path();
+      if (first.startsWith("/" + action + "/")) {
+        ErrorFields.path(error, first.substring(action.length() + 1));
+      }
+      throw error;
+    }
+
+    switch (action) {
+      case "createSurface" -> createSurface(body, config);
+      case "updateComponents" -> updateComponents(body, config);
+      case "updateDataModel" -> updateDataModel(body);
+      // The deletion also cancels the calls of the surface to the agent.
+      case "deleteSurface" -> model.deleteSurface((String) body.get("surfaceId"));
+      case CALL_RENDERER_FUNCTION -> callRendererFunction(message, body);
+      case "agentFunctionResponse" -> rpc.handleAgentFunctionResponse(message);
+      default -> throw new A2uiStateError("This SDK does not handle '" + action + "' messages.");
+    }
+  }
+
+  /** Gives a function call of the agent to the RPC handler, with the context of its surface. */
+  private void callRendererFunction(Map<String, Object> message, Map<String, Object> body) {
+    DataContext context;
+    if (body.get("surfaceId") instanceof String surfaceId) {
+      // The handler refuses the call if the surface does not exist.
+      context = model.getSurface(surfaceId).map(DataContext::new).orElse(null);
+    } else {
+      // A call that names no surface runs in an empty surface. Thus it reads the data of no
+      // surface. The catalog that the call names is the default catalog of that surface.
+      Map<String, Catalog<C, ?>> available = v1Catalogs();
+      Map<String, Object> call = Json.asObject(body.get("callFunction"));
+      SurfaceModel<C> empty =
+          new SurfaceModel<>(
+              "",
+              ProtocolVersion.V1_0,
+              call == null ? null : available.get(call.get("catalogId")),
+              available,
+              false,
+              null);
+      context = new DataContext(empty);
+    }
+    rpc.handleCallRendererFunction(message, context);
+  }
+
+  /** Gets the catalogs that a v1.0 surface can use, by ID. */
+  private Map<String, Catalog<C, ?>> v1Catalogs() {
+    Map<String, Catalog<C, ?>> available = new LinkedHashMap<>();
+    catalogs.forEach((catalogId, catalog) -> {
+      if (catalog.protocolVersion().orElse(null) == ProtocolVersion.V1_0) {
+        available.put(catalogId, catalog);
+      }
+    });
+    return available;
+  }
+
+  private static boolean acceptsUnknown(ValidationConfig config) {
+    return config == null || config.allowUnknownElements();
+  }
+
+  private void createSurface(Map<String, Object> body, ValidationConfig config) {
+    String id = (String) body.get("surfaceId");
+    if (model.getSurface(id).isPresent()) {
+      throw new A2uiIntegrityError("Surface already exists: " + id);
+    }
+
+    Map<String, Catalog<C, ?>> available = v1Catalogs();
+    String catalogId = (String) body.get("catalogId");
+    Catalog<C, ?> defaultCatalog = catalogId == null ? null : available.get(catalogId);
+    if (catalogId != null && defaultCatalog == null) {
+      throw new A2uiCatalogError(
+          catalogs.containsKey(catalogId)
+              ? "Catalog not found: "
+                  + catalogId
+                  + " is not a v1.0 catalog, so surface '"
+                  + id
+                  + "' cannot use it."
+              : "Catalog not found: " + catalogId + " (createSurface for surface '" + id + "').");
+    }
+    SurfaceModel<C> surface =
+        new SurfaceModel<>(
+            id,
+            ProtocolVersion.V1_0,
+            defaultCatalog,
+            available,
+            Boolean.TRUE.equals(body.get("sendDataModel")),
+            metadataOf(body.get("metadata")));
+    // The data comes before the components, because the components bind to the data. The
+    // processor writes each top-level key separately. Thus one notification occurs for each key,
+    // and the write does not replace the root.
+    Map<String, Object> data = Json.asObject(body.get("dataModel"));
+    if (data != null) {
+      data.forEach((key, value) -> surface.dataModel().set("/" + Json.escapePointer(key), value));
+    }
+    List<Planned> planned =
+        body.get("components") instanceof List<?> components
+            ? plan(surface, components, config)
+            : List.of();
+    if (outboundListener != null) {
+      // Only a processor that can send a message can send a call of the surface to the agent.
+      surface.setAgentFunctionCaller(call -> onCallingThread(rpc.callAgentFunction(id, call)));
+    }
+    // All the checks are complete. Thus the surface becomes visible fully or not at all.
+    model.addSurface(surface);
+    write(surface, planned);
+  }
+
+  private void updateComponents(Map<String, Object> body, ValidationConfig config) {
+    SurfaceModel<C> surface = existingSurface((String) body.get("surfaceId"));
+    List<Planned> planned = plan(surface, (List<?>) body.get("components"), config);
+    Reactive.batch(() -> write(surface, planned));
+  }
+
+  private void updateDataModel(Map<String, Object> body) {
+    SurfaceModel<C> surface = existingSurface((String) body.get("surfaceId"));
+    String path = body.get("path") instanceof String text && !text.isEmpty() ? text : "/";
+    // The data model also accepts a relative path. The path of a message is always absolute.
+    if (!path.startsWith("/")) {
+      throw ErrorFields.path(
+          new A2uiValidationError(
+              "Invalid path syntax in the updateDataModel message: '"
+                  + path
+                  + "' is not a JSON Pointer that starts with '/'."),
+          "/path");
+    }
+    surface.dataModel().set(path, body.get("value"));
+  }
+
+  private SurfaceModel<C> existingSurface(String id) {
+    return model
+        .getSurface(id)
+        .orElseThrow(() -> new A2uiIntegrityError("Surface not found for message: " + id));
+  }
+
+  /**
+   * One component of an update. The processor examined it, and it is ready for a surface.
+   *
+   * @param normalized the component with each envelope key in its {@code @} form
+   */
+  private record Planned(
+      String id, String type, Catalog<?, ?> catalog, Map<String, Object> normalized) {}
+
+  /**
+   * Examines the components of an update against the surface as it is after the update. The method
+   * changes nothing.
+   *
+   * @return the components to write
+   */
+  private List<Planned> plan(SurfaceModel<C> surface, List<?> components, ValidationConfig config) {
+    Catalog<C, ?> defaultCatalog = surface.defaultCatalog().orElse(null);
+    boolean allowUnknown = acceptsUnknown(config);
+    List<Planned> planned = new ArrayList<>(components.size());
+    Set<String> ids = new HashSet<>();
+    List<Located> problems = new ArrayList<>();
+    for (int position = 0; position < components.size(); position++) {
+      int at = position;
+      Map<String, Object> component = Json.asObject(components.get(position));
+      String id = (String) component.get("id");
+      if (!ids.add(id)) {
+        throw new A2uiIntegrityError(
+            "Duplicate component ID '" + id + "' in one update of surface '" + surface.id() + "'.");
+      }
+      String type = (String) component.get("component");
+      if (config != null && !Uax31.isIdentifier(type)) {
+        problems.add(
+            new Located(
+                at,
+                new Problem(
+                    "/component",
+                    Problem.INVALID_VALUE,
+                    "Component type '" + type + "' must be a valid UAX #31 identifier")));
+      }
+      if (config != null && !Uax31.isIdentifier(id)) {
+        problems.add(
+            new Located(
+                at,
+                new Problem(
+                    "/id",
+                    Problem.INVALID_VALUE,
+                    "Component id '" + id + "' must be a valid UAX #31 identifier")));
+      }
+      Planned entry = normalize(surface, id, component);
+      planned.add(entry);
+      if (config != null) {
+        // A call that names no catalog runs in the default catalog of the surface. The catalog of
+        // the component examines such a call only if it is that default catalog.
+        boolean runsUnqualifiedCalls = entry.catalog() == defaultCatalog;
+        checksFor(entry.catalog())
+            .componentProblems(entry.normalized(), runsUnqualifiedCalls, allowUnknown)
+            .forEach(problem -> problems.add(new Located(at, problem)));
+      }
+      List<Problem> callProblems = new ArrayList<>();
+      checkCallCatalogs(surface, entry, entry.normalized(), "", config, allowUnknown, callProblems);
+      callProblems.forEach(problem -> problems.add(new Located(at, problem)));
+    }
+    if (!problems.isEmpty()) {
+      throw invalidComponents(surface, planned, problems);
+    }
+    if (config != null) {
+      List<ComponentGraph.Node> update = new ArrayList<>(planned.size());
+      for (int position = 0; position < planned.size(); position++) {
+        Planned entry = planned.get(position);
+        update.add(
+            node(
+                entry.id(),
+                entry.type(),
+                entry.catalog(),
+                entry.normalized(),
+                OptionalInt.of(position)));
+      }
+      graphCheckFor(surface).validate(update, surface.rootId(), config);
+    }
+    return planned;
+  }
+
+  /**
+   * One problem of a component of an update.
+   *
+   * @param position the index of the component in the update
+   * @param problem the problem, with a path that is relative to the component
+   */
+  private record Located(int position, Problem problem) {}
+
+  /**
+   * Makes the error for the problems of the components of an update.
+   *
+   * <p>The path of the error is the deepest location that contains each problem of the first
+   * component that is not correct. The details have each problem of each component.
+   */
+  private static A2uiValidationError invalidComponents(
+      SurfaceModel<?> surface, List<Planned> planned, List<Located> problems) {
+    String listed =
+        problems.stream()
+            .map(located -> {
+              Planned component = planned.get(located.position());
+              return "component '"
+                  + component.id()
+                  + "' ("
+                  + component.type()
+                  + "): "
+                  + located.problem();
+            })
+            .collect(Collectors.joining("; "));
+    int firstPosition = problems.getFirst().position();
+    List<String> shared = null;
+    for (Located located : problems) {
+      if (located.position() != firstPosition) {
+        continue;
+      }
+      List<String> place = List.of(located.problem().path().split("/", -1));
+      if (shared == null) {
+        shared = place;
+      } else {
+        int same = 0;
+        while (same < Math.min(shared.size(), place.size())
+            && shared.get(same).equals(place.get(same))) {
+          same++;
+        }
+        shared = shared.subList(0, same);
+      }
+    }
+    String below = String.join("/", shared);
+    A2uiValidationError error =
+        new A2uiValidationError("Invalid components for surface '" + surface.id() + "': " + listed);
+    ErrorFields.path(
+        error,
+        "/components/"
+            + firstPosition
+            + (below.endsWith("/") ? below.substring(0, below.length() - 1) : below));
+    return ErrorFields.details(
+        error, problems.stream().map(located -> located.problem().toDetail()).toList());
+  }
+
+  /**
+   * Resolves the catalog of a component, and gives the {@code @} form to each envelope key that
+   * v1.0 accepts without its {@code @}: {@code catalogId}, {@code metadata}, {@code accessibility}
+   * and {@code checks}. Such a key is an envelope key only if the schema of the component declares
+   * no property of that name.
+   */
+  private Planned normalize(SurfaceModel<C> surface, String id, Map<String, Object> component) {
+    String type = (String) component.get("component");
+    Map<String, Object> normalized = new LinkedHashMap<>(component);
+
+    // The default catalog of the surface makes the decision for `catalogId`, because the processor
+    // must read this key before it knows the catalog of the component.
+    Catalog<C, ?> defaultCatalog = surface.defaultCatalog().orElse(null);
+    if (!owns(defaultCatalog, type, "catalogId")) {
+      adoptLegacyKey(normalized, id, "catalogId");
+    }
+    Object catalogId = normalized.get("@catalogId");
+    if (normalized.containsKey("@catalogId") && !(catalogId instanceof String)) {
+      throw new A2uiValidationError(
+          "Component '" + id + "' has a @catalogId that is not a string: " + catalogId);
+    }
+    Catalog<C, ?> catalog = surface.resolveComponentCatalog((String) catalogId, id);
+    for (String key : LEGACY_ENVELOPE_KEYS) {
+      if (!owns(catalog, type, key)) {
+        adoptLegacyKey(normalized, id, key);
+      }
+    }
+    return new Planned(id, type, catalog, Collections.unmodifiableMap(normalized));
+  }
+
+  private boolean owns(Catalog<?, ?> catalog, String type, String key) {
+    return catalog != null && indexFor(catalog).ownsLegacyEnvelopeName(type, key);
+  }
+
+  /** Moves the value of an envelope key without {@code @} to the key with {@code @}. */
+  private static void adoptLegacyKey(Map<String, Object> component, String id, String key) {
+    if (!component.containsKey(key)) {
+      return;
+    }
+    if (component.containsKey("@" + key)) {
+      throw new A2uiValidationError(
+          "Component '"
+              + id
+              + "' has both '@"
+              + key
+              + "' and '"
+              + key
+              + "', which mean the same in the envelope.");
+    }
+    component.put("@" + key, component.remove(key));
+  }
+
+  /**
+   * Resolves the catalog of each function call in a node or below it.
+   *
+   * <p>A call that cannot run is an error, with or without a validation configuration. With a
+   * configuration, the method also examines each call that the checks of the component did not
+   * examine, because the call runs in a different catalog. It examines such a call against the
+   * catalog in which the call runs.
+   *
+   * @param owner the component that contains the node
+   * @param path the JSON Pointer of the node in the component
+   * @param problems the list that receives the problems
+   */
+  private void checkCallCatalogs(
+      SurfaceModel<C> surface,
+      Planned owner,
+      Object node,
+      String path,
+      ValidationConfig config,
+      boolean allowUnknown,
+      List<Problem> problems) {
+    if (node instanceof List<?> list) {
+      for (int index = 0; index < list.size(); index++) {
+        checkCallCatalogs(
+            surface, owner, list.get(index), path + "/" + index, config, allowUnknown, problems);
+      }
+      return;
+    }
+    Map<String, Object> map = Json.asObject(node);
+    if (map == null) {
+      return;
+    }
+    if (map.get("@call") instanceof String name && !name.startsWith("@")) {
+      Object catalogId = map.get("catalogId");
+      if (catalogId != null && !(catalogId instanceof String)) {
+        throw new A2uiValidationError(
+            path + ": the catalogId of the call to '" + name + "' must be a string");
+      }
+      Catalog<C, ?> target =
+          surface.resolveCatalog((String) catalogId, "Function call '" + name + "'");
+      boolean examinedByOwner =
+          catalogId == null
+              ? owner.catalog() == surface.defaultCatalog().orElse(null)
+              : catalogId.equals(owner.catalog().id());
+      if (config != null && !examinedByOwner) {
+        problems.addAll(checksFor(target).callProblems(map, path, allowUnknown));
+      }
+    }
+    map.forEach((key, value) ->
+        checkCallCatalogs(
+            surface,
+            owner,
+            value,
+            path + "/" + Json.escapePointer(key),
+            config,
+            allowUnknown,
+            problems));
+  }
+
+  /**
+   * Examines the parts of a value that need no catalog: the depth of the values and the syntax of
+   * the data paths.
+   *
+   * @param subject the description of the value that contains the node, for the messages
+   * @param depth the depth of the node. A message has the depth 0.
+   */
+  private static void checkValue(String subject, Object node, int depth) {
+    if (depth > ComponentGraph.MAX_DEPTH) {
+      throw new A2uiRecursionError(
+          "Global recursion limit exceeded: "
+              + subject
+              + " nests values deeper than "
+              + ComponentGraph.MAX_DEPTH
+              + " levels.");
+    }
+    if (node instanceof List<?> list) {
+      list.forEach(item -> checkValue(subject, item, depth + 1));
+    } else if (node instanceof Map<?, ?> map) {
+      // v1.0 binds data with `@path`. A child list template and `updateDataModel` use `path`.
+      for (String key : PATH_KEYS) {
+        if (map.get(key) instanceof String path) {
+          checkPath(subject, path);
+        }
+      }
+      map.values().forEach(value -> checkValue(subject, value, depth + 1));
+    }
+  }
+
+  /**
+   * Examines the escapes of a JSON Pointer.
+   *
+   * @throws A2uiValidationError if the path has a {@code ~} that is not the start of {@code ~0} or
+   *     {@code ~1}
+   */
+  private static void checkPath(String subject, String path) {
+    for (int tilde = path.indexOf('~'); tilde >= 0; tilde = path.indexOf('~', tilde + 1)) {
+      char next = tilde + 1 < path.length() ? path.charAt(tilde + 1) : ' ';
+      if (next != '0' && next != '1') {
+        throw new A2uiValidationError(
+            "Invalid path syntax in "
+                + subject
+                + ": '"
+                + path
+                + "' has a '~' that is not followed by '0' or '1'.");
+      }
+    }
+  }
+
+  /**
+   * Gets the object that examines the component graph of a surface for each update. It keeps the
+   * result of an examination. Thus it does not read the full surface for each small update.
+   */
+  private GraphUpdateCheck graphCheckFor(SurfaceModel<C> surface) {
+    return graphChecks.computeIfAbsent(
+        surface,
+        key ->
+            new GraphUpdateCheck(
+                key.componentsModel(),
+                existing ->
+                    node(
+                        existing.id(),
+                        existing.type(),
+                        existing.catalog(),
+                        existing.properties(),
+                        OptionalInt.empty())));
+  }
+
+  /**
+   * Writes the planned components. If the processor examined their graph, the object that examined
+   * it follows the write.
+   */
+  private void write(SurfaceModel<C> surface, List<Planned> planned) {
+    GraphUpdateCheck check = graphChecks.get(surface);
+    if (check == null) {
+      apply(surface, planned);
+    } else {
+      check.apply(() -> apply(surface, planned));
+    }
+  }
+
+  private ComponentGraph.Node node(
+      String id,
+      String type,
+      Catalog<?, ?> catalog,
+      Map<String, Object> values,
+      OptionalInt position) {
+    return new ComponentGraph.Node(
+        id,
+        type,
+        catalog.components().get(type),
+        indexFor(catalog).children(type, values),
+        position);
+  }
+
+  private void apply(SurfaceModel<C> surface, List<Planned> planned) {
+    SurfaceComponentsModel components = surface.componentsModel();
+    for (Planned entry : planned) {
+      Map<String, Object> normalized = entry.normalized();
+      Map<String, Object> properties = new LinkedHashMap<>(normalized);
+      properties.keySet().removeAll(ENVELOPE_KEYS);
+      A2uiMetadata metadata = metadataOf(normalized.get("@metadata"));
+      Map<String, Object> accessibility = Json.asObject(normalized.get("@accessibility"));
+      List<?> rules = normalized.get("@checks") instanceof List<?> list ? list : null;
+
+      ComponentModel existing = components.get(entry.id()).orElse(null);
+      // A component with a different type or a different catalog is a different component with
+      // the same ID. Thus the processor replaces it, and a view can discard its state.
+      if (existing != null
+          && existing.type().equals(entry.type())
+          && existing.catalog() == entry.catalog()) {
+        existing.replaceDefinition(properties, metadata, accessibility, rules);
+      } else {
+        components.removeComponent(entry.id());
+        components.addComponent(
+            new ComponentModel(
+                entry.id(),
+                entry.type(),
+                entry.catalog(),
+                properties,
+                metadata,
+                accessibility,
+                rules));
+      }
+    }
+  }
+
+  private static A2uiMetadata metadataOf(Object raw) {
+    Map<String, Object> metadata = Json.asObject(raw);
+    return metadata == null
+        ? null
+        : new A2uiMetadata(Optional.ofNullable(Json.asObject(metadata.get("extensions"))));
+  }
+
+  private static String listed(List<Problem> problems) {
+    return problems.stream().map(Problem::toString).collect(Collectors.joining("; "));
+  }
+
+  private CatalogChecks checksFor(Catalog<?, ?> catalog) {
+    return checks.computeIfAbsent(catalog, CatalogChecks::new);
+  }
+
+  private CatalogSchemaIndex indexFor(Catalog<?, ?> catalog) {
+    return indexes.computeIfAbsent(catalog, CatalogSchemaIndex::new);
+  }
+}

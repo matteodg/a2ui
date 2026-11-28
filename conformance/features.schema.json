@@ -21,6 +21,7 @@
         "ts-web-core",
         "dart-core",
         "swift-core",
+        "java-core",
         "python-agent",
         "python-a2a",
         "python-adk",
@@ -31,6 +32,7 @@
         "angular-renderer",
         "flutter-renderer",
         "swiftui-renderer",
+        "swing-renderer",
         "markdown-it-renderer"
       ],
       "description": "Identifier of a conformance harness claiming support for a feature."
